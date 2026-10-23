@@ -105,7 +105,26 @@ static void WCPresentTriggerDistanceEditor(UIViewController *presenter) {
     [presenter presentViewController:alert animated:YES completion:nil];
 }
 
-#pragma mark - Input swipe action picker
+#pragma mark - Input action options
+
+static NSArray<NSDictionary *> *WCInputActionOptions(void) {
+    return @[
+        @{ @"title": @"不设置", @"value": @(WCInputActionNone) },
+        @{ @"title": @"清空", @"value": @(WCInputActionClear) },
+        @{ @"title": @"粘贴", @"value": @(WCInputActionPaste) },
+        @{ @"title": @"复制", @"value": @(WCInputActionCopy) },
+        @{ @"title": @"剪切", @"value": @(WCInputActionCut) },
+    ];
+}
+
+static NSString *WCInputActionName(NSInteger action) {
+    for (NSDictionary *option in WCInputActionOptions()) {
+        if ([option[@"value"] integerValue] == action) return option[@"title"];
+    }
+    return @"清空";
+}
+
+#pragma mark - Input action picker
 
 static void WCPresentInputSwipeActionPicker(UIViewController *presenter, NSString *title, NSString *defaultsKey) {
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
@@ -176,23 +195,6 @@ static WCRow *WCInputActionRow(NSString *title, NSString *key) {
     return row;
 }
 
-static NSArray<NSDictionary *> *WCInputActionOptions(void) {
-    return @[
-        @{ @"title": @"不设置", @"value": @(WCInputActionNone) },
-        @{ @"title": @"清空", @"value": @(WCInputActionClear) },
-        @{ @"title": @"粘贴", @"value": @(WCInputActionPaste) },
-        @{ @"title": @"复制", @"value": @(WCInputActionCopy) },
-        @{ @"title": @"剪切", @"value": @(WCInputActionCut) },
-    ];
-}
-
-static NSString *WCInputActionName(NSInteger action) {
-    for (NSDictionary *option in WCInputActionOptions()) {
-        if ([option[@"value"] integerValue] == action) return option[@"title"];
-    }
-    return @"清空";
-}
-
 static NSString *WCRowDetailText(WCRow *row) {
     NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
     switch (row.kind) {
@@ -236,7 +238,7 @@ static NSString *kOtherCollapseKey = @"com.qiu7c.wcgesture.settings.collapse.oth
     [super viewDidLoad];
     self.title = @"WCGesture";
     self.tableView.backgroundColor = [UIColor systemGroupedBackgroundColor];
-    self.tableView.sectionHeaderTopPadding = 0;
+    if (@available(iOS 15.0, *)) self.tableView.sectionHeaderTopPadding = 0;
     self.tableView.rowHeight = UITableViewAutomaticDimension;
     self.tableView.estimatedRowHeight = 48;
     [self rebuildSections];
