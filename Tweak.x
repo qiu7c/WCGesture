@@ -221,13 +221,6 @@ static UIWindow *WCActiveWindow(void) {
     return nil;
 }
 
-static UIViewController *WCTopViewController(void) {
-    UIWindow *window = WCActiveWindow();
-    UIViewController *root = window.rootViewController;
-    while (root.presentedViewController) root = root.presentedViewController;
-    return root;
-}
-
 #pragma mark - Navigation return gesture detection
 
 static UIViewController *WCViewControllerForResponder(id responderObject) {
