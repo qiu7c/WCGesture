@@ -191,6 +191,43 @@ static CGFloat WCReplySwipeTriggerDistance(void) {
     return MIN(100.0, MAX(36.0, value));
 }
 
+#pragma mark - Active window (multi-scene safe)
+
+// keyWindow is deprecated since iOS 13 and compiled with -Werror; this walks
+// connected scenes the same way WCAtlas does, with a windows fallback.
+static UIWindow *WCActiveWindow(void) {
+    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+        if (scene.activationState != UISceneActivationStateForegroundActive ||
+            ![scene isKindOfClass:[UIWindowScene class]]) continue;
+        NSArray<UIWindow *> *windows = ((UIWindowScene *)scene).windows;
+        for (UIWindow *window in windows) {
+            NSString *className = NSStringFromClass(window.class);
+            if (window.isKeyWindow && window.windowLevel == UIWindowLevelNormal &&
+                ![className containsString:@"iConsole"]) return window;
+        }
+        for (UIWindow *window in windows) {
+            NSString *className = NSStringFromClass(window.class);
+            if (!window.hidden && window.alpha > 0.0 && window.windowLevel == UIWindowLevelNormal &&
+                ![className containsString:@"iConsole"]) return window;
+        }
+    }
+    id windows = WCTweakSafeValue(UIApplication.sharedApplication, @"windows");
+    if ([windows isKindOfClass:[NSArray class]]) {
+        for (UIWindow *window in windows) {
+            if (!window.hidden && window.alpha > 0.0 && window.windowLevel == UIWindowLevelNormal &&
+                ![NSStringFromClass(window.class) containsString:@"iConsole"]) return window;
+        }
+    }
+    return nil;
+}
+
+static UIViewController *WCTopViewController(void) {
+    UIWindow *window = WCActiveWindow();
+    UIViewController *root = window.rootViewController;
+    while (root.presentedViewController) root = root.presentedViewController;
+    return root;
+}
+
 #pragma mark - Navigation return gesture detection
 
 static UIViewController *WCViewControllerForResponder(id responderObject) {
@@ -785,7 +822,7 @@ static void WCSynchronizeReplyGesturesInView(UIView *view) {
 }
 
 static void WCSynchronizeVisibleReplyGestures(void) {
-    UIWindow *window = [UIApplication sharedApplication].keyWindow;
+    UIWindow *window = WCActiveWindow();
     if (window) WCSynchronizeReplyGesturesInView(window);
 }
 
@@ -1030,7 +1067,7 @@ static void WCSynchronizeVisibleReplyGestures(void) {
             dispatch_async(dispatch_get_main_queue(), ^{
                 WCSynchronizeVisibleReplyGestures();
                 // Re-sync input swipe on the active chat too.
-                UIWindow *window = [UIApplication sharedApplication].keyWindow;
+                UIWindow *window = WCActiveWindow();
                 if (window) {
                     Class growClass = NSClassFromString(@"MMGrowTextView");
                     if (growClass) {

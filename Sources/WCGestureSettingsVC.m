@@ -28,8 +28,26 @@ static BOOL WCIsSelfActionKey(NSString *key) {
            [key isEqualToString:WCMessageTripleTapSelfActionKey];
 }
 
+static UIWindow *WCActiveWindow(void) {
+    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+        if (scene.activationState != UISceneActivationStateForegroundActive ||
+            ![scene isKindOfClass:[UIWindowScene class]]) continue;
+        for (UIWindow *window in ((UIWindowScene *)scene).windows) {
+            NSString *className = NSStringFromClass(window.class);
+            if (window.isKeyWindow && window.windowLevel == UIWindowLevelNormal &&
+                ![className containsString:@"iConsole"]) return window;
+        }
+        for (UIWindow *window in ((UIWindowScene *)scene).windows) {
+            NSString *className = NSStringFromClass(window.class);
+            if (!window.hidden && window.alpha > 0.0 && window.windowLevel == UIWindowLevelNormal &&
+                ![className containsString:@"iConsole"]) return window;
+        }
+    }
+    return nil;
+}
+
 static UIViewController *WCTopViewController(void) {
-    UIViewController *root = [UIApplication sharedApplication].keyWindow.rootViewController;
+    UIViewController *root = WCActiveWindow().rootViewController;
     while (root.presentedViewController) root = root.presentedViewController;
     return root;
 }
@@ -204,7 +222,7 @@ void WCGesturePresentSettings(UIViewController *presenter) {
 
 static UIViewController *WCFindWeChatRootController(void) {
     Class rootVCClass = NSClassFromString(@"RootViewController");
-    UIViewController *root = [UIApplication sharedApplication].keyWindow.rootViewController;
+    UIViewController *root = WCActiveWindow().rootViewController;
     if (rootVCClass && [root isKindOfClass:rootVCClass]) return root;
     while (root.presentedViewController) root = root.presentedViewController;
     return root;
