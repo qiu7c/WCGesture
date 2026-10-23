@@ -71,6 +71,10 @@
 
 #pragma mark - KVC helpers
 
+// Defined later in the global-gesture section; forward-declared for the
+// Moments double-tap handler which appears earlier in the file.
+static void WCPlayConfiguredHaptic(void);
+
 static id WCTweakSafeValue(id object, NSString *key) {
     if (!object || key.length == 0) return nil;
     @try {
