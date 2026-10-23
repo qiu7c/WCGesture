@@ -6,6 +6,9 @@ NS_ASSUME_NONNULL_BEGIN
 /// Master switch key. When OFF, every gesture feature is disabled.
 FOUNDATION_EXPORT NSString *const WCGestureEnabledKey;
 
+/// User-customizable plugin display name shown in WeChat's plugin manager.
+FOUNDATION_EXPORT NSString *const WCPluginNameKey;
+
 /// Message-gesture feature keys (left/right swipe, double/triple tap on bubbles).
 FOUNDATION_EXPORT NSString *const WCReplySwipeEnabledKey;
 FOUNDATION_EXPORT NSString *const WCReplySwipeSelfActionKey;
@@ -29,6 +32,11 @@ FOUNDATION_EXPORT NSString *const WCInputTripleTapActionKey;
 FOUNDATION_EXPORT NSString *const WCMomentsDoubleTapLikeKey;
 FOUNDATION_EXPORT NSString *const WCMomentsLikeHapticKey;
 
+/// Global multi-finger long-press (any WeChat page).
+FOUNDATION_EXPORT NSString *const WCGlobalGestureEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGlobalTwoFingerActionKey;
+FOUNDATION_EXPORT NSString *const WCGlobalThreeFingerActionKey;
+
 /// Input-box gesture action enum (shared by swipe and multi-tap).
 typedef NS_ENUM(NSInteger, WCInputAction) {
     WCInputActionNone = 0,
@@ -49,6 +57,17 @@ typedef NS_ENUM(NSInteger, WCReplySwipeAction) {
     WCReplySwipeActionCopy = 3,
     WCReplySwipeActionDelete = 4,
     WCReplySwipeActionRepeat = 5,
+};
+
+/// Global multi-finger long-press action.
+typedef NS_ENUM(NSInteger, WCGlobalAction) {
+    WCGlobalActionNone = 0,
+    WCGlobalActionScreenshot = 1,  // 截图当前页面
+    WCGlobalActionBack = 2,        // 返回上一页
+    WCGlobalActionLockScreen = 3,  // 锁屏
+    WCGlobalActionScanQR = 4,      // 扫描屏幕二维码
+    WCGlobalActionMenu = 5,        // 弹快捷菜单
+    WCGlobalActionJump = 6,        // 跳转指定 view 页面
 };
 
 /// Registers the default values for all keys once per process.

@@ -1,6 +1,7 @@
 #import "WCGestureConfig.h"
 
 NSString *const WCGestureEnabledKey = @"com.qiu7c.wcgesture.enabled";
+NSString *const WCPluginNameKey = @"com.qiu7c.wcgesture.plugin-name";
 
 NSString *const WCReplySwipeEnabledKey = @"com.qiu7c.wcgesture.chat.reply-swipe";
 NSString *const WCReplySwipeSelfActionKey = @"com.qiu7c.wcgesture.chat.reply-swipe.self-action";
@@ -22,6 +23,10 @@ NSString *const WCInputTripleTapActionKey = @"com.qiu7c.wcgesture.chat.input-ges
 NSString *const WCMomentsDoubleTapLikeKey = @"com.qiu7c.wcgesture.moments.double-tap-like";
 NSString *const WCMomentsLikeHapticKey = @"com.qiu7c.wcgesture.moments.like-haptic";
 
+NSString *const WCGlobalGestureEnabledKey = @"com.qiu7c.wcgesture.global.enabled";
+NSString *const WCGlobalTwoFingerActionKey = @"com.qiu7c.wcgesture.global.two-finger-action";
+NSString *const WCGlobalThreeFingerActionKey = @"com.qiu7c.wcgesture.global.three-finger-action";
+
 NSString *const WCGestureDidChangeNotification = @"WCGestureDidChangeNotification";
 
 void WCGestureRegisterDefaults(void) {
@@ -29,6 +34,7 @@ void WCGestureRegisterDefaults(void) {
     dispatch_once(&onceToken, ^{
         NSDictionary *defaults = @{
             WCGestureEnabledKey: @YES,
+            WCPluginNameKey: @"微信手势",
             WCReplySwipeEnabledKey: @NO,
             WCReplySwipeSelfActionKey: @(WCReplySwipeActionQuote),
             WCReplySwipeOtherActionKey: @(WCReplySwipeActionQuote),
@@ -46,6 +52,9 @@ void WCGestureRegisterDefaults(void) {
             WCInputTripleTapActionKey: @(WCInputActionNone),
             WCMomentsDoubleTapLikeKey: @NO,
             WCMomentsLikeHapticKey: @YES,
+            WCGlobalGestureEnabledKey: @NO,
+            WCGlobalTwoFingerActionKey: @(WCGlobalActionNone),
+            WCGlobalThreeFingerActionKey: @(WCGlobalActionNone),
         };
         [[NSUserDefaults standardUserDefaults] registerDefaults:defaults];
     });

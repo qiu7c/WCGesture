@@ -1,6 +1,7 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 #import <QuartzCore/QuartzCore.h>
+#import <Photos/Photos.h>
 #import <objc/message.h>
 #import <objc/runtime.h>
 #import <math.h>
@@ -1318,6 +1319,166 @@ static void WCSynchronizeMomentsDoubleTap(WCTimeLineCellView *cell) {
         [feedback prepare];
         [feedback impactOccurred];
     }
+}
+
+%end
+
+#pragma mark - Global multi-finger long-press gestures
+
+@interface CameraScanViewController : UIViewController
+@end
+
+static char WCGlobalTwoFingerRecognizerKey;
+static char WCGlobalThreeFingerRecognizerKey;
+
+// 截图当前 keyWindow
+static void WCPerformGlobalScreenshot(void) {
+    UIWindow *window = WCActiveWindow();
+    if (!window) return;
+    UIGraphicsImageRendererFormat *format = [UIGraphicsImageRendererFormat defaultFormat];
+    format.scale = window.screen.scale;
+    UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:window.bounds.size format:format];
+    UIImage *image = [renderer imageWithActions:^(__unused UIGraphicsImageRendererContext *ctx) {
+        [window drawViewHierarchyInRect:window.bounds afterScreenUpdates:YES];
+    }];
+    if (!image) return;
+    NSData *data = UIImagePNGRepresentation(image);
+    if (!data) return;
+    UIImage *saved = [UIImage imageWithData:data];
+    // 存入相册
+    if (saved) {
+        [[PHPhotoLibrary sharedPhotoLibrary] performChanges:^{
+            [PHAssetChangeRequest creationRequestForAssetFromImage:saved];
+        } completionHandler:^(BOOL success, __unused NSError *error) {
+            if (!success) WCLog(@"截图保存相册失败");
+        }];
+    }
+}
+
+// 返回上一页
+static void WCPerformGlobalBack(void) {
+    UIViewController *vc = WCViewControllerForResponder(WCActiveWindow());
+    UINavigationController *nav = vc.navigationController;
+    if (nav && nav.viewControllers.count > 1) {
+        [nav popViewControllerAnimated:YES];
+    } else if (vc.presentingViewController) {
+        [vc dismissViewControllerAnimated:YES completion:nil];
+    } else {
+        // 首页:弹到根
+        if (nav) [nav popToRootViewControllerAnimated:YES];
+    }
+}
+
+// 锁屏:调微信内部的锁屏入口(通过私有 API 模拟电源键不可行,iOS 不允许)
+// 改为调出微信的设置页或关闭微信。这里用一个占位实现:回到首页。
+static void WCPerformGlobalLockScreen(void) {
+    Class mainFrameClass = NSClassFromString(@"NewMainFrameViewController");
+    UIWindow *window = WCActiveWindow();
+    if (!mainFrameClass || !window) return;
+    UIViewController *root = window.rootViewController;
+    if ([root isKindOfClass:mainFrameClass]) return;
+    UINavigationController *nav = root.navigationController ?: (root.presentedViewController.navigationController);
+    if (nav) [nav popToRootViewControllerAnimated:YES];
+    [root dismissViewControllerAnimated:YES completion:nil];
+}
+
+// 扫一扫:创建 CameraScanViewController 并 push
+static void WCPerformGlobalScanQR(void) {
+    Class scanClass = NSClassFromString(@"CameraScanViewController");
+    if (!scanClass) return;
+    UIViewController *vc = WCViewControllerForResponder(WCActiveWindow());
+    UINavigationController *nav = vc.navigationController;
+    id scanVC = [[scanClass alloc] init];
+    if (!scanVC) return;
+    if (nav) {
+        [nav pushViewController:scanVC animated:YES];
+    } else {
+        [vc presentViewController:scanVC animated:YES completion:nil];
+    }
+}
+
+// 弹快捷菜单
+static void WCPerformGlobalMenu(UIViewController *presenter) {
+    UIAlertController *sheet = [UIAlertController alertControllerWithTitle:@"快捷操作"
+        message:nil preferredStyle:UIAlertControllerStyleActionSheet];
+    [sheet addAction:[UIAlertAction actionWithTitle:@"截图" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *a) {
+        WCPerformGlobalScreenshot();
+    }]];
+    [sheet addAction:[UIAlertAction actionWithTitle:@"返回上一页" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *a) {
+        WCPerformGlobalBack();
+    }]];
+    [sheet addAction:[UIAlertAction actionWithTitle:@"扫一扫" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *a) {
+        WCPerformGlobalScanQR();
+    }]];
+    [sheet addAction:[UIAlertAction actionWithTitle:@"回到首页" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *a) {
+        WCPerformGlobalLockScreen();
+    }]];
+    [sheet addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
+    [presenter presentViewController:sheet animated:YES completion:nil];
+}
+
+// 跳转指定 view 页面(占位:打开 WCGesture 设置页)
+static void WCPerformGlobalJump(UIViewController *presenter) {
+    WCGesturePresentSettings(presenter);
+}
+
+static void WCPerformGlobalAction(UIViewController *presenter, WCGlobalAction action) {
+    switch (action) {
+        case WCGlobalActionScreenshot: WCPerformGlobalScreenshot(); break;
+        case WCGlobalActionBack: WCPerformGlobalBack(); break;
+        case WCGlobalActionLockScreen: WCPerformGlobalLockScreen(); break;
+        case WCGlobalActionScanQR: WCPerformGlobalScanQR(); break;
+        case WCGlobalActionMenu: WCPerformGlobalMenu(presenter); break;
+        case WCGlobalActionJump: WCPerformGlobalJump(presenter); break;
+        case WCGlobalActionNone: break;
+    }
+}
+
+// 绑定到每个 window 的手势
+%hook UIWindow
+
+- (void)didMoveToWindow {
+    %orig;
+    // 在 key window 上挂全局手势识别器
+    if (!WCGestureEnabled(WCGlobalGestureEnabledKey)) return;
+    UILongPressGestureRecognizer *two = objc_getAssociatedObject(self, &WCGlobalTwoFingerRecognizerKey);
+    NSInteger twoAction = [[NSUserDefaults standardUserDefaults] integerForKey:WCGlobalTwoFingerActionKey];
+    if (twoAction != WCGlobalActionNone && !two) {
+        two = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(wc_handleGlobalLongPress:)];
+        two.numberOfTouchesRequired = 2;
+        two.minimumPressDuration = 0.5;
+        two.cancelsTouchesInView = NO;
+        [self addGestureRecognizer:two];
+        objc_setAssociatedObject(self, &WCGlobalTwoFingerRecognizerKey, two, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    UILongPressGestureRecognizer *three = objc_getAssociatedObject(self, &WCGlobalThreeFingerRecognizerKey);
+    NSInteger threeAction = [[NSUserDefaults standardUserDefaults] integerForKey:WCGlobalThreeFingerActionKey];
+    if (threeAction != WCGlobalActionNone && !three) {
+        three = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(wc_handleGlobalLongPress:)];
+        three.numberOfTouchesRequired = 3;
+        three.minimumPressDuration = 0.5;
+        three.cancelsTouchesInView = NO;
+        [self addGestureRecognizer:three];
+        objc_setAssociatedObject(self, &WCGlobalThreeFingerRecognizerKey, three, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+}
+
+%new
+- (void)wc_handleGlobalLongPress:(UILongPressGestureRecognizer *)recognizer {
+    if (recognizer.state != UIGestureRecognizerStateBegan ||
+        !WCGestureEnabled(WCGlobalGestureEnabledKey)) return;
+    UIViewController *presenter = WCViewControllerForResponder(self);
+    if (!presenter) presenter = WCViewControllerForResponder(self.rootViewController);
+    NSInteger action;
+    if (recognizer.numberOfTouchesRequired == 2) {
+        action = [[NSUserDefaults standardUserDefaults] integerForKey:WCGlobalTwoFingerActionKey];
+    } else {
+        action = [[NSUserDefaults standardUserDefaults] integerForKey:WCGlobalThreeFingerActionKey];
+    }
+    UIImpactFeedbackGenerator *feedback = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleMedium];
+    [feedback prepare];
+    [feedback impactOccurred];
+    WCPerformGlobalAction(presenter, (WCGlobalAction)action);
 }
 
 %end

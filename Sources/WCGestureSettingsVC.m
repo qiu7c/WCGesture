@@ -106,6 +106,131 @@ static void WCPresentTriggerDistanceEditor(UIViewController *presenter) {
     [presenter presentViewController:alert animated:YES completion:nil];
 }
 
+static void WCPresentPluginNameEditor(UIViewController *presenter) {
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"插件名称"
+        message:@"设置在微信插件管理页显示的名字"
+         preferredStyle:UIAlertControllerStyleAlert];
+    [alert addTextFieldWithConfigurationHandler:^(UITextField *field) {
+        field.text = [defaults stringForKey:WCPluginNameKey] ?: @"微信手势";
+        field.autocapitalizationType = UITextAutocapitalizationTypeNone;
+    }];
+    [alert addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
+    [alert addAction:[UIAlertAction actionWithTitle:@"保存" style:UIAlertActionStyleDefault
+        handler:^(__unused UIAlertAction *action) {
+            NSString *text = [alert.textFields.firstObject.text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+            if (text.length == 0) text = @"微信手势";
+            [defaults setObject:text forKey:WCPluginNameKey];
+            WCPostChange(WCPluginNameKey);
+        }]];
+    [presenter presentViewController:alert animated:YES completion:nil];
+}
+
+#pragma mark - Config export/import (compact share code)
+
+// Short alias → full defaults key. Only these keys are exported; defaults are
+// omitted so the code stays short. Version "v" field supports future additions.
+static NSDictionary<NSString *, NSString *> *WCConfigShareKeys(void) {
+    return @{
+        @"a": WCReplySwipeEnabledKey,
+        @"b": WCReplySwipeSelfActionKey,
+        @"c": WCReplySwipeOtherActionKey,
+        @"d": WCReplySwipeRightSelfActionKey,
+        @"e": WCReplySwipeRightOtherActionKey,
+        @"f": WCReplySwipeTriggerDistanceKey,
+        @"g": WCMessageDoubleTapSelfActionKey,
+        @"h": WCMessageDoubleTapOtherActionKey,
+        @"i": WCMessageTripleTapSelfActionKey,
+        @"j": WCMessageTripleTapOtherActionKey,
+        @"k": WCInputGestureEnabledKey,
+        @"l": WCInputSwipeLeftActionKey,
+        @"m": WCInputSwipeRightActionKey,
+        @"n": WCInputDoubleTapActionKey,
+        @"o": WCInputTripleTapActionKey,
+        @"p": WCMomentsDoubleTapLikeKey,
+        @"q": WCMomentsLikeHapticKey,
+        @"r": WCGlobalGestureEnabledKey,
+        @"s": WCGlobalTwoFingerActionKey,
+        @"t": WCGlobalThreeFingerActionKey,
+        @"u": WCPluginNameKey,
+    };
+}
+
+// 编码:JSON → Base64 → 拼前缀标记。只导出已设置的非空值,口令尽量短。
+// 不带版本号:按短别名匹配,对得上的键才写入,对不上就跳过,天然兼容未来增删字段。
+static NSString *WCConfigExportCode(void) {
+    NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
+    NSMutableDictionary *dict = [NSMutableDictionary dictionary];
+    [WCConfigShareKeys() enumerateKeysUsingBlock:^(NSString *alias, NSString *key, __unused BOOL *stop) {
+        id value = [d objectForKey:key];
+        if (value) dict[alias] = value;
+    }];
+    NSData *json = [NSJSONSerialization dataWithJSONObject:dict options:0 error:nil];
+    if (!json) return @"";
+    NSString *base64 = [json base64EncodedStringWithOptions:0];
+    return [NSString stringWithFormat:@"WCG1-%@", base64];
+}
+
+static BOOL WCConfigImportCode(NSString *code) {
+    NSString *prefix = @"WCG1-";
+    if (![code hasPrefix:prefix]) return NO;
+    NSString *base64 = [code substringFromIndex:prefix.length];
+    NSData *json = [[NSData alloc] initWithBase64EncodedString:base64 options:0];
+    if (!json) return NO;
+    NSDictionary *dict = [NSJSONSerialization JSONObjectWithData:json options:0 error:nil];
+    if (![dict isKindOfClass:[NSDictionary class]]) return NO;
+    NSDictionary *aliasMap = WCConfigShareKeys();
+    [dict enumerateKeysAndObjectsUsingBlock:^(id alias, id value, __unused BOOL *stop) {
+        if (![alias isKindOfClass:[NSString class]]) return;
+        NSString *key = aliasMap[alias];
+        // 对得上的键才写入;对不上(未来新增字段或旧版本)就跳过
+        if (key) [[NSUserDefaults standardUserDefaults] setObject:value forKey:key];
+    }];
+    return YES;
+}
+
+static void WCPresentExportConfig(UIViewController *presenter) {
+    NSString *code = WCConfigExportCode();
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"导出配置"
+        message:@"复制下方口令，在新设备/新账号导入即可恢复设置"
+         preferredStyle:UIAlertControllerStyleAlert];
+    [alert addTextFieldWithConfigurationHandler:^(UITextField *field) {
+        field.text = code;
+        field.userInteractionEnabled = NO;
+    }];
+    [alert addAction:[UIAlertAction actionWithTitle:@"复制" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *a) {
+        [UIPasteboard.generalPasteboard setString:code];
+    }]];
+    [alert addAction:[UIAlertAction actionWithTitle:@"关闭" style:UIAlertActionStyleCancel handler:nil]];
+    [presenter presentViewController:alert animated:YES completion:nil];
+}
+
+static void WCPresentImportConfig(UIViewController *presenter) {
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"导入配置"
+        message:@"粘贴配置口令"
+         preferredStyle:UIAlertControllerStyleAlert];
+    [alert addTextFieldWithConfigurationHandler:^(UITextField *field) {
+        field.placeholder = @"WCG1-...";
+        field.autocapitalizationType = UITextAutocapitalizationTypeNone;
+        field.text = UIPasteboard.generalPasteboard.string;
+    }];
+    [alert addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
+    [alert addAction:[UIAlertAction actionWithTitle:@"导入" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *a) {
+        NSString *text = alert.textFields.firstObject.text;
+        if (WCConfigImportCode(text)) {
+            WCPostChange(nil);
+            UIAlertController *ok = [UIAlertController alertControllerWithTitle:nil message:@"导入成功" preferredStyle:UIAlertControllerStyleAlert];
+            [ok addAction:[UIAlertAction actionWithTitle:@"好" style:UIAlertActionStyleDefault handler:nil]];
+            [presenter presentViewController:ok animated:YES completion:nil];
+        } else {
+            UIAlertController *fail = [UIAlertController alertControllerWithTitle:nil message:@"口令格式错误" preferredStyle:UIAlertControllerStyleAlert];
+            [fail addAction:[UIAlertAction actionWithTitle:@"好" style:UIAlertActionStyleDefault handler:nil]];
+            [presenter presentViewController:fail animated:YES completion:nil];
+        }
+    }]];
+    [presenter presentViewController:alert animated:YES completion:nil];
+}
+
 #pragma mark - Input action options
 
 static NSArray<NSDictionary *> *WCInputActionOptions(void) {
@@ -151,7 +276,11 @@ typedef NS_ENUM(NSInteger, WCRowKind) {
     WCRowKindSwitch,        // toggle
     WCRowKindActionDetail,  // tap → message action picker
     WCRowKindInputAction,   // tap → input swipe action picker
+    WCRowKindGlobalAction,  // tap → global action picker
     WCRowKindDistance,      // tap → number editor
+    WCRowKindPluginName,    // tap → plugin name editor
+    WCRowKindExport,         // tap → export config
+    WCRowKindImport,        // tap → import config
 };
 
 @interface WCRow : NSObject
@@ -196,6 +325,57 @@ static WCRow *WCInputActionRow(NSString *title, NSString *key) {
     return row;
 }
 
+static WCRow *WCGlobalActionRow(NSString *title, NSString *key) {
+    WCRow *row = [WCRow new];
+    row.title = title;
+    row.defaultsKey = key;
+    row.kind = WCRowKindGlobalAction;
+    return row;
+}
+
+static WCRow *WCPlainRow(NSString *title, WCRowKind kind) {
+    WCRow *row = [WCRow new];
+    row.title = title;
+    row.kind = kind;
+    return row;
+}
+
+static NSArray<NSDictionary *> *WCGlobalActionOptions(void) {
+    return @[
+        @{ @"title": @"不设置", @"value": @(WCGlobalActionNone) },
+        @{ @"title": @"截图", @"value": @(WCGlobalActionScreenshot) },
+        @{ @"title": @"返回上一页", @"value": @(WCGlobalActionBack) },
+        @{ @"title": @"回到首页", @"value": @(WCGlobalActionLockScreen) },
+        @{ @"title": @"扫一扫", @"value": @(WCGlobalActionScanQR) },
+        @{ @"title": @"快捷菜单", @"value": @(WCGlobalActionMenu) },
+        @{ @"title": @"跳转设置页", @"value": @(WCGlobalActionJump) },
+    ];
+}
+
+static NSString *WCGlobalActionName(NSInteger action) {
+    for (NSDictionary *option in WCGlobalActionOptions()) {
+        if ([option[@"value"] integerValue] == action) return option[@"title"];
+    }
+    return @"不设置";
+}
+
+static void WCPresentGlobalActionPicker(UIViewController *presenter, NSString *title, NSString *defaultsKey) {
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSInteger current = [defaults integerForKey:defaultsKey];
+    UIAlertController *sheet = [UIAlertController alertControllerWithTitle:title
+        message:@"选择触发动作" preferredStyle:UIAlertControllerStyleActionSheet];
+    for (NSDictionary *option in WCGlobalActionOptions()) {
+        NSInteger value = [option[@"value"] integerValue];
+        NSString *label = value == current ? [@"✓  " stringByAppendingString:option[@"title"]] : option[@"title"];
+        [sheet addAction:[UIAlertAction actionWithTitle:label style:UIAlertActionStyleDefault
+            handler:^(__unused UIAlertAction *action) {
+                WCSetInteger(value, defaultsKey);
+            }]];
+    }
+    [sheet addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
+    [presenter presentViewController:sheet animated:YES completion:nil];
+}
+
 static NSString *WCRowDetailText(WCRow *row) {
     NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
     switch (row.kind) {
@@ -205,6 +385,13 @@ static NSString *WCRowDetailText(WCRow *row) {
             return WCActionName([d integerForKey:row.defaultsKey], row.selfMessage);
         case WCRowKindInputAction:
             return WCInputActionName([d integerForKey:row.defaultsKey]);
+        case WCRowKindGlobalAction:
+            return WCGlobalActionName([d integerForKey:row.defaultsKey]);
+        case WCRowKindPluginName:
+            return [d stringForKey:WCPluginNameKey] ?: @"微信手势";
+        case WCRowKindExport:
+        case WCRowKindImport:
+            return @"";
         case WCRowKindDistance: {
             double v = [d doubleForKey:WCReplySwipeTriggerDistanceKey];
             return [NSString stringWithFormat:@"%.0f", v <= 0 ? 56.0 : v];
@@ -215,7 +402,7 @@ static NSString *WCRowDetailText(WCRow *row) {
 
 #pragma mark - Card view helper
 
-static UIView *WCMakeCard(NSString *title, NSString *subtitle, NSString *symbol, UIColor *accent, UIColor *bg) {
+static UIView *WCMakeCard(NSString *title, NSString *symbol, UIColor *accent, UIColor *bg) {
     UIView *card = [[UIView alloc] init];
     card.backgroundColor = bg;
     card.layer.cornerRadius = 16;
@@ -230,18 +417,13 @@ static UIView *WCMakeCard(NSString *title, NSString *subtitle, NSString *symbol,
     titleLabel.text = title;
     titleLabel.font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
     titleLabel.textColor = UIColor.labelColor;
-    UILabel *subLabel = [[UILabel alloc] init];
-    subLabel.text = subtitle;
-    subLabel.font = [UIFont systemFontOfSize:13];
-    subLabel.textColor = UIColor.secondaryLabelColor;
     UIImageView *chevron = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"chevron.right"
         withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:14 weight:UIImageSymbolWeightMedium]]];
     chevron.tintColor = UIColor.tertiaryLabelColor;
-    for (UIView *v in @[iconWrap, icon, titleLabel, subLabel, chevron]) v.translatesAutoresizingMaskIntoConstraints = NO;
+    for (UIView *v in @[iconWrap, icon, titleLabel, chevron]) v.translatesAutoresizingMaskIntoConstraints = NO;
     [iconWrap addSubview:icon];
     [card addSubview:iconWrap];
     [card addSubview:titleLabel];
-    [card addSubview:subLabel];
     [card addSubview:chevron];
     [NSLayoutConstraint activateConstraints:@[
         [iconWrap.leadingAnchor constraintEqualToAnchor:card.leadingAnchor constant:16],
@@ -250,14 +432,19 @@ static UIView *WCMakeCard(NSString *title, NSString *subtitle, NSString *symbol,
         [iconWrap.heightAnchor constraintEqualToConstant:40],
         [icon.centerXAnchor constraintEqualToAnchor:iconWrap.centerXAnchor],
         [icon.centerYAnchor constraintEqualToAnchor:iconWrap.centerYAnchor],
+        [icon.widthAnchor constraintEqualToConstant:22],
+        [icon.heightAnchor constraintEqualToConstant:22],
         [titleLabel.leadingAnchor constraintEqualToAnchor:iconWrap.trailingAnchor constant:12],
-        [titleLabel.topAnchor constraintEqualToAnchor:card.topAnchor constant:18],
+        [titleLabel.centerYAnchor constraintEqualToAnchor:card.centerYAnchor],
         [titleLabel.trailingAnchor constraintEqualToAnchor:chevron.leadingAnchor constant:-8],
-        [subLabel.leadingAnchor constraintEqualToAnchor:iconWrap.trailingAnchor constant:12],
-        [subLabel.topAnchor constraintEqualToAnchor:titleLabel.bottomAnchor constant:2],
         [chevron.trailingAnchor constraintEqualToAnchor:card.trailingAnchor constant:-16],
         [chevron.centerYAnchor constraintEqualToAnchor:card.centerYAnchor],
+        [chevron.widthAnchor constraintEqualToConstant:12],
+        [chevron.heightAnchor constraintEqualToConstant:12],
+        [chevron setContentCompressionResistancePriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal],
     ]];
+    [chevron setContentHuggingPriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
+    [titleLabel setContentCompressionResistancePriority:UILayoutPriorityDefaultLow forAxis:UILayoutConstraintAxisHorizontal];
     return card;
 }
 
@@ -266,6 +453,8 @@ static UIView *WCMakeCard(NSString *title, NSString *subtitle, NSString *symbol,
 typedef NS_ENUM(NSInteger, WCGestureCategory) {
     WCGestureCategoryChat = 0,
     WCGestureCategoryOther = 1,
+    WCGestureCategoryGlobal = 2,
+    WCGestureCategoryPlugin = 3,
 };
 
 @interface WCGestureSettingsController ()
@@ -280,10 +469,14 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
     WCRefreshCachedCurrentUser();
 
     CGFloat margin = 16;
-    UIView *chatCard = WCMakeCard(@"聊天页手势", @"消息气泡、输入框手势",
+    UIView *chatCard = WCMakeCard(@"聊天页手势",
         @"bubble.left", UIColor.systemBlueColor, UIColor.secondarySystemGroupedBackgroundColor);
-    UIView *otherCard = WCMakeCard(@"其他手势", @"朋友圈双击点赞",
+    UIView *otherCard = WCMakeCard(@"其他手势",
         @"heart", UIColor.systemPinkColor, UIColor.secondarySystemGroupedBackgroundColor);
+    UIView *globalCard = WCMakeCard(@"全局手势",
+        @"hand.tap", UIColor.systemGreenColor, UIColor.secondarySystemGroupedBackgroundColor);
+    UIView *pluginCard = WCMakeCard(@"插件设置",
+        @"gearshape", UIColor.systemOrangeColor, UIColor.secondarySystemGroupedBackgroundColor);
 
     UILabel *versionLabel = [[UILabel alloc] init];
     versionLabel.text = @"版本 1.0.0";
@@ -317,15 +510,21 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
 
     chatCard.tag = WCGestureCategoryChat;
     otherCard.tag = WCGestureCategoryOther;
-    for (UIView *v in @[chatCard, otherCard, versionLabel, authorCard, brandLabel]) {
+    globalCard.tag = WCGestureCategoryGlobal;
+    pluginCard.tag = WCGestureCategoryPlugin;
+    for (UIView *v in @[chatCard, otherCard, globalCard, pluginCard, versionLabel, authorCard, brandLabel]) {
         v.translatesAutoresizingMaskIntoConstraints = NO;
         [self.view addSubview:v];
     }
     // Tappable
     chatCard.userInteractionEnabled = YES;
     otherCard.userInteractionEnabled = YES;
+    globalCard.userInteractionEnabled = YES;
+    pluginCard.userInteractionEnabled = YES;
     [chatCard addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(openCategory:)]];
     [otherCard addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(openCategory:)]];
+    [globalCard addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(openCategory:)]];
+    [pluginCard addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(openCategory:)]];
 
     [NSLayoutConstraint activateConstraints:@[
         [chatCard.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor constant:margin],
@@ -336,15 +535,24 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
         [otherCard.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:margin],
         [otherCard.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-margin],
         [otherCard.heightAnchor constraintEqualToConstant:76],
-        [versionLabel.topAnchor constraintEqualToAnchor:otherCard.bottomAnchor constant:32],
-        [versionLabel.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:margin],
-        [versionLabel.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-margin],
-        [authorCard.topAnchor constraintEqualToAnchor:versionLabel.bottomAnchor constant:8],
-        [authorCard.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:margin],
-        [authorCard.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-margin],
-        [brandLabel.topAnchor constraintEqualToAnchor:authorCard.bottomAnchor constant:margin],
+        [globalCard.topAnchor constraintEqualToAnchor:otherCard.bottomAnchor constant:margin],
+        [globalCard.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:margin],
+        [globalCard.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-margin],
+        [globalCard.heightAnchor constraintEqualToConstant:76],
+        [pluginCard.topAnchor constraintEqualToAnchor:globalCard.bottomAnchor constant:margin],
+        [pluginCard.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:margin],
+        [pluginCard.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-margin],
+        [pluginCard.heightAnchor constraintEqualToConstant:76],
+        // 版权信息固定在页面视觉最底部
+        [brandLabel.bottomAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.bottomAnchor constant:-margin],
         [brandLabel.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:margin],
         [brandLabel.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-margin],
+        [authorCard.bottomAnchor constraintEqualToAnchor:brandLabel.topAnchor constant:-8],
+        [authorCard.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:margin],
+        [authorCard.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-margin],
+        [versionLabel.bottomAnchor constraintEqualToAnchor:authorCard.topAnchor constant:-8],
+        [versionLabel.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:margin],
+        [versionLabel.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-margin],
     ]];
 }
 
@@ -360,6 +568,8 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
 @interface WCGestureDetailController ()
 @property (nonatomic, assign) NSInteger category;
 @property (nonatomic, copy) NSArray<NSArray<WCRow *> *> *sections;
+@property (nonatomic, copy) NSArray<NSString *> *sectionTitles;
+@property (nonatomic, copy) NSArray<NSString *> *collapseKeys;
 @end
 
 @implementation WCGestureDetailController
@@ -368,7 +578,8 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
     self = [super initWithStyle:UITableViewStyleInsetGrouped];
     if (self) {
         _category = category;
-        self.title = category == WCGestureCategoryChat ? @"聊天页手势" : @"其他手势";
+        self.title = (category == WCGestureCategoryChat) ? @"聊天页手势"
+            : (category == WCGestureCategoryOther) ? @"其他手势" : @"全局手势";
         [self rebuildRows];
     }
     return self;
@@ -396,6 +607,9 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
 - (void)rebuildRows {
     NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
     NSMutableArray *sections = [NSMutableArray array];
+    NSMutableArray *titles = [NSMutableArray array];
+    NSMutableArray *collapseKeys = [NSMutableArray array];
+    NSString *prefix = @"com.qiu7c.wcgesture.collapse";
     if (self.category == WCGestureCategoryChat) {
         NSMutableArray *msg = [NSMutableArray array];
         [msg addObject:WCSwitchRow(@"消息手势", WCReplySwipeEnabledKey)];
@@ -411,6 +625,8 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
             [msg addObject:WCDistanceRow(@"触发距离")];
         }
         [sections addObject:msg];
+        [titles addObject:@"消息手势"];
+        [collapseKeys addObject:[prefix stringByAppendingString:@".chat.msg"]];
         NSMutableArray *input = [NSMutableArray array];
         [input addObject:WCSwitchRow(@"输入框手势", WCInputGestureEnabledKey)];
         if ([d boolForKey:WCInputGestureEnabledKey]) {
@@ -420,15 +636,49 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
             [input addObject:WCInputActionRow(@"三击动作", WCInputTripleTapActionKey)];
         }
         [sections addObject:input];
-    } else {
+        [titles addObject:@"输入框手势"];
+        [collapseKeys addObject:[prefix stringByAppendingString:@".chat.input"]];
+    } else if (self.category == WCGestureCategoryOther) {
         NSMutableArray *moments = [NSMutableArray array];
         [moments addObject:WCSwitchRow(@"朋友圈双击点赞", WCMomentsDoubleTapLikeKey)];
         if ([d boolForKey:WCMomentsDoubleTapLikeKey]) {
             [moments addObject:WCSwitchRow(@"点赞触感反馈", WCMomentsLikeHapticKey)];
         }
         [sections addObject:moments];
+        [titles addObject:@"朋友圈"];
+        [collapseKeys addObject:[prefix stringByAppendingString:@".other.moments"]];
+    } else if (self.category == WCGestureCategoryGlobal) {
+        NSMutableArray *global = [NSMutableArray array];
+        [global addObject:WCSwitchRow(@"全局手势", WCGlobalGestureEnabledKey)];
+        if ([d boolForKey:WCGlobalGestureEnabledKey]) {
+            [global addObject:WCGlobalActionRow(@"双指长按", WCGlobalTwoFingerActionKey)];
+            [global addObject:WCGlobalActionRow(@"三指长按", WCGlobalThreeFingerActionKey)];
+        }
+        [sections addObject:global];
+        [titles addObject:@"全局手势"];
+        [collapseKeys addObject:[prefix stringByAppendingString:@".global"]];
+    } else {
+        // 插件设置
+        NSMutableArray *plugin = [NSMutableArray array];
+        [plugin addObject:WCPlainRow(@"插件名称", WCRowKindPluginName)];
+        [sections addObject:plugin];
+        [titles addObject:@"插件"];
+        [collapseKeys addObject:[prefix stringByAppendingString:@".plugin"]];
+        NSMutableArray *config = [NSMutableArray array];
+        [config addObject:WCPlainRow(@"导出配置", WCRowKindExport)];
+        [config addObject:WCPlainRow(@"导入配置", WCRowKindImport)];
+        [sections addObject:config];
+        [titles addObject:@"配置"];
+        [collapseKeys addObject:[prefix stringByAppendingString:@".config"]];
     }
     self.sections = sections;
+    self.sectionTitles = titles;
+    self.collapseKeys = collapseKeys;
+}
+
+- (BOOL)sectionCollapsed:(NSInteger)section {
+    if (section < 0 || section >= (NSInteger)self.collapseKeys.count) return NO;
+    return [[NSUserDefaults standardUserDefaults] boolForKey:self.collapseKeys[section]];
 }
 
 #pragma mark - Table view
@@ -438,7 +688,37 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
 }
 
 - (NSInteger)tableView:(__unused UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
+    if ([self sectionCollapsed:section]) return 0;
     return self.sections[section].count;
+}
+
+- (UIView *)tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section {
+    NSString *title = (section < (NSInteger)self.sectionTitles.count) ? self.sectionTitles[section] : @"";
+    BOOL collapsed = [self sectionCollapsed:section];
+    UIButton *header = [UIButton buttonWithType:UIButtonTypeSystem];
+    header.frame = CGRectMake(0, 0, tableView.bounds.size.width, 40);
+    [header setTitle:[NSString stringWithFormat:@"  %@  %@", title, collapsed ? @"▸" : @"▾"]
+           forState:UIControlStateNormal];
+    header.contentHorizontalAlignment = UIControlContentHorizontalAlignmentLeft;
+    header.titleLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightSemibold];
+    [header setTitleColor:[UIColor secondaryLabelColor] forState:UIControlStateNormal];
+    header.tag = section;
+    [header addTarget:self action:@selector(toggleSection:) forControlEvents:UIControlEventTouchUpInside];
+    return header;
+}
+
+- (CGFloat)tableView:(__unused UITableView *)tableView heightForHeaderInSection:(__unused NSInteger)section {
+    return 40;
+}
+
+- (void)toggleSection:(UIButton *)header {
+    NSInteger section = header.tag;
+    if (section < 0 || section >= (NSInteger)self.collapseKeys.count) return;
+    NSString *key = self.collapseKeys[section];
+    BOOL now = [[NSUserDefaults standardUserDefaults] boolForKey:key];
+    [[NSUserDefaults standardUserDefaults] setBool:!now forKey:key];
+    [self.tableView reloadSections:[NSIndexSet indexSetWithIndex:section]
+              withRowAnimation:UITableViewRowAnimationAutomatic];
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
@@ -449,6 +729,7 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
         cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleValue1 reuseIdentifier:cellId];
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
     }
+    cell.backgroundColor = UIColor.secondarySystemGroupedBackgroundColor;
     cell.textLabel.text = row.title;
     cell.detailTextLabel.text = WCRowDetailText(row);
     cell.accessoryView = nil;
@@ -486,6 +767,18 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
             break;
         case WCRowKindInputAction:
             WCPresentInputSwipeActionPicker(self, row.title, row.defaultsKey);
+            break;
+        case WCRowKindGlobalAction:
+            WCPresentGlobalActionPicker(self, row.title, row.defaultsKey);
+            break;
+        case WCRowKindPluginName:
+            WCPresentPluginNameEditor(self);
+            break;
+        case WCRowKindExport:
+            WCPresentExportConfig(self);
+            break;
+        case WCRowKindImport:
+            WCPresentImportConfig(self);
             break;
         case WCRowKindDistance:
             WCPresentTriggerDistanceEditor(self);
@@ -537,11 +830,12 @@ void WCGestureRegisterEntry(void) {
     if (!mgr) return;
 
     // Register a controller-based entry. WeChat instantiates the controller
-    // by the class name string we pass here.
+    // by the class name string we pass here. Title is user-customizable.
+    NSString *pluginName = [[NSUserDefaults standardUserDefaults] stringForKey:WCPluginNameKey] ?: @"微信手势";
     SEL registerController = sel_registerName("registerControllerWithTitle:version:controller:");
     if ([mgr respondsToSelector:registerController]) {
         ((void (*)(id, SEL, id, id, id))objc_msgSend)(mgr, registerController,
-            @"微信手势", @"1.0.0", NSStringFromClass([WCGestureSettingsController class]));
+            pluginName, @"1.0.0", NSStringFromClass([WCGestureSettingsController class]));
         return;
     }
 
@@ -549,6 +843,6 @@ void WCGestureRegisterEntry(void) {
     SEL registerSwitch = sel_registerName("registerSwitchWithTitle:key:");
     if ([mgr respondsToSelector:registerSwitch]) {
         ((void (*)(id, SEL, id, id))objc_msgSend)(mgr, registerSwitch,
-            @"微信手势", WCReplySwipeEnabledKey);
+            pluginName, WCReplySwipeEnabledKey);
     }
 }
