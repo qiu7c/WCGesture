@@ -688,8 +688,10 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
 }
 
 - (NSInteger)tableView:(__unused UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
-    if ([self sectionCollapsed:section]) return 0;
-    return self.sections[section].count;
+    NSUInteger total = self.sections[section].count;
+    // 折叠时只保留第 0 行(大开关),子设置项收起
+    if ([self sectionCollapsed:section]) return MIN(1, total);
+    return total;
 }
 
 - (UIView *)tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section {
