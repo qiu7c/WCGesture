@@ -161,7 +161,7 @@ static NSDictionary<NSString *, NSString *> *WCConfigShareKeys(void) {
 static NSString *WCConfigExportCode(void) {
     NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
     NSMutableDictionary *dict = [NSMutableDictionary dictionary];
-    [WCConfigShareKeys() enumerateKeysUsingBlock:^(NSString *alias, NSString *key, __unused BOOL *stop) {
+    [WCConfigShareKeys() enumerateKeysAndObjectsUsingBlock:^(NSString *alias, NSString *key, __unused BOOL *stop) {
         id value = [d objectForKey:key];
         if (value) dict[alias] = value;
     }];
@@ -441,8 +441,8 @@ static UIView *WCMakeCard(NSString *title, NSString *symbol, UIColor *accent, UI
         [chevron.centerYAnchor constraintEqualToAnchor:card.centerYAnchor],
         [chevron.widthAnchor constraintEqualToConstant:12],
         [chevron.heightAnchor constraintEqualToConstant:12],
-        [chevron setContentCompressionResistancePriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal],
     ]];
+    [chevron setContentCompressionResistancePriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
     [chevron setContentHuggingPriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
     [titleLabel setContentCompressionResistancePriority:UILayoutPriorityDefaultLow forAxis:UILayoutConstraintAxisHorizontal];
     return card;
