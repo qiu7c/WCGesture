@@ -1,5 +1,6 @@
 #import "WCGestureSettingsVC.h"
 #import "WCGestureConfig.h"
+#import <objc/message.h>
 #import <objc/runtime.h>
 
 static NSArray<NSDictionary *> *WCActionOptions(BOOL selfMessage) {
