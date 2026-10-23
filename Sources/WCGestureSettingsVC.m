@@ -170,19 +170,21 @@ static NSString *WCRowDetailText(WCRow *row) {
 
 @implementation WCGestureSettingsController
 
+- (void)wc_finishInit {
+    self.title = @"微信手势";
+    [self rebuildSections];
+    [[NSNotificationCenter defaultCenter] addObserver:self
+        selector:@selector(settingsDidChange:) name:WCGestureDidChangeNotification object:nil];
+}
+
 - (instancetype)initWithStyle:(UITableViewStyle)style {
-    self = [super initWithStyle:UITableViewStyleGrouped];
-    if (self) {
-        self.title = @"微信手势";
-        [self rebuildSections];
-        [[NSNotificationCenter defaultCenter] addObserver:self
-            selector:@selector(settingsDidChange:) name:WCGestureDidChangeNotification object:nil];
-    }
+    self = [super initWithStyle:UITableViewStyleInsetGrouped];
+    if (self) [self wc_finishInit];
     return self;
 }
 
-- (instancetype)initWithNibName:(NSString *)nibNameOrNil bundle:(NSBundle *)nibBundleOrNil {
-    return [self initWithStyle:UITableViewStyleGrouped];
+- (instancetype)init {
+    return [self initWithStyle:UITableViewStyleInsetGrouped];
 }
 
 - (void)dealloc {
@@ -287,7 +289,7 @@ void WCGesturePresentSettings(UIViewController *presenter) {
     // Push the real controller when we have a navigation context; otherwise
     // fall back to an ActionSheet-style quick toggle.
     if (presenter.navigationController) {
-        WCGestureSettingsController *vc = [[WCGestureSettingsController alloc] initWithStyle:UITableViewStyleGrouped];
+        WCGestureSettingsController *vc = [WCGestureSettingsController new];
         [presenter.navigationController pushViewController:vc animated:YES];
         return;
     }
