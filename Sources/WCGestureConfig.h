@@ -36,6 +36,16 @@ FOUNDATION_EXPORT NSString *const WCMomentsLikeHapticKey;
 FOUNDATION_EXPORT NSString *const WCGlobalGestureEnabledKey;
 FOUNDATION_EXPORT NSString *const WCGlobalTwoFingerActionKey;
 FOUNDATION_EXPORT NSString *const WCGlobalThreeFingerActionKey;
+FOUNDATION_EXPORT NSString *const WCGestureHapticStyleKey;
+
+/// Haptic intensity levels (maps to UIImpactFeedbackStyle).
+typedef NS_ENUM(NSInteger, WCHapticStyle) {
+    WCHapticStyleLight = 0,
+    WCHapticStyleMedium = 1,
+    WCHapticStyleHeavy = 2,
+    WCHapticStyleSoft = 3,
+    WCHapticStyleRigid = 4,
+};
 
 /// Input-box gesture action enum (shared by swipe and multi-tap).
 typedef NS_ENUM(NSInteger, WCInputAction) {

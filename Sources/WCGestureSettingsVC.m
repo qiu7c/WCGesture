@@ -106,6 +106,42 @@ static void WCPresentTriggerDistanceEditor(UIViewController *presenter) {
     [presenter presentViewController:alert animated:YES completion:nil];
 }
 
+#pragma mark - Haptic style picker
+
+static NSArray<NSDictionary *> *WCHapticStyleOptions(void) {
+    return @[
+        @{ @"title": @"轻柔", @"value": @(WCHapticStyleLight) },
+        @{ @"title": @"中等", @"value": @(WCHapticStyleMedium) },
+        @{ @"title": @"强烈", @"value": @(WCHapticStyleHeavy) },
+        @{ @"title": @"柔和", @"value": @(WCHapticStyleSoft) },
+        @{ @"title": @"干脆", @"value": @(WCHapticStyleRigid) },
+    ];
+}
+
+static NSString *WCHapticStyleName(NSInteger style) {
+    for (NSDictionary *option in WCHapticStyleOptions()) {
+        if ([option[@"value"] integerValue] == style) return option[@"title"];
+    }
+    return @"中等";
+}
+
+static void WCPresentHapticStylePicker(UIViewController *presenter) {
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSInteger current = [defaults integerForKey:WCGestureHapticStyleKey];
+    UIAlertController *sheet = [UIAlertController alertControllerWithTitle:@"震感强度"
+        message:@"选择触感反馈强度" preferredStyle:UIAlertControllerStyleActionSheet];
+    for (NSDictionary *option in WCHapticStyleOptions()) {
+        NSInteger value = [option[@"value"] integerValue];
+        NSString *label = value == current ? [@"✓  " stringByAppendingString:option[@"title"]] : option[@"title"];
+        [sheet addAction:[UIAlertAction actionWithTitle:label style:UIAlertActionStyleDefault
+            handler:^(__unused UIAlertAction *action) {
+                WCSetInteger(value, WCGestureHapticStyleKey);
+            }]];
+    }
+    [sheet addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
+    [presenter presentViewController:sheet animated:YES completion:nil];
+}
+
 static void WCPresentPluginNameEditor(UIViewController *presenter) {
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"插件名称"
@@ -279,6 +315,7 @@ typedef NS_ENUM(NSInteger, WCRowKind) {
     WCRowKindGlobalAction,  // tap → global action picker
     WCRowKindDistance,      // tap → number editor
     WCRowKindPluginName,    // tap → plugin name editor
+    WCRowKindHapticStyle,   // tap → haptic style picker
     WCRowKindExport,         // tap → export config
     WCRowKindImport,        // tap → import config
 };
@@ -389,6 +426,8 @@ static NSString *WCRowDetailText(WCRow *row) {
             return WCGlobalActionName([d integerForKey:row.defaultsKey]);
         case WCRowKindPluginName:
             return [d stringForKey:WCPluginNameKey] ?: @"微信手势";
+        case WCRowKindHapticStyle:
+            return WCHapticStyleName([d integerForKey:WCGestureHapticStyleKey]);
         case WCRowKindExport:
         case WCRowKindImport:
             return @"";
@@ -661,6 +700,7 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
         // 插件设置
         NSMutableArray *plugin = [NSMutableArray array];
         [plugin addObject:WCPlainRow(@"插件名称", WCRowKindPluginName)];
+        [plugin addObject:WCPlainRow(@"震感强度", WCRowKindHapticStyle)];
         [sections addObject:plugin];
         [titles addObject:@"插件"];
         [collapseKeys addObject:[prefix stringByAppendingString:@".plugin"]];
@@ -775,6 +815,9 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
             break;
         case WCRowKindPluginName:
             WCPresentPluginNameEditor(self);
+            break;
+        case WCRowKindHapticStyle:
+            WCPresentHapticStylePicker(self);
             break;
         case WCRowKindExport:
             WCPresentExportConfig(self);

@@ -1315,9 +1315,7 @@ static void WCSynchronizeMomentsDoubleTap(WCTimeLineCellView *cell) {
     [self onAccessibilityLike];
     WCShowMomentsHeart(self, recognizer);
     if ([[NSUserDefaults standardUserDefaults] boolForKey:WCMomentsLikeHapticKey]) {
-        UIImpactFeedbackGenerator *feedback = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleMedium];
-        [feedback prepare];
-        [feedback impactOccurred];
+        WCPlayConfiguredHaptic();
     }
 }
 
@@ -1327,6 +1325,22 @@ static void WCSynchronizeMomentsDoubleTap(WCTimeLineCellView *cell) {
 
 @interface CameraScanViewController : UIViewController
 @end
+
+static UIImpactFeedbackStyle WCHapticStyleFromConfig(void) {
+    switch ((WCHapticStyle)[[NSUserDefaults standardUserDefaults] integerForKey:WCGestureHapticStyleKey]) {
+        case WCHapticStyleLight: return UIImpactFeedbackStyleLight;
+        case WCHapticStyleHeavy: return UIImpactFeedbackStyleHeavy;
+        case WCHapticStyleSoft: return UIImpactFeedbackStyleSoft;
+        case WCHapticStyleRigid: return UIImpactFeedbackStyleRigid;
+        case WCHapticStyleMedium: default: return UIImpactFeedbackStyleMedium;
+    }
+}
+
+static void WCPlayConfiguredHaptic(void) {
+    UIImpactFeedbackGenerator *feedback = [[UIImpactFeedbackGenerator alloc] initWithStyle:WCHapticStyleFromConfig()];
+    [feedback prepare];
+    [feedback impactOccurred];
+}
 
 static char WCGlobalTwoFingerRecognizerKey;
 static char WCGlobalThreeFingerRecognizerKey;
@@ -1434,33 +1448,59 @@ static void WCPerformGlobalAction(UIViewController *presenter, WCGlobalAction ac
     }
 }
 
+// 在指定 window 上按当前设置同步全局手势识别器
+static void WCSynchronizeGlobalGesturesOnWindow(UIWindow *window) {
+    if (!window) return;
+    BOOL enabled = WCGestureEnabled(WCGlobalGestureEnabledKey);
+    NSInteger twoAction = [[NSUserDefaults standardUserDefaults] integerForKey:WCGlobalTwoFingerActionKey];
+    NSInteger threeAction = [[NSUserDefaults standardUserDefaults] integerForKey:WCGlobalThreeFingerActionKey];
+
+    UILongPressGestureRecognizer *two = objc_getAssociatedObject(window, &WCGlobalTwoFingerRecognizerKey);
+    BOOL twoWanted = enabled && twoAction != WCGlobalActionNone;
+    if (twoWanted && !two) {
+        two = [[UILongPressGestureRecognizer alloc] initWithTarget:window action:@selector(wc_handleGlobalLongPress:)];
+        two.numberOfTouchesRequired = 2;
+        two.minimumPressDuration = 0.5;
+        two.cancelsTouchesInView = NO;
+        [window addGestureRecognizer:two];
+        objc_setAssociatedObject(window, &WCGlobalTwoFingerRecognizerKey, two, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    } else if (!twoWanted && two) {
+        [window removeGestureRecognizer:two];
+        objc_setAssociatedObject(window, &WCGlobalTwoFingerRecognizerKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+
+    UILongPressGestureRecognizer *three = objc_getAssociatedObject(window, &WCGlobalThreeFingerRecognizerKey);
+    BOOL threeWanted = enabled && threeAction != WCGlobalActionNone;
+    if (threeWanted && !three) {
+        three = [[UILongPressGestureRecognizer alloc] initWithTarget:window action:@selector(wc_handleGlobalLongPress:)];
+        three.numberOfTouchesRequired = 3;
+        three.minimumPressDuration = 0.5;
+        three.cancelsTouchesInView = NO;
+        [window addGestureRecognizer:three];
+        objc_setAssociatedObject(window, &WCGlobalThreeFingerRecognizerKey, three, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    } else if (!threeWanted && three) {
+        [window removeGestureRecognizer:three];
+        objc_setAssociatedObject(window, &WCGlobalThreeFingerRecognizerKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+}
+
+static void WCSynchronizeGlobalGestures(void) {
+    for (UIWindow *window in UIApplication.sharedApplication.windows) {
+        WCSynchronizeGlobalGesturesOnWindow(window);
+    }
+}
+
 // 绑定到每个 window 的手势
 %hook UIWindow
 
 - (void)didMoveToWindow {
     %orig;
-    // 在 key window 上挂全局手势识别器
-    if (!WCGestureEnabled(WCGlobalGestureEnabledKey)) return;
-    UILongPressGestureRecognizer *two = objc_getAssociatedObject(self, &WCGlobalTwoFingerRecognizerKey);
-    NSInteger twoAction = [[NSUserDefaults standardUserDefaults] integerForKey:WCGlobalTwoFingerActionKey];
-    if (twoAction != WCGlobalActionNone && !two) {
-        two = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(wc_handleGlobalLongPress:)];
-        two.numberOfTouchesRequired = 2;
-        two.minimumPressDuration = 0.5;
-        two.cancelsTouchesInView = NO;
-        [self addGestureRecognizer:two];
-        objc_setAssociatedObject(self, &WCGlobalTwoFingerRecognizerKey, two, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    }
-    UILongPressGestureRecognizer *three = objc_getAssociatedObject(self, &WCGlobalThreeFingerRecognizerKey);
-    NSInteger threeAction = [[NSUserDefaults standardUserDefaults] integerForKey:WCGlobalThreeFingerActionKey];
-    if (threeAction != WCGlobalActionNone && !three) {
-        three = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(wc_handleGlobalLongPress:)];
-        three.numberOfTouchesRequired = 3;
-        three.minimumPressDuration = 0.5;
-        three.cancelsTouchesInView = NO;
-        [self addGestureRecognizer:three];
-        objc_setAssociatedObject(self, &WCGlobalThreeFingerRecognizerKey, three, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    }
+    WCSynchronizeGlobalGesturesOnWindow(self);
+}
+
+- (void)didMoveToSuperview {
+    %orig;
+    WCSynchronizeGlobalGesturesOnWindow(self);
 }
 
 %new
@@ -1475,9 +1515,7 @@ static void WCPerformGlobalAction(UIViewController *presenter, WCGlobalAction ac
     } else {
         action = [[NSUserDefaults standardUserDefaults] integerForKey:WCGlobalThreeFingerActionKey];
     }
-    UIImpactFeedbackGenerator *feedback = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleMedium];
-    [feedback prepare];
-    [feedback impactOccurred];
+    WCPlayConfiguredHaptic();
     WCPerformGlobalAction(presenter, (WCGlobalAction)action);
 }
 
@@ -1502,6 +1540,7 @@ static void WCPerformGlobalAction(UIViewController *presenter, WCGlobalAction ac
             // Resync on the next runloop so the cell re-reads the new value.
             dispatch_async(dispatch_get_main_queue(), ^{
                 WCSynchronizeVisibleReplyGestures();
+                WCSynchronizeGlobalGestures();
                 // Re-sync input swipe on the active chat too.
                 UIWindow *window = WCActiveWindow();
                 if (window) {
