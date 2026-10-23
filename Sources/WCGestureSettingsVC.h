@@ -2,14 +2,18 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-/// Presents the WCGesture settings sheet from the given view controller.
-/// Uses UIAlertController action sheets and inline number prompts; no
-/// dependency on WCAtlas's full settings framework.
+/// A real UITableViewController subclass registered with WeChat's WCPluginsMgr.
+/// WeChat instantiates it by class name when the user taps the plugin entry.
+@interface WCGestureSettingsController : UITableViewController
+@end
+
+/// Presents the WCGesture settings sheet (ActionSheet style) from the given
+/// view controller. Used by the Me-page fallback entry.
 void WCGesturePresentSettings(UIViewController *presenter);
 
-/// Pushes a WCGesture settings entry into WeChat's plugin/settings page when
-/// the WCPluginsMgr registration API is available. Otherwise registers a
-/// standalone entry through the "Me" page hook.
+/// Registers WCGestureSettingsController with WeChat's plugin manager
+/// (WCPluginsMgr) using the real registerControllerWithTitle:version:controller:
+/// API. Falls back silently when the API is unavailable.
 void WCGestureRegisterEntry(void);
 
 NS_ASSUME_NONNULL_END
