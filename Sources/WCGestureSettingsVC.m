@@ -1,5 +1,6 @@
 #import "WCGestureSettingsVC.h"
 #import "WCGestureConfig.h"
+#import "WCGestureAccount.h"
 #import <objc/message.h>
 #import <objc/runtime.h>
 
@@ -212,24 +213,62 @@ static NSString *WCRowDetailText(WCRow *row) {
     return @"";
 }
 
-#pragma mark - Settings controller (registered with WCPluginsMgr)
+#pragma mark - Card view helper
 
-@interface WCSection : NSObject
-@property (nonatomic, copy) NSString *title;
-@property (nonatomic, copy) NSString *footer;
-@property (nonatomic, copy) NSArray<WCRow *> *headerRows;   // always-visible rows
-@property (nonatomic, copy) NSArray<WCRow *> *detailRows;   // shown when expanded
-@property (nonatomic, assign) BOOL expanded;
-@property (nonatomic, copy) NSString *collapseKey;          // NSUserDefaults key for collapse state
-@end
-@implementation WCSection
-@end
+static UIView *WCMakeCard(NSString *title, NSString *subtitle, NSString *symbol, UIColor *accent, UIColor *bg) {
+    UIView *card = [[UIView alloc] init];
+    card.backgroundColor = bg;
+    card.layer.cornerRadius = 16;
+    card.layer.masksToBounds = YES;
+    UIView *iconWrap = [[UIView alloc] init];
+    iconWrap.backgroundColor = [accent colorWithAlphaComponent:0.14];
+    iconWrap.layer.cornerRadius = 12;
+    UIImageView *icon = [[UIImageView alloc] initWithImage:[[UIImage systemImageNamed:symbol
+        withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:20 weight:UIImageSymbolWeightMedium]]
+        imageWithTintColor:accent renderingMode:UIImageRenderingModeAlwaysOriginal]];
+    UILabel *titleLabel = [[UILabel alloc] init];
+    titleLabel.text = title;
+    titleLabel.font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
+    titleLabel.textColor = UIColor.labelColor;
+    UILabel *subLabel = [[UILabel alloc] init];
+    subLabel.text = subtitle;
+    subLabel.font = [UIFont systemFontOfSize:13];
+    subLabel.textColor = UIColor.secondaryLabelColor;
+    UIImageView *chevron = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"chevron.right"
+        withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:14 weight:UIImageSymbolWeightMedium]]];
+    chevron.tintColor = UIColor.tertiaryLabelColor;
+    for (UIView *v in @[iconWrap, icon, titleLabel, subLabel, chevron]) v.translatesAutoresizingMaskIntoConstraints = NO;
+    [iconWrap addSubview:icon];
+    [card addSubview:iconWrap];
+    [card addSubview:titleLabel];
+    [card addSubview:subLabel];
+    [card addSubview:chevron];
+    [NSLayoutConstraint activateConstraints:@[
+        [iconWrap.leadingAnchor constraintEqualToAnchor:card.leadingAnchor constant:16],
+        [iconWrap.centerYAnchor constraintEqualToAnchor:card.centerYAnchor],
+        [iconWrap.widthAnchor constraintEqualToConstant:40],
+        [iconWrap.heightAnchor constraintEqualToConstant:40],
+        [icon.centerXAnchor constraintEqualToAnchor:iconWrap.centerXAnchor],
+        [icon.centerYAnchor constraintEqualToAnchor:iconWrap.centerYAnchor],
+        [titleLabel.leadingAnchor constraintEqualToAnchor:iconWrap.trailingAnchor constant:12],
+        [titleLabel.topAnchor constraintEqualToAnchor:card.topAnchor constant:18],
+        [titleLabel.trailingAnchor constraintEqualToAnchor:chevron.leadingAnchor constant:-8],
+        [subLabel.leadingAnchor constraintEqualToAnchor:iconWrap.trailingAnchor constant:12],
+        [subLabel.topAnchor constraintEqualToAnchor:titleLabel.bottomAnchor constant:2],
+        [chevron.trailingAnchor constraintEqualToAnchor:card.trailingAnchor constant:-16],
+        [chevron.centerYAnchor constraintEqualToAnchor:card.centerYAnchor],
+    ]];
+    return card;
+}
 
-static NSString *kChatPageCollapseKey = @"com.qiu7c.wcgesture.settings.collapse.chatpage";
-static NSString *kOtherCollapseKey = @"com.qiu7c.wcgesture.settings.collapse.other";
+#pragma mark - Home controller (registered with WCPluginsMgr)
+
+typedef NS_ENUM(NSInteger, WCGestureCategory) {
+    WCGestureCategoryChat = 0,
+    WCGestureCategoryOther = 1,
+};
 
 @interface WCGestureSettingsController ()
-@property (nonatomic, copy) NSArray<WCSection *> *sections;
 @end
 
 @implementation WCGestureSettingsController
@@ -237,23 +276,112 @@ static NSString *kOtherCollapseKey = @"com.qiu7c.wcgesture.settings.collapse.oth
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.title = @"WCGesture";
-    self.tableView.backgroundColor = [UIColor systemGroupedBackgroundColor];
-    if (@available(iOS 15.0, *)) self.tableView.sectionHeaderTopPadding = 0;
-    self.tableView.rowHeight = UITableViewAutomaticDimension;
-    self.tableView.estimatedRowHeight = 48;
-    [self rebuildSections];
-    [[NSNotificationCenter defaultCenter] addObserver:self
-        selector:@selector(settingsDidChange:) name:WCGestureDidChangeNotification object:nil];
+    self.view.backgroundColor = [UIColor systemGroupedBackgroundColor];
+    WCRefreshCachedCurrentUser();
+
+    CGFloat margin = 16;
+    UIView *chatCard = WCMakeCard(@"聊天页手势", @"消息气泡、输入框手势",
+        @"bubble.left", UIColor.systemBlueColor, UIColor.secondarySystemGroupedBackgroundColor);
+    UIView *otherCard = WCMakeCard(@"其他手势", @"朋友圈双击点赞",
+        @"heart", UIColor.systemPinkColor, UIColor.secondarySystemGroupedBackgroundColor);
+
+    UILabel *versionLabel = [[UILabel alloc] init];
+    versionLabel.text = @"版本 1.0.0";
+    versionLabel.font = [UIFont systemFontOfSize:13];
+    versionLabel.textColor = UIColor.tertiaryLabelColor;
+    versionLabel.textAlignment = NSTextAlignmentCenter;
+
+    UIView *authorCard = [[UIView alloc] init];
+    authorCard.backgroundColor = UIColor.secondarySystemGroupedBackgroundColor;
+    authorCard.layer.cornerRadius = 12;
+    authorCard.layer.masksToBounds = YES;
+    UILabel *authorLabel = [[UILabel alloc] init];
+    authorLabel.text = @"联系作者：Cc";
+    authorLabel.font = [UIFont systemFontOfSize:14];
+    authorLabel.textColor = UIColor.secondaryLabelColor;
+    authorLabel.textAlignment = NSTextAlignmentCenter;
+    authorLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    [authorCard addSubview:authorLabel];
+    [NSLayoutConstraint activateConstraints:@[
+        [authorLabel.leadingAnchor constraintEqualToAnchor:authorCard.leadingAnchor constant:16],
+        [authorLabel.trailingAnchor constraintEqualToAnchor:authorCard.trailingAnchor constant:-16],
+        [authorLabel.centerYAnchor constraintEqualToAnchor:authorCard.centerYAnchor],
+        [authorLabel.heightAnchor constraintEqualToConstant:44],
+    ]];
+
+    UILabel *brandLabel = [[UILabel alloc] init];
+    brandLabel.text = @"WCGesture by Cc";
+    brandLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+    brandLabel.textColor = UIColor.tertiaryLabelColor;
+    brandLabel.textAlignment = NSTextAlignmentCenter;
+
+    chatCard.tag = WCGestureCategoryChat;
+    otherCard.tag = WCGestureCategoryOther;
+    for (UIView *v in @[chatCard, otherCard, versionLabel, authorCard, brandLabel]) {
+        v.translatesAutoresizingMaskIntoConstraints = NO;
+        [self.view addSubview:v];
+    }
+    // Tappable
+    chatCard.userInteractionEnabled = YES;
+    otherCard.userInteractionEnabled = YES;
+    [chatCard addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(openCategory:)]];
+    [otherCard addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(openCategory:)]];
+
+    [NSLayoutConstraint activateConstraints:@[
+        [chatCard.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor constant:margin],
+        [chatCard.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:margin],
+        [chatCard.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-margin],
+        [chatCard.heightAnchor constraintEqualToConstant:76],
+        [otherCard.topAnchor constraintEqualToAnchor:chatCard.bottomAnchor constant:margin],
+        [otherCard.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:margin],
+        [otherCard.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-margin],
+        [otherCard.heightAnchor constraintEqualToConstant:76],
+        [versionLabel.topAnchor constraintEqualToAnchor:otherCard.bottomAnchor constant:32],
+        [versionLabel.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:margin],
+        [versionLabel.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-margin],
+        [authorCard.topAnchor constraintEqualToAnchor:versionLabel.bottomAnchor constant:8],
+        [authorCard.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:margin],
+        [authorCard.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-margin],
+        [brandLabel.topAnchor constraintEqualToAnchor:authorCard.bottomAnchor constant:margin],
+        [brandLabel.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:margin],
+        [brandLabel.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-margin],
+    ]];
 }
 
-- (instancetype)initWithStyle:(UITableViewStyle)style {
+- (void)openCategory:(UITapGestureRecognizer *)recognizer {
+    WCGestureDetailController *vc = [[WCGestureDetailController alloc] initWithCategory:recognizer.view.tag];
+    [self.navigationController pushViewController:vc animated:YES];
+}
+
+@end
+
+#pragma mark - Detail controller
+
+@interface WCGestureDetailController ()
+@property (nonatomic, assign) NSInteger category;
+@property (nonatomic, copy) NSArray<NSArray<WCRow *> *> *sections;
+@end
+
+@implementation WCGestureDetailController
+
+- (instancetype)initWithCategory:(NSInteger)category {
     self = [super initWithStyle:UITableViewStyleInsetGrouped];
-    if (self) [self rebuildSections];
+    if (self) {
+        _category = category;
+        self.title = category == WCGestureCategoryChat ? @"聊天页手势" : @"其他手势";
+        [self rebuildRows];
+    }
     return self;
 }
 
-- (instancetype)init {
-    return [self initWithStyle:UITableViewStyleInsetGrouped];
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    if (@available(iOS 15.0, *)) self.tableView.sectionHeaderTopPadding = 0;
+    self.tableView.backgroundColor = [UIColor systemGroupedBackgroundColor];
+    self.tableView.rowHeight = UITableViewAutomaticDimension;
+    self.tableView.estimatedRowHeight = 48;
+    [[NSNotificationCenter defaultCenter] addObserver:self
+        selector:@selector(settingsDidChange:) name:WCGestureDidChangeNotification object:nil];
 }
 
 - (void)dealloc {
@@ -261,63 +389,46 @@ static NSString *kOtherCollapseKey = @"com.qiu7c.wcgesture.settings.collapse.oth
 }
 
 - (void)settingsDidChange:(__unused NSNotification *)note {
-    [self rebuildSections];
+    [self rebuildRows];
     [self.tableView reloadData];
 }
 
-- (void)rebuildSections {
+- (void)rebuildRows {
     NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
-
-    // ── 聊天页手势 ──
-    BOOL msgGesture = [d boolForKey:WCReplySwipeEnabledKey];
-    BOOL inputGesture = [d boolForKey:WCInputGestureEnabledKey];
-    NSMutableArray *chatHeader = [NSMutableArray array];
-    [chatHeader addObject:WCSwitchRow(@"消息手势", WCReplySwipeEnabledKey)];
-    [chatHeader addObject:WCSwitchRow(@"输入框手势", WCInputGestureEnabledKey)];
-
-    NSMutableArray *chatDetail = [NSMutableArray array];
-    if (msgGesture) {
-        [chatDetail addObject:WCActionRow(@"左滑 · 自己", WCReplySwipeSelfActionKey, YES)];
-        [chatDetail addObject:WCActionRow(@"左滑 · 对方", WCReplySwipeOtherActionKey, NO)];
-        [chatDetail addObject:WCActionRow(@"右滑 · 自己", WCReplySwipeRightSelfActionKey, YES)];
-        [chatDetail addObject:WCActionRow(@"右滑 · 对方", WCReplySwipeRightOtherActionKey, NO)];
-        [chatDetail addObject:WCActionRow(@"双击 · 自己", WCMessageDoubleTapSelfActionKey, YES)];
-        [chatDetail addObject:WCActionRow(@"双击 · 对方", WCMessageDoubleTapOtherActionKey, NO)];
-        [chatDetail addObject:WCActionRow(@"三击 · 自己", WCMessageTripleTapSelfActionKey, YES)];
-        [chatDetail addObject:WCActionRow(@"三击 · 对方", WCMessageTripleTapOtherActionKey, NO)];
-        [chatDetail addObject:WCDistanceRow(@"触发距离")];
+    NSMutableArray *sections = [NSMutableArray array];
+    if (self.category == WCGestureCategoryChat) {
+        NSMutableArray *msg = [NSMutableArray array];
+        [msg addObject:WCSwitchRow(@"消息手势", WCReplySwipeEnabledKey)];
+        if ([d boolForKey:WCReplySwipeEnabledKey]) {
+            [msg addObject:WCActionRow(@"左滑 · 自己", WCReplySwipeSelfActionKey, YES)];
+            [msg addObject:WCActionRow(@"左滑 · 对方", WCReplySwipeOtherActionKey, NO)];
+            [msg addObject:WCActionRow(@"右滑 · 自己", WCReplySwipeRightSelfActionKey, YES)];
+            [msg addObject:WCActionRow(@"右滑 · 对方", WCReplySwipeRightOtherActionKey, NO)];
+            [msg addObject:WCActionRow(@"双击 · 自己", WCMessageDoubleTapSelfActionKey, YES)];
+            [msg addObject:WCActionRow(@"双击 · 对方", WCMessageDoubleTapOtherActionKey, NO)];
+            [msg addObject:WCActionRow(@"三击 · 自己", WCMessageTripleTapSelfActionKey, YES)];
+            [msg addObject:WCActionRow(@"三击 · 对方", WCMessageTripleTapOtherActionKey, NO)];
+            [msg addObject:WCDistanceRow(@"触发距离")];
+        }
+        [sections addObject:msg];
+        NSMutableArray *input = [NSMutableArray array];
+        [input addObject:WCSwitchRow(@"输入框手势", WCInputGestureEnabledKey)];
+        if ([d boolForKey:WCInputGestureEnabledKey]) {
+            [input addObject:WCInputActionRow(@"左滑动作", WCInputSwipeLeftActionKey)];
+            [input addObject:WCInputActionRow(@"右滑动作", WCInputSwipeRightActionKey)];
+            [input addObject:WCInputActionRow(@"双击动作", WCInputDoubleTapActionKey)];
+            [input addObject:WCInputActionRow(@"三击动作", WCInputTripleTapActionKey)];
+        }
+        [sections addObject:input];
+    } else {
+        NSMutableArray *moments = [NSMutableArray array];
+        [moments addObject:WCSwitchRow(@"朋友圈双击点赞", WCMomentsDoubleTapLikeKey)];
+        if ([d boolForKey:WCMomentsDoubleTapLikeKey]) {
+            [moments addObject:WCSwitchRow(@"点赞触感反馈", WCMomentsLikeHapticKey)];
+        }
+        [sections addObject:moments];
     }
-    if (inputGesture) {
-        [chatDetail addObject:WCInputActionRow(@"左滑动作", WCInputSwipeLeftActionKey)];
-        [chatDetail addObject:WCInputActionRow(@"右滑动作", WCInputSwipeRightActionKey)];
-        [chatDetail addObject:WCInputActionRow(@"双击动作", WCInputDoubleTapActionKey)];
-        [chatDetail addObject:WCInputActionRow(@"三击动作", WCInputTripleTapActionKey)];
-    }
-
-    WCSection *chat = [WCSection new];
-    chat.title = @"聊天页手势";
-    chat.headerRows = chatHeader;
-    chat.detailRows = chatDetail;
-    chat.collapseKey = kChatPageCollapseKey;
-    chat.expanded = ![d boolForKey:chat.collapseKey];
-
-    // ── 其他手势 ──
-    NSMutableArray *otherHeader = [NSMutableArray array];
-    [otherHeader addObject:WCSwitchRow(@"朋友圈双击点赞", WCMomentsDoubleTapLikeKey)];
-
-    NSMutableArray *otherDetail = [NSMutableArray array];
-    if ([d boolForKey:WCMomentsDoubleTapLikeKey]) {
-        [otherDetail addObject:WCSwitchRow(@"点赞触感反馈", WCMomentsLikeHapticKey)];
-    }
-
-    WCSection *other = [WCSection new];
-    other.title = @"其他手势";
-    other.headerRows = otherHeader;
-    other.detailRows = otherDetail;
-    other.collapseKey = kOtherCollapseKey;
-    other.expanded = ![d boolForKey:other.collapseKey];
-
-    self.sections = @[chat, other];
+    self.sections = sections;
 }
 
 #pragma mark - Table view
@@ -327,43 +438,11 @@ static NSString *kOtherCollapseKey = @"com.qiu7c.wcgesture.settings.collapse.oth
 }
 
 - (NSInteger)tableView:(__unused UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
-    WCSection *sec = self.sections[section];
-    NSUInteger count = sec.headerRows.count;
-    if (sec.expanded) count += sec.detailRows.count;
-    return count;
-}
-
-- (UIView *)tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section {
-    WCSection *sec = self.sections[section];
-    UIButton *header = [UIButton buttonWithType:UIButtonTypeSystem];
-    header.frame = CGRectMake(0, 0, tableView.bounds.size.width, 44);
-    [header setTitle:[NSString stringWithFormat:@"  %@  %@", sec.title, sec.expanded ? @"▾" : @"▸"]
-           forState:UIControlStateNormal];
-    header.contentHorizontalAlignment = UIControlContentHorizontalAlignmentLeft;
-    header.titleLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightSemibold];
-    [header setTitleColor:[UIColor secondaryLabelColor] forState:UIControlStateNormal];
-    header.tag = section;
-    [header addTarget:self action:@selector(toggleSection:) forControlEvents:UIControlEventTouchUpInside];
-    return header;
-}
-
-- (CGFloat)tableView:(__unused UITableView *)tableView heightForHeaderInSection:(__unused NSInteger)section {
-    return 44;
-}
-
-- (nullable NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
-    return self.sections[section].footer;
+    return self.sections[section].count;
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
-    WCSection *sec = self.sections[indexPath.section];
-    WCRow *row;
-    if ((NSUInteger)indexPath.row < sec.headerRows.count) {
-        row = sec.headerRows[indexPath.row];
-    } else {
-        NSUInteger detailIdx = (NSUInteger)indexPath.row - sec.headerRows.count;
-        if (detailIdx < sec.detailRows.count) row = sec.detailRows[detailIdx];
-    }
+    WCRow *row = self.sections[indexPath.section][indexPath.row];
     NSString *cellId = @"WCGestureCell";
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:cellId];
     if (!cell) {
@@ -388,42 +467,20 @@ static NSString *kOtherCollapseKey = @"com.qiu7c.wcgesture.settings.collapse.oth
     return cell;
 }
 
-- (void)toggleSection:(UIButton *)header {
-    NSInteger section = header.tag;
-    if (section < 0 || section >= (NSInteger)self.sections.count) return;
-    WCSection *sec = self.sections[section];
-    sec.expanded = !sec.expanded;
-    [[NSUserDefaults standardUserDefaults] setBool:!sec.expanded forKey:sec.collapseKey];
-    [self.tableView reloadData];
-}
-
 - (void)handleSwitch:(UISwitch *)sw {
     NSInteger section = sw.tag / 10000;
     NSInteger rowIdx = sw.tag % 10000;
     if (section < 0 || section >= (NSInteger)self.sections.count) return;
-    WCSection *sec = self.sections[section];
-    WCRow *row;
-    if ((NSUInteger)rowIdx < sec.headerRows.count) row = sec.headerRows[rowIdx];
-    else {
-        NSUInteger detailIdx = (NSUInteger)rowIdx - sec.headerRows.count;
-        if (detailIdx < sec.detailRows.count) row = sec.detailRows[detailIdx];
-    }
-    if (row) WCSetBool(sw.on, row.defaultsKey);
+    NSArray<WCRow *> *rows = self.sections[section];
+    if (rowIdx < 0 || rowIdx >= (NSInteger)rows.count) return;
+    WCSetBool(sw.on, rows[rowIdx].defaultsKey);
 }
 
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
-    WCSection *sec = self.sections[indexPath.section];
-    WCRow *row;
-    if ((NSUInteger)indexPath.row < sec.headerRows.count) row = sec.headerRows[indexPath.row];
-    else {
-        NSUInteger detailIdx = (NSUInteger)indexPath.row - sec.headerRows.count;
-        if (detailIdx < sec.detailRows.count) row = sec.detailRows[detailIdx];
-    }
+    WCRow *row = self.sections[indexPath.section][indexPath.row];
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
-    if (!row) return;
     switch (row.kind) {
-        case WCRowKindSwitch:
-            break;
+        case WCRowKindSwitch: break;
         case WCRowKindActionDetail:
             WCPresentActionPicker(self, row.title, row.selfMessage, row.defaultsKey);
             break;
@@ -434,41 +491,6 @@ static NSString *kOtherCollapseKey = @"com.qiu7c.wcgesture.settings.collapse.oth
             WCPresentTriggerDistanceEditor(self);
             break;
     }
-}
-
-- (CGFloat)tableView:(__unused UITableView *)tableView heightForFooterInSection:(__unused NSInteger)section {
-    return (NSInteger)section == (NSInteger)self.sections.count - 1 ? 100 : 0;
-}
-
-- (UIView *)tableView:(__unused UITableView *)tableView viewForFooterInSection:(NSInteger)section {
-    if (section != (NSInteger)self.sections.count - 1) return nil;
-    UIView *footer = [[UIView alloc] initWithFrame:CGRectMake(0, 0, tableView.bounds.size.width, 100)];
-    UILabel *version = [[UILabel alloc] init];
-    version.text = @"版本 1.0.0";
-    version.font = [UIFont systemFontOfSize:13];
-    version.textColor = [UIColor tertiaryLabelColor];
-    version.textAlignment = NSTextAlignmentCenter;
-    UILabel *author = [[UILabel alloc] init];
-    author.text = @"联系作者：占位符";
-    author.font = [UIFont systemFontOfSize:13];
-    author.textColor = [UIColor tertiaryLabelColor];
-    author.textAlignment = NSTextAlignmentCenter;
-    UILabel *brand = [[UILabel alloc] init];
-    brand.text = @"WCGesture by Cc";
-    brand.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
-    brand.textColor = [UIColor secondaryLabelColor];
-    brand.textAlignment = NSTextAlignmentCenter;
-    UIStackView *stack = [[UIStackView alloc] initWithArrangedSubviews:@[version, author, brand]];
-    stack.axis = UILayoutConstraintAxisVertical;
-    stack.alignment = UIStackViewAlignmentCenter;
-    stack.spacing = 4;
-    stack.translatesAutoresizingMaskIntoConstraints = NO;
-    [footer addSubview:stack];
-    [NSLayoutConstraint activateConstraints:@[
-        [stack.centerXAnchor constraintEqualToAnchor:footer.centerXAnchor],
-        [stack.centerYAnchor constraintEqualToAnchor:footer.centerYAnchor],
-    ]];
-    return footer;
 }
 
 @end

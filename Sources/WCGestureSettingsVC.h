@@ -2,9 +2,14 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-/// A real UITableViewController subclass registered with WeChat's WCPluginsMgr.
-/// WeChat instantiates it by class name when the user taps the plugin entry.
-@interface WCGestureSettingsController : UITableViewController
+/// Home page: two rounded cards (聊天页手势 / 其他手势) + footer info.
+/// Registered with WeChat's WCPluginsMgr; instantiated by class name.
+@interface WCGestureSettingsController : UIViewController
+@end
+
+/// Detail page for a category of gestures.
+@interface WCGestureDetailController : UITableViewController
+- (instancetype)initWithCategory:(NSInteger)category;
 @end
 
 /// Presents the WCGesture settings sheet (ActionSheet style) from the given

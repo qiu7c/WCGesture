@@ -1328,6 +1328,9 @@ static void WCSynchronizeMomentsDoubleTap(WCTimeLineCellView *cell) {
     @autoreleasepool {
         WCGestureRegisterDefaults();
         WCInstallServiceCenterCompatibility();
+        // Cache the current-user wxid asynchronously; voice/text repeat need it
+        // to fill m_nsFromUsr. Refresh again when opening settings.
+        dispatch_async(dispatch_get_main_queue(), ^{ WCRefreshCachedCurrentUser(); });
         WCGestureRegisterEntry();
         %init;
 
