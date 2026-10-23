@@ -22,12 +22,6 @@ static NSString *WCActionName(NSInteger action, BOOL selfMessage) {
     return @"不设置";
 }
 
-static BOOL WCIsSelfActionKey(NSString *key) {
-    return [key isEqualToString:WCReplySwipeSelfActionKey] ||
-           [key isEqualToString:WCReplySwipeRightSelfActionKey] ||
-           [key isEqualToString:WCMessageDoubleTapSelfActionKey] ||
-           [key isEqualToString:WCMessageTripleTapSelfActionKey];
-}
 
 static UIWindow *WCActiveWindow(void) {
     for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
@@ -220,14 +214,6 @@ void WCGesturePresentSettings(UIViewController *presenter) {
 }
 
 #pragma mark - Entry registration
-
-static UIViewController *WCFindWeChatRootController(void) {
-    Class rootVCClass = NSClassFromString(@"RootViewController");
-    UIViewController *root = WCActiveWindow().rootViewController;
-    if (rootVCClass && [root isKindOfClass:rootVCClass]) return root;
-    while (root.presentedViewController) root = root.presentedViewController;
-    return root;
-}
 
 void WCGestureRegisterEntry(void) {
     // Try WCPluginsMgr registration first (WCAtlas-style), else no-op:
