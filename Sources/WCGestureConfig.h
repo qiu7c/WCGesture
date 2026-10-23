@@ -18,8 +18,25 @@ FOUNDATION_EXPORT NSString *const WCMessageDoubleTapOtherActionKey;
 FOUNDATION_EXPORT NSString *const WCMessageTripleTapSelfActionKey;
 FOUNDATION_EXPORT NSString *const WCMessageTripleTapOtherActionKey;
 
-/// Input-box swipe keys (left = clear, right = paste).
-FOUNDATION_EXPORT NSString *const WCInputSwipeActionsEnabledKey;
+/// Input-box gesture keys (swipe + multi-tap on the chat input).
+FOUNDATION_EXPORT NSString *const WCInputGestureEnabledKey;
+FOUNDATION_EXPORT NSString *const WCInputSwipeLeftActionKey;
+FOUNDATION_EXPORT NSString *const WCInputSwipeRightActionKey;
+FOUNDATION_EXPORT NSString *const WCInputDoubleTapActionKey;
+FOUNDATION_EXPORT NSString *const WCInputTripleTapActionKey;
+
+/// Moments (朋友圈) double-tap like.
+FOUNDATION_EXPORT NSString *const WCMomentsDoubleTapLikeKey;
+FOUNDATION_EXPORT NSString *const WCMomentsLikeHapticKey;
+
+/// Input-box gesture action enum (shared by swipe and multi-tap).
+typedef NS_ENUM(NSInteger, WCInputAction) {
+    WCInputActionNone = 0,
+    WCInputActionClear = 1,   // 清空输入框
+    WCInputActionPaste = 2,   // 粘贴剪贴板
+    WCInputActionCopy = 3,    // 复制输入框内容
+    WCInputActionCut = 4,     // 剪切输入框内容
+};
 
 /// Notification posted when an enhancement key changes, so gesture recognizers
 /// can be re-synchronized on the next view appearance. Object carries the key.

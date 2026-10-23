@@ -13,7 +13,14 @@ NSString *const WCMessageDoubleTapOtherActionKey = @"com.qiu7c.wcgesture.chat.me
 NSString *const WCMessageTripleTapSelfActionKey = @"com.qiu7c.wcgesture.chat.message-gesture.triple-tap.self-action";
 NSString *const WCMessageTripleTapOtherActionKey = @"com.qiu7c.wcgesture.chat.message-gesture.triple-tap.other-action";
 
-NSString *const WCInputSwipeActionsEnabledKey = @"com.qiu7c.wcgesture.chat.input-swipe-actions";
+NSString *const WCInputGestureEnabledKey = @"com.qiu7c.wcgesture.chat.input-gesture";
+NSString *const WCInputSwipeLeftActionKey = @"com.qiu7c.wcgesture.chat.input-gesture.swipe.left";
+NSString *const WCInputSwipeRightActionKey = @"com.qiu7c.wcgesture.chat.input-gesture.swipe.right";
+NSString *const WCInputDoubleTapActionKey = @"com.qiu7c.wcgesture.chat.input-gesture.double-tap";
+NSString *const WCInputTripleTapActionKey = @"com.qiu7c.wcgesture.chat.input-gesture.triple-tap";
+
+NSString *const WCMomentsDoubleTapLikeKey = @"com.qiu7c.wcgesture.moments.double-tap-like";
+NSString *const WCMomentsLikeHapticKey = @"com.qiu7c.wcgesture.moments.like-haptic";
 
 NSString *const WCGestureDidChangeNotification = @"WCGestureDidChangeNotification";
 
@@ -32,16 +39,22 @@ void WCGestureRegisterDefaults(void) {
             WCMessageDoubleTapOtherActionKey: @(WCReplySwipeActionNone),
             WCMessageTripleTapSelfActionKey: @(WCReplySwipeActionNone),
             WCMessageTripleTapOtherActionKey: @(WCReplySwipeActionNone),
-            WCInputSwipeActionsEnabledKey: @NO,
+            WCInputGestureEnabledKey: @NO,
+            WCInputSwipeLeftActionKey: @(WCInputActionClear),
+            WCInputSwipeRightActionKey: @(WCInputActionPaste),
+            WCInputDoubleTapActionKey: @(WCInputActionNone),
+            WCInputTripleTapActionKey: @(WCInputActionNone),
+            WCMomentsDoubleTapLikeKey: @NO,
+            WCMomentsLikeHapticKey: @YES,
         };
         [[NSUserDefaults standardUserDefaults] registerDefaults:defaults];
     });
 }
 
 BOOL WCGestureEnabled(NSString *key) {
+    // The per-feature switches gate everything; there is no separate master
+    // switch in the UI, so each gesture is controlled by its own key.
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    BOOL masterEnabled = [defaults boolForKey:WCGestureEnabledKey];
-    if (!masterEnabled) return NO;
     if (key.length == 0) return YES;
     return [defaults boolForKey:key];
 }

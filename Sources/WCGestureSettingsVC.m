@@ -105,11 +105,32 @@ static void WCPresentTriggerDistanceEditor(UIViewController *presenter) {
     [presenter presentViewController:alert animated:YES completion:nil];
 }
 
+#pragma mark - Input swipe action picker
+
+static void WCPresentInputSwipeActionPicker(UIViewController *presenter, NSString *title, NSString *defaultsKey) {
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSInteger current = [defaults integerForKey:defaultsKey];
+    UIAlertController *sheet = [UIAlertController alertControllerWithTitle:title
+        message:@"选择触发动作"
+         preferredStyle:UIAlertControllerStyleActionSheet];
+    for (NSDictionary *option in WCInputActionOptions()) {
+        NSInteger value = [option[@"value"] integerValue];
+        NSString *label = value == current ? [@"✓  " stringByAppendingString:option[@"title"]] : option[@"title"];
+        [sheet addAction:[UIAlertAction actionWithTitle:label style:UIAlertActionStyleDefault
+            handler:^(__unused UIAlertAction *action) {
+                WCSetInteger(value, defaultsKey);
+            }]];
+    }
+    [sheet addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
+    [presenter presentViewController:sheet animated:YES completion:nil];
+}
+
 #pragma mark - Row model
 
 typedef NS_ENUM(NSInteger, WCRowKind) {
     WCRowKindSwitch,        // toggle
-    WCRowKindActionDetail,  // tap → action picker
+    WCRowKindActionDetail,  // tap → message action picker
+    WCRowKindInputAction,   // tap → input swipe action picker
     WCRowKindDistance,      // tap → number editor
 };
 
@@ -147,6 +168,31 @@ static WCRow *WCDistanceRow(NSString *title) {
     return row;
 }
 
+static WCRow *WCInputActionRow(NSString *title, NSString *key) {
+    WCRow *row = [WCRow new];
+    row.title = title;
+    row.defaultsKey = key;
+    row.kind = WCRowKindInputAction;
+    return row;
+}
+
+static NSArray<NSDictionary *> *WCInputActionOptions(void) {
+    return @[
+        @{ @"title": @"不设置", @"value": @(WCInputActionNone) },
+        @{ @"title": @"清空", @"value": @(WCInputActionClear) },
+        @{ @"title": @"粘贴", @"value": @(WCInputActionPaste) },
+        @{ @"title": @"复制", @"value": @(WCInputActionCopy) },
+        @{ @"title": @"剪切", @"value": @(WCInputActionCut) },
+    ];
+}
+
+static NSString *WCInputActionName(NSInteger action) {
+    for (NSDictionary *option in WCInputActionOptions()) {
+        if ([option[@"value"] integerValue] == action) return option[@"title"];
+    }
+    return @"清空";
+}
+
 static NSString *WCRowDetailText(WCRow *row) {
     NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
     switch (row.kind) {
@@ -154,6 +200,8 @@ static NSString *WCRowDetailText(WCRow *row) {
             return [d boolForKey:row.defaultsKey] ? @"开" : @"关";
         case WCRowKindActionDetail:
             return WCActionName([d integerForKey:row.defaultsKey], row.selfMessage);
+        case WCRowKindInputAction:
+            return WCInputActionName([d integerForKey:row.defaultsKey]);
         case WCRowKindDistance: {
             double v = [d doubleForKey:WCReplySwipeTriggerDistanceKey];
             return [NSString stringWithFormat:@"%.0f", v <= 0 ? 56.0 : v];
@@ -164,14 +212,33 @@ static NSString *WCRowDetailText(WCRow *row) {
 
 #pragma mark - Settings controller (registered with WCPluginsMgr)
 
+@interface WCSection : NSObject
+@property (nonatomic, copy) NSString *title;
+@property (nonatomic, copy) NSString *footer;
+@property (nonatomic, copy) NSArray<WCRow *> *headerRows;   // always-visible rows
+@property (nonatomic, copy) NSArray<WCRow *> *detailRows;   // shown when expanded
+@property (nonatomic, assign) BOOL expanded;
+@property (nonatomic, copy) NSString *collapseKey;          // NSUserDefaults key for collapse state
+@end
+@implementation WCSection
+@end
+
+static NSString *kChatPageCollapseKey = @"com.qiu7c.wcgesture.settings.collapse.chatpage";
+static NSString *kOtherCollapseKey = @"com.qiu7c.wcgesture.settings.collapse.other";
+
 @interface WCGestureSettingsController ()
-@property (nonatomic, copy) NSArray<NSArray<WCRow *> *> *sections;
+@property (nonatomic, copy) NSArray<WCSection *> *sections;
 @end
 
 @implementation WCGestureSettingsController
 
-- (void)wc_finishInit {
-    self.title = @"微信手势";
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    self.title = @"WCGesture";
+    self.tableView.backgroundColor = [UIColor systemGroupedBackgroundColor];
+    self.tableView.sectionHeaderTopPadding = 0;
+    self.tableView.rowHeight = UITableViewAutomaticDimension;
+    self.tableView.estimatedRowHeight = 48;
     [self rebuildSections];
     [[NSNotificationCenter defaultCenter] addObserver:self
         selector:@selector(settingsDidChange:) name:WCGestureDidChangeNotification object:nil];
@@ -179,7 +246,7 @@ static NSString *WCRowDetailText(WCRow *row) {
 
 - (instancetype)initWithStyle:(UITableViewStyle)style {
     self = [super initWithStyle:UITableViewStyleInsetGrouped];
-    if (self) [self wc_finishInit];
+    if (self) [self rebuildSections];
     return self;
 }
 
@@ -198,28 +265,57 @@ static NSString *WCRowDetailText(WCRow *row) {
 
 - (void)rebuildSections {
     NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
-    BOOL msgGesture = [d boolForKey:WCReplySwipeEnabledKey];
-    NSMutableArray<WCRow *> *general = [NSMutableArray array];
-    [general addObject:WCSwitchRow(@"手势总开关", WCGestureEnabledKey)];
 
-    NSMutableArray<WCRow *> *msg = [NSMutableArray array];
-    [msg addObject:WCSwitchRow(@"消息手势", WCReplySwipeEnabledKey)];
+    // ── 聊天页手势 ──
+    BOOL msgGesture = [d boolForKey:WCReplySwipeEnabledKey];
+    BOOL inputGesture = [d boolForKey:WCInputGestureEnabledKey];
+    NSMutableArray *chatHeader = [NSMutableArray array];
+    [chatHeader addObject:WCSwitchRow(@"消息手势", WCReplySwipeEnabledKey)];
+    [chatHeader addObject:WCSwitchRow(@"输入框手势", WCInputGestureEnabledKey)];
+
+    NSMutableArray *chatDetail = [NSMutableArray array];
     if (msgGesture) {
-        [msg addObject:WCActionRow(@"左滑 · 自己", WCReplySwipeSelfActionKey, YES)];
-        [msg addObject:WCActionRow(@"左滑 · 对方", WCReplySwipeOtherActionKey, NO)];
-        [msg addObject:WCActionRow(@"右滑 · 自己", WCReplySwipeRightSelfActionKey, YES)];
-        [msg addObject:WCActionRow(@"右滑 · 对方", WCReplySwipeRightOtherActionKey, NO)];
-        [msg addObject:WCActionRow(@"双击 · 自己", WCMessageDoubleTapSelfActionKey, YES)];
-        [msg addObject:WCActionRow(@"双击 · 对方", WCMessageDoubleTapOtherActionKey, NO)];
-        [msg addObject:WCActionRow(@"三击 · 自己", WCMessageTripleTapSelfActionKey, YES)];
-        [msg addObject:WCActionRow(@"三击 · 对方", WCMessageTripleTapOtherActionKey, NO)];
-        [msg addObject:WCDistanceRow(@"触发距离")];
+        [chatDetail addObject:WCActionRow(@"左滑 · 自己", WCReplySwipeSelfActionKey, YES)];
+        [chatDetail addObject:WCActionRow(@"左滑 · 对方", WCReplySwipeOtherActionKey, NO)];
+        [chatDetail addObject:WCActionRow(@"右滑 · 自己", WCReplySwipeRightSelfActionKey, YES)];
+        [chatDetail addObject:WCActionRow(@"右滑 · 对方", WCReplySwipeRightOtherActionKey, NO)];
+        [chatDetail addObject:WCActionRow(@"双击 · 自己", WCMessageDoubleTapSelfActionKey, YES)];
+        [chatDetail addObject:WCActionRow(@"双击 · 对方", WCMessageDoubleTapOtherActionKey, NO)];
+        [chatDetail addObject:WCActionRow(@"三击 · 自己", WCMessageTripleTapSelfActionKey, YES)];
+        [chatDetail addObject:WCActionRow(@"三击 · 对方", WCMessageTripleTapOtherActionKey, NO)];
+        [chatDetail addObject:WCDistanceRow(@"触发距离")];
+    }
+    if (inputGesture) {
+        [chatDetail addObject:WCInputActionRow(@"左滑动作", WCInputSwipeLeftActionKey)];
+        [chatDetail addObject:WCInputActionRow(@"右滑动作", WCInputSwipeRightActionKey)];
+        [chatDetail addObject:WCInputActionRow(@"双击动作", WCInputDoubleTapActionKey)];
+        [chatDetail addObject:WCInputActionRow(@"三击动作", WCInputTripleTapActionKey)];
     }
 
-    NSMutableArray<WCRow *> *input = [NSMutableArray array];
-    [input addObject:WCSwitchRow(@"输入框滑动", WCInputSwipeActionsEnabledKey)];
+    WCSection *chat = [WCSection new];
+    chat.title = @"聊天页手势";
+    chat.headerRows = chatHeader;
+    chat.detailRows = chatDetail;
+    chat.collapseKey = kChatPageCollapseKey;
+    chat.expanded = ![d boolForKey:chat.collapseKey];
 
-    self.sections = @[general, msg, input];
+    // ── 其他手势 ──
+    NSMutableArray *otherHeader = [NSMutableArray array];
+    [otherHeader addObject:WCSwitchRow(@"朋友圈双击点赞", WCMomentsDoubleTapLikeKey)];
+
+    NSMutableArray *otherDetail = [NSMutableArray array];
+    if ([d boolForKey:WCMomentsDoubleTapLikeKey]) {
+        [otherDetail addObject:WCSwitchRow(@"点赞触感反馈", WCMomentsLikeHapticKey)];
+    }
+
+    WCSection *other = [WCSection new];
+    other.title = @"其他手势";
+    other.headerRows = otherHeader;
+    other.detailRows = otherDetail;
+    other.collapseKey = kOtherCollapseKey;
+    other.expanded = ![d boolForKey:other.collapseKey];
+
+    self.sections = @[chat, other];
 }
 
 #pragma mark - Table view
@@ -229,11 +325,43 @@ static NSString *WCRowDetailText(WCRow *row) {
 }
 
 - (NSInteger)tableView:(__unused UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
-    return self.sections[section].count;
+    WCSection *sec = self.sections[section];
+    NSUInteger count = sec.headerRows.count;
+    if (sec.expanded) count += sec.detailRows.count;
+    return count;
+}
+
+- (UIView *)tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section {
+    WCSection *sec = self.sections[section];
+    UIButton *header = [UIButton buttonWithType:UIButtonTypeSystem];
+    header.frame = CGRectMake(0, 0, tableView.bounds.size.width, 44);
+    [header setTitle:[NSString stringWithFormat:@"  %@  %@", sec.title, sec.expanded ? @"▾" : @"▸"]
+           forState:UIControlStateNormal];
+    header.contentHorizontalAlignment = UIControlContentHorizontalAlignmentLeft;
+    header.titleLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightSemibold];
+    [header setTitleColor:[UIColor secondaryLabelColor] forState:UIControlStateNormal];
+    header.tag = section;
+    [header addTarget:self action:@selector(toggleSection:) forControlEvents:UIControlEventTouchUpInside];
+    return header;
+}
+
+- (CGFloat)tableView:(__unused UITableView *)tableView heightForHeaderInSection:(__unused NSInteger)section {
+    return 44;
+}
+
+- (nullable NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
+    return self.sections[section].footer;
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
-    WCRow *row = self.sections[indexPath.section][indexPath.row];
+    WCSection *sec = self.sections[indexPath.section];
+    WCRow *row;
+    if ((NSUInteger)indexPath.row < sec.headerRows.count) {
+        row = sec.headerRows[indexPath.row];
+    } else {
+        NSUInteger detailIdx = (NSUInteger)indexPath.row - sec.headerRows.count;
+        if (detailIdx < sec.detailRows.count) row = sec.detailRows[detailIdx];
+    }
     NSString *cellId = @"WCGestureCell";
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:cellId];
     if (!cell) {
@@ -242,6 +370,9 @@ static NSString *WCRowDetailText(WCRow *row) {
     }
     cell.textLabel.text = row.title;
     cell.detailTextLabel.text = WCRowDetailText(row);
+    cell.accessoryView = nil;
+    cell.accessoryType = UITableViewCellAccessoryNone;
+    cell.selectionStyle = UITableViewCellSelectionStyleNone;
     if (row.kind == WCRowKindSwitch) {
         UISwitch *sw = [[UISwitch alloc] init];
         [sw addTarget:self action:@selector(handleSwitch:) forControlEvents:UIControlEventValueChanged];
@@ -249,36 +380,93 @@ static NSString *WCRowDetailText(WCRow *row) {
         sw.on = [[NSUserDefaults standardUserDefaults] boolForKey:row.defaultsKey];
         cell.accessoryView = sw;
     } else {
-        cell.accessoryView = nil;
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
         cell.selectionStyle = UITableViewCellSelectionStyleDefault;
     }
     return cell;
 }
 
+- (void)toggleSection:(UIButton *)header {
+    NSInteger section = header.tag;
+    if (section < 0 || section >= (NSInteger)self.sections.count) return;
+    WCSection *sec = self.sections[section];
+    sec.expanded = !sec.expanded;
+    [[NSUserDefaults standardUserDefaults] setBool:!sec.expanded forKey:sec.collapseKey];
+    [self.tableView reloadData];
+}
+
 - (void)handleSwitch:(UISwitch *)sw {
     NSInteger section = sw.tag / 10000;
     NSInteger rowIdx = sw.tag % 10000;
     if (section < 0 || section >= (NSInteger)self.sections.count) return;
-    NSArray<WCRow *> *rows = self.sections[section];
-    if (rowIdx < 0 || rowIdx >= (NSInteger)rows.count) return;
-    WCRow *row = rows[rowIdx];
-    WCSetBool(sw.on, row.defaultsKey);
+    WCSection *sec = self.sections[section];
+    WCRow *row;
+    if ((NSUInteger)rowIdx < sec.headerRows.count) row = sec.headerRows[rowIdx];
+    else {
+        NSUInteger detailIdx = (NSUInteger)rowIdx - sec.headerRows.count;
+        if (detailIdx < sec.detailRows.count) row = sec.detailRows[detailIdx];
+    }
+    if (row) WCSetBool(sw.on, row.defaultsKey);
 }
 
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
-    WCRow *row = self.sections[indexPath.section][indexPath.row];
+    WCSection *sec = self.sections[indexPath.section];
+    WCRow *row;
+    if ((NSUInteger)indexPath.row < sec.headerRows.count) row = sec.headerRows[indexPath.row];
+    else {
+        NSUInteger detailIdx = (NSUInteger)indexPath.row - sec.headerRows.count;
+        if (detailIdx < sec.detailRows.count) row = sec.detailRows[detailIdx];
+    }
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
+    if (!row) return;
     switch (row.kind) {
         case WCRowKindSwitch:
             break;
         case WCRowKindActionDetail:
             WCPresentActionPicker(self, row.title, row.selfMessage, row.defaultsKey);
             break;
+        case WCRowKindInputAction:
+            WCPresentInputSwipeActionPicker(self, row.title, row.defaultsKey);
+            break;
         case WCRowKindDistance:
             WCPresentTriggerDistanceEditor(self);
             break;
     }
+}
+
+- (CGFloat)tableView:(__unused UITableView *)tableView heightForFooterInSection:(__unused NSInteger)section {
+    return (NSInteger)section == (NSInteger)self.sections.count - 1 ? 100 : 0;
+}
+
+- (UIView *)tableView:(__unused UITableView *)tableView viewForFooterInSection:(NSInteger)section {
+    if (section != (NSInteger)self.sections.count - 1) return nil;
+    UIView *footer = [[UIView alloc] initWithFrame:CGRectMake(0, 0, tableView.bounds.size.width, 100)];
+    UILabel *version = [[UILabel alloc] init];
+    version.text = @"版本 1.0.0";
+    version.font = [UIFont systemFontOfSize:13];
+    version.textColor = [UIColor tertiaryLabelColor];
+    version.textAlignment = NSTextAlignmentCenter;
+    UILabel *author = [[UILabel alloc] init];
+    author.text = @"联系作者：占位符";
+    author.font = [UIFont systemFontOfSize:13];
+    author.textColor = [UIColor tertiaryLabelColor];
+    author.textAlignment = NSTextAlignmentCenter;
+    UILabel *brand = [[UILabel alloc] init];
+    brand.text = @"WCGesture by Cc";
+    brand.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
+    brand.textColor = [UIColor secondaryLabelColor];
+    brand.textAlignment = NSTextAlignmentCenter;
+    UIStackView *stack = [[UIStackView alloc] initWithArrangedSubviews:@[version, author, brand]];
+    stack.axis = UILayoutConstraintAxisVertical;
+    stack.alignment = UIStackViewAlignmentCenter;
+    stack.spacing = 4;
+    stack.translatesAutoresizingMaskIntoConstraints = NO;
+    [footer addSubview:stack];
+    [NSLayoutConstraint activateConstraints:@[
+        [stack.centerXAnchor constraintEqualToAnchor:footer.centerXAnchor],
+        [stack.centerYAnchor constraintEqualToAnchor:footer.centerYAnchor],
+    ]];
+    return footer;
 }
 
 @end
@@ -295,28 +483,21 @@ void WCGesturePresentSettings(UIViewController *presenter) {
     }
     if (!presenter) presenter = WCTopViewController();
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    BOOL master = [defaults boolForKey:WCGestureEnabledKey];
     BOOL msgGesture = [defaults boolForKey:WCReplySwipeEnabledKey];
-    BOOL inputSwipe = [defaults boolForKey:WCInputSwipeActionsEnabledKey];
+    BOOL inputGesture = [defaults boolForKey:WCInputGestureEnabledKey];
 
     UIAlertController *sheet = [UIAlertController alertControllerWithTitle:@"微信手势"
-        message:master ? @"WCGesture 设置" : @"手势总开关已关闭"
+        message:@"WCGesture 设置"
          preferredStyle:UIAlertControllerStyleActionSheet];
 
-    [sheet addAction:[UIAlertAction actionWithTitle:master ? @"关闭手势总开关" : @"开启手势总开关"
+    [sheet addAction:[UIAlertAction actionWithTitle:msgGesture ? @"消息手势：开" : @"消息手势：关"
         style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
-            WCSetBool(!master, WCGestureEnabledKey);
+            WCSetBool(!msgGesture, WCReplySwipeEnabledKey);
         }]];
-    if (master) {
-        [sheet addAction:[UIAlertAction actionWithTitle:msgGesture ? @"消息手势：开" : @"消息手势：关"
-            style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
-                WCSetBool(!msgGesture, WCReplySwipeEnabledKey);
-            }]];
-        [sheet addAction:[UIAlertAction actionWithTitle:inputSwipe ? @"输入框滑动：开" : @"输入框滑动：关"
-            style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
-                WCSetBool(!inputSwipe, WCInputSwipeActionsEnabledKey);
-            }]];
-    }
+    [sheet addAction:[UIAlertAction actionWithTitle:inputGesture ? @"输入框手势：开" : @"输入框手势：关"
+        style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
+            WCSetBool(!inputGesture, WCInputGestureEnabledKey);
+        }]];
     [sheet addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
     [presenter presentViewController:sheet animated:YES completion:nil];
 }
@@ -340,10 +521,10 @@ void WCGestureRegisterEntry(void) {
         return;
     }
 
-    // Older API: a single switch row.
+    // Older API: a single switch row controlling message gestures.
     SEL registerSwitch = sel_registerName("registerSwitchWithTitle:key:");
     if ([mgr respondsToSelector:registerSwitch]) {
         ((void (*)(id, SEL, id, id))objc_msgSend)(mgr, registerSwitch,
-            @"微信手势", WCGestureEnabledKey);
+            @"微信手势", WCReplySwipeEnabledKey);
     }
 }

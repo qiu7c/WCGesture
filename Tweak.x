@@ -114,6 +114,8 @@ static char WCReplyFeedbackTriggeredKey;
 static char WCReplyPanRightwardKey;
 static char WCInputSwipeLeftRecognizerKey;
 static char WCInputSwipeRightRecognizerKey;
+static char WCInputDoubleTapRecognizerKey;
+static char WCInputTripleTapRecognizerKey;
 
 #pragma mark - Visible chat controller cache (for repeat forwarding)
 
@@ -270,20 +272,35 @@ static BOOL WCIsNavigationReturnGesture(UIGestureRecognizer *candidate, UIView *
 @implementation WCReplyTransformSnapshot
 @end
 
+// Resolves a stable cross-cell message identity. Returns nil when the
+// message lacks a usable identity, so unrelated cells are never matched.
+static NSString *WCMessageIdentityKeyForMessage(id message) {
+    if (!message) return nil;
+    SEL combinedSelector = NSSelectorFromString(@"combineChatNameWithLocalId");
+    if ([message respondsToSelector:combinedSelector]) {
+        id combined = ((id (*)(id, SEL))objc_msgSend)(message, combinedSelector);
+        if ([combined isKindOfClass:[NSString class]] && [combined length] > 0) return combined;
+    }
+    SEL chatSelector = NSSelectorFromString(@"GetChatName");
+    SEL localIDSelector = NSSelectorFromString(@"m_uiMesLocalID");
+    if (![message respondsToSelector:chatSelector] || ![message respondsToSelector:localIDSelector]) return nil;
+    id chatName = ((id (*)(id, SEL))objc_msgSend)(message, chatSelector);
+    if (![chatName isKindOfClass:[NSString class]] || [chatName length] == 0) return nil;
+    unsigned int localID = ((unsigned int (*)(id, SEL))objc_msgSend)(message, localIDSelector);
+    return localID > 0 ? [NSString stringWithFormat:@"%@_%u", chatName, localID] : nil;
+}
+
 // Recursively walks the view tree collecting cells that share the message's
 // identity, so a swipe translates all copies of the same message (e.g. an
-// image cell and its hidden counterpart) together.
+// image cell and its hidden counterpart) together. Cells with no usable
+// identity are skipped entirely.
 static void WCCollectReplyTransformTargets(UIView *view,
                                            NSString *messageKey,
                                            NSMutableArray<WCReplyTransformSnapshot *> *snapshots) {
     if (!view || messageKey.length == 0) return;
     id message = WCMessageWrapForCell(view);
-    // Match by fromUsr + localID as a stable cross-cell identity.
-    NSString *candidateKey = [NSString stringWithFormat:@"%@_%@",
-        WCTweakSafeValue(message, @"m_nsFromUsr"),
-        WCTweakSafeValue(message, @"m_n64MesLocalID")];
-    if (candidateKey.length > 0 && ![candidateKey hasPrefix:@"(null)"] &&
-        [candidateKey isEqualToString:messageKey]) {
+    NSString *candidateKey = WCMessageIdentityKeyForMessage(message);
+    if (candidateKey.length > 0 && [candidateKey isEqualToString:messageKey]) {
         WCReplyTransformSnapshot *snapshot = [WCReplyTransformSnapshot new];
         snapshot.view = view;
         snapshot.transform = view.transform;
@@ -294,12 +311,9 @@ static void WCCollectReplyTransformTargets(UIView *view,
 }
 
 static NSArray<WCReplyTransformSnapshot *> *WCReplyTransformSnapshots(CommonMessageCellView *sourceCell) {
-    id message = WCMessageWrapForCell(sourceCell);
-    NSString *messageKey = [NSString stringWithFormat:@"%@_%@",
-        WCTweakSafeValue(message, @"m_nsFromUsr"),
-        WCTweakSafeValue(message, @"m_n64MesLocalID")];
+    NSString *messageKey = WCMessageIdentityKeyForMessage(WCMessageWrapForCell(sourceCell));
     NSMutableArray<WCReplyTransformSnapshot *> *snapshots = [NSMutableArray array];
-    if (messageKey.length > 0 && ![messageKey hasPrefix:@"(null)"] && sourceCell.window) {
+    if (messageKey.length > 0 && sourceCell.window) {
         WCCollectReplyTransformTargets(sourceCell.window, messageKey, snapshots);
     }
     if (snapshots.count == 0 && sourceCell) {
@@ -528,6 +542,10 @@ static id WCContactForUserName(NSString *userName) {
 // Voice repeat keeps a short native-forward upload window so WeChat's
 // upload pipeline stays in forwarding mode for this resend only.
 static NSTimeInterval WCVoiceRepeatForwardDeadline = 0;
+
+static BOOL WCVoiceRepeatUploadIsActive(void) {
+    return WCVoiceRepeatForwardDeadline > NSDate.date.timeIntervalSince1970;
+}
 
 static BOOL WCSendVoiceMessage(id source, NSString *sourcePathOverride, NSString *session) {
     if (!source || session.length == 0) return NO;
@@ -764,7 +782,7 @@ static BOOL WCPerformMessageGestureAction(CommonMessageCellView *cell, WCReplySw
     return performed;
 }
 
-#pragma mark - Input box swipe
+#pragma mark - Input box gestures (swipe + multi-tap)
 
 static UITextView *WCInnerTextView(id growTextView) {
     id textView = WCTweakSafeValue(growTextView, @"textView");
@@ -772,36 +790,126 @@ static UITextView *WCInnerTextView(id growTextView) {
     return [textView isKindOfClass:[UITextView class]] ? textView : nil;
 }
 
-static void WCSynchronizeInputSwipeActions(MMGrowTextView *view) {
-    if (!view) return;
-    BOOL enabled = WCGestureEnabled(WCInputSwipeActionsEnabledKey);
-    UISwipeGestureRecognizer *left = objc_getAssociatedObject(view, &WCInputSwipeLeftRecognizerKey);
-    UISwipeGestureRecognizer *right = objc_getAssociatedObject(view, &WCInputSwipeRightRecognizerKey);
-    if (enabled) {
-        if (!left) {
-            left = [[UISwipeGestureRecognizer alloc] initWithTarget:view action:@selector(wc_handleInputSwipeLeft:)];
-            left.direction = UISwipeGestureRecognizerDirectionLeft;
-            left.cancelsTouchesInView = NO;
-            [view addGestureRecognizer:left];
-            objc_setAssociatedObject(view, &WCInputSwipeLeftRecognizerKey, left, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        }
-        if (!right) {
-            right = [[UISwipeGestureRecognizer alloc] initWithTarget:view action:@selector(wc_handleInputSwipeRight:)];
-            right.direction = UISwipeGestureRecognizerDirectionRight;
-            right.cancelsTouchesInView = NO;
-            [view addGestureRecognizer:right];
-            objc_setAssociatedObject(view, &WCInputSwipeRightRecognizerKey, right, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+// Performs a configured input-gesture action on the grow-text-view.
+static void WCPerformInputAction(MMGrowTextView *view, WCInputAction action) {
+    if (action == WCInputActionNone) return;
+    UITextView *textView = WCInnerTextView(view);
+    if (action == WCInputActionClear) {
+        WCTweakSetValue(view, @"text", @"");
+        if (textView) {
+            textView.text = @"";
+            textView.selectedRange = NSMakeRange(0, 0);
+            SEL changeSelector = NSSelectorFromString(@"textViewDidChange:");
+            if ([view respondsToSelector:changeSelector]) {
+                ((void (*)(id, SEL, id))objc_msgSend)(view, changeSelector, textView);
+            }
         }
         return;
     }
-    if (left) {
+    if (action == WCInputActionPaste) {
+        if (textView) {
+            [textView becomeFirstResponder];
+            [textView paste:nil];
+            return;
+        }
+        NSString *pasteText = UIPasteboard.generalPasteboard.string;
+        if (pasteText.length == 0) return;
+        NSString *currentText = WCTweakSafeValue(view, @"text");
+        if (![currentText isKindOfClass:[NSString class]]) currentText = @"";
+        WCTweakSetValue(view, @"text", [currentText stringByAppendingString:pasteText]);
+        return;
+    }
+    if (action == WCInputActionCopy) {
+        NSString *text = WCTweakSafeValue(view, @"text");
+        if ([text length] > 0) UIPasteboard.generalPasteboard.string = text;
+        return;
+    }
+    if (action == WCInputActionCut) {
+        NSString *text = WCTweakSafeValue(view, @"text");
+        if ([text length] > 0) {
+            UIPasteboard.generalPasteboard.string = text;
+            WCTweakSetValue(view, @"text", @"");
+            if (textView) {
+                textView.text = @"";
+                textView.selectedRange = NSMakeRange(0, 0);
+                SEL changeSelector = NSSelectorFromString(@"textViewDidChange:");
+                if ([view respondsToSelector:changeSelector]) {
+                    ((void (*)(id, SEL, id))objc_msgSend)(view, changeSelector, textView);
+                }
+            }
+        }
+    }
+}
+
+static void WCSynchronizeInputGestures(MMGrowTextView *view) {
+    if (!view) return;
+    BOOL enabled = WCGestureEnabled(WCInputGestureEnabledKey) && view.window;
+    // Swipe recognizers
+    UISwipeGestureRecognizer *left = objc_getAssociatedObject(view, &WCInputSwipeLeftRecognizerKey);
+    UISwipeGestureRecognizer *right = objc_getAssociatedObject(view, &WCInputSwipeRightRecognizerKey);
+    BOOL swipeLeftOn = enabled && (WCInputAction)[[NSUserDefaults standardUserDefaults]
+        integerForKey:WCInputSwipeLeftActionKey] != WCInputActionNone;
+    BOOL swipeRightOn = enabled && (WCInputAction)[[NSUserDefaults standardUserDefaults]
+        integerForKey:WCInputSwipeRightActionKey] != WCInputActionNone;
+    if (swipeLeftOn && !left) {
+        left = [[UISwipeGestureRecognizer alloc] initWithTarget:view action:@selector(wc_handleInputSwipeLeft:)];
+        left.direction = UISwipeGestureRecognizerDirectionLeft;
+        left.cancelsTouchesInView = NO;
+        [view addGestureRecognizer:left];
+        objc_setAssociatedObject(view, &WCInputSwipeLeftRecognizerKey, left, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    } else if (!swipeLeftOn && left) {
         [view removeGestureRecognizer:left];
         objc_setAssociatedObject(view, &WCInputSwipeLeftRecognizerKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
-    if (right) {
+    if (swipeRightOn && !right) {
+        right = [[UISwipeGestureRecognizer alloc] initWithTarget:view action:@selector(wc_handleInputSwipeRight:)];
+        right.direction = UISwipeGestureRecognizerDirectionRight;
+        right.cancelsTouchesInView = NO;
+        [view addGestureRecognizer:right];
+        objc_setAssociatedObject(view, &WCInputSwipeRightRecognizerKey, right, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    } else if (!swipeRightOn && right) {
         [view removeGestureRecognizer:right];
         objc_setAssociatedObject(view, &WCInputSwipeRightRecognizerKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
+    // Multi-tap recognizers
+    UITapGestureRecognizer *doubleTap = objc_getAssociatedObject(view, &WCInputDoubleTapRecognizerKey);
+    UITapGestureRecognizer *tripleTap = objc_getAssociatedObject(view, &WCInputTripleTapRecognizerKey);
+    BOOL doubleOn = enabled && (WCInputAction)[[NSUserDefaults standardUserDefaults]
+        integerForKey:WCInputDoubleTapActionKey] != WCInputActionNone;
+    BOOL tripleOn = enabled && (WCInputAction)[[NSUserDefaults standardUserDefaults]
+        integerForKey:WCInputTripleTapActionKey] != WCInputActionNone;
+    if (!doubleOn && doubleTap) {
+        [view removeGestureRecognizer:doubleTap];
+        objc_setAssociatedObject(view, &WCInputDoubleTapRecognizerKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        doubleTap = nil;
+    }
+    if (!tripleOn && tripleTap) {
+        [view removeGestureRecognizer:tripleTap];
+        objc_setAssociatedObject(view, &WCInputTripleTapRecognizerKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        tripleTap = nil;
+        if (doubleTap) {
+            [view removeGestureRecognizer:doubleTap];
+            objc_setAssociatedObject(view, &WCInputDoubleTapRecognizerKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            doubleTap = nil;
+        }
+    }
+    if (!doubleTap && doubleOn) {
+        doubleTap = [[UITapGestureRecognizer alloc] initWithTarget:view action:@selector(wc_handleInputTapAction:)];
+        doubleTap.numberOfTapsRequired = 2;
+        doubleTap.numberOfTouchesRequired = 1;
+        doubleTap.cancelsTouchesInView = YES;
+        [view addGestureRecognizer:doubleTap];
+        objc_setAssociatedObject(view, &WCInputDoubleTapRecognizerKey, doubleTap, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    if (!tripleTap && tripleOn) {
+        tripleTap = [[UITapGestureRecognizer alloc] initWithTarget:view action:@selector(wc_handleInputTapAction:)];
+        tripleTap.numberOfTapsRequired = 3;
+        tripleTap.numberOfTouchesRequired = 1;
+        tripleTap.cancelsTouchesInView = YES;
+        [view addGestureRecognizer:tripleTap];
+        objc_setAssociatedObject(view, &WCInputTripleTapRecognizerKey, tripleTap, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    if (doubleTap && tripleTap) [doubleTap requireGestureRecognizerToFail:tripleTap];
 }
 
 #pragma mark - Bulk resync on settings change
@@ -960,42 +1068,107 @@ static void WCSynchronizeVisibleReplyGestures(void) {
 
 - (void)didMoveToWindow {
     %orig;
-    WCSynchronizeInputSwipeActions(self);
+    WCSynchronizeInputGestures(self);
 }
 
 %new
 - (void)wc_handleInputSwipeLeft:(UISwipeGestureRecognizer *)recognizer {
     if (recognizer.state != UIGestureRecognizerStateEnded ||
-        !WCGestureEnabled(WCInputSwipeActionsEnabledKey)) return;
-    UITextView *textView = WCInnerTextView(self);
-    WCTweakSetValue(self, @"text", @"");
-    if (textView) {
-        textView.text = @"";
-        textView.selectedRange = NSMakeRange(0, 0);
-        SEL changeSelector = NSSelectorFromString(@"textViewDidChange:");
-        if ([self respondsToSelector:changeSelector]) {
-            ((void (*)(id, SEL, id))objc_msgSend)(self, changeSelector, textView);
-        }
-    }
+        !WCGestureEnabled(WCInputGestureEnabledKey)) return;
+    WCInputAction action = (WCInputAction)[[NSUserDefaults standardUserDefaults]
+        integerForKey:WCInputSwipeLeftActionKey];
+    WCPerformInputAction(self, action);
 }
 
 %new
 - (void)wc_handleInputSwipeRight:(UISwipeGestureRecognizer *)recognizer {
     if (recognizer.state != UIGestureRecognizerStateEnded ||
-        !WCGestureEnabled(WCInputSwipeActionsEnabledKey)) return;
-    UITextView *textView = WCInnerTextView(self);
-    if (textView) {
-        [textView becomeFirstResponder];
-        [textView paste:nil];
-        return;
-    }
-    NSString *pasteText = UIPasteboard.generalPasteboard.string;
-    if (pasteText.length == 0) return;
-    NSString *currentText = WCTweakSafeValue(self, @"text");
-    if (![currentText isKindOfClass:[NSString class]]) currentText = @"";
-    WCTweakSetValue(self, @"text", [currentText stringByAppendingString:pasteText]);
+        !WCGestureEnabled(WCInputGestureEnabledKey)) return;
+    WCInputAction action = (WCInputAction)[[NSUserDefaults standardUserDefaults]
+        integerForKey:WCInputSwipeRightActionKey];
+    WCPerformInputAction(self, action);
 }
 
+%new
+- (void)wc_handleInputTapAction:(UITapGestureRecognizer *)recognizer {
+    if (recognizer.state != UIGestureRecognizerStateRecognized ||
+        !self.window ||
+        !WCGestureEnabled(WCInputGestureEnabledKey)) return;
+    NSString *key = recognizer.numberOfTapsRequired >= 3
+        ? WCInputTripleTapActionKey
+        : WCInputDoubleTapActionKey;
+    WCInputAction action = (WCInputAction)[[NSUserDefaults standardUserDefaults] integerForKey:key];
+    WCPerformInputAction(self, action);
+}
+
+%end
+
+#pragma mark - Voice repeat upload hooks
+
+// These four hooks make voice repeat actually deliver. Without them, the
+// 12-second forward window set by WCSendVoiceMessage is never consulted and
+// WeChat uploads the resent voice in ordinary-recording mode, which it rejects.
+@interface UploadVoiceWrap : NSObject
+@end
+@interface UploadVoiceRequest : NSObject
+@end
+@interface MMNewUploadVoiceMgr : NSObject
+@end
+@interface UploadVoiceCDNMgr : NSObject
+@end
+
+%hook UploadVoiceWrap
+- (void)setM_uiVoiceForwardFlag:(unsigned int)forwardFlag {
+    %orig(WCVoiceRepeatUploadIsActive() ? 1 : forwardFlag);
+}
+%end
+
+%hook UploadVoiceRequest
+- (void)setForwardFlag:(unsigned int)forwardFlag {
+    %orig(WCVoiceRepeatUploadIsActive() ? 1 : forwardFlag);
+}
+%end
+
+%hook MMNewUploadVoiceMgr
+- (void)AddNewPart:(id)part
+           LocalID:(unsigned int)localID
+          n64SvrID:(long long)serverID
+            Offset:(unsigned int)offset
+               Len:(unsigned int)length
+         VoiceTime:(unsigned int)voiceTime
+        CreateTime:(unsigned int)createTime
+           EndFlag:(unsigned int)endFlag
+        CancelFlag:(unsigned int)cancelFlag
+       VoiceFormat:(unsigned int)voiceFormat
+       ForwardFlag:(unsigned int)forwardFlag
+         msgSource:(id)msgSource
+          chatName:(id)chatName {
+    %orig(part, localID, serverID, offset, length, voiceTime, createTime,
+          endFlag, cancelFlag, voiceFormat,
+          WCVoiceRepeatUploadIsActive() ? 1 : forwardFlag,
+          msgSource, chatName);
+}
+%end
+
+%hook UploadVoiceCDNMgr
+- (void)AddNewPart:(id)part
+           LocalID:(unsigned int)localID
+          n64SvrID:(long long)serverID
+            Offset:(unsigned int)offset
+               Len:(unsigned int)length
+         VoiceTime:(unsigned int)voiceTime
+        CreateTime:(unsigned int)createTime
+           EndFlag:(unsigned int)endFlag
+        CancelFlag:(unsigned int)cancelFlag
+       VoiceFormat:(unsigned int)voiceFormat
+       ForwardFlag:(unsigned int)forwardFlag
+         msgSource:(id)msgSource
+          chatName:(id)chatName {
+    %orig(part, localID, serverID, offset, length, voiceTime, createTime,
+          endFlag, cancelFlag, voiceFormat,
+          WCVoiceRepeatUploadIsActive() ? 1 : forwardFlag,
+          msgSource, chatName);
+}
 %end
 
 @interface MoreViewController : UIViewController
@@ -1045,6 +1218,110 @@ static void WCSynchronizeVisibleReplyGestures(void) {
 
 %end
 
+#pragma mark - Moments (朋友圈) double-tap like
+
+@interface WCTimeLineCellView : UIView
+- (void)onAccessibilityLike;
+- (void)didMoveToWindow;
+- (void)setViewModel:(id)viewModel;
+- (void)prepareForReuse;
+@end
+
+static char WCMomentsDoubleTapRecognizerKey;
+
+static BOOL WCMomentsIsNativeDetailContext(id responderObject) {
+    Class detailClass = NSClassFromString(@"WCCommentDetailViewControllerFB");
+    if (!detailClass) return NO;
+    UIViewController *controller = WCViewControllerForResponder(responderObject);
+    for (UIViewController *current = controller; current; current = current.parentViewController) {
+        if ([current isKindOfClass:detailClass]) return YES;
+    }
+    return controller && [controller.navigationController.topViewController isKindOfClass:detailClass];
+}
+
+static void WCShowMomentsHeart(WCTimeLineCellView *cell, UITapGestureRecognizer *recognizer) {
+    UIWindow *window = cell.window;
+    if (!window || !recognizer) return;
+    CGPoint point = [recognizer locationInView:window];
+    UIImageSymbolConfiguration *config = [UIImageSymbolConfiguration configurationWithPointSize:34.0 weight:UIImageSymbolWeightSemibold];
+    UIImageView *heart = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"heart.fill" withConfiguration:config]];
+    heart.tintColor = [UIColor colorWithRed:0.96 green:0.25 blue:0.34 alpha:1.0];
+    heart.contentMode = UIViewContentModeScaleAspectFit;
+    heart.bounds = CGRectMake(0.0, 0.0, 44.0, 44.0);
+    heart.center = point;
+    heart.alpha = 0.0;
+    heart.transform = CGAffineTransformMakeScale(0.52, 0.52);
+    heart.userInteractionEnabled = NO;
+    [window addSubview:heart];
+    [UIView animateKeyframesWithDuration:0.52 delay:0.0
+        options:UIViewKeyframeAnimationOptionCalculationModeCubic | UIViewAnimationOptionAllowUserInteraction
+        animations:^{
+        [UIView addKeyframeWithRelativeStartTime:0.0 relativeDuration:0.30 animations:^{
+            heart.alpha = 1.0;
+            heart.transform = CGAffineTransformConcat(CGAffineTransformMakeTranslation(0.0, -5.0), CGAffineTransformMakeScale(1.12, 1.12));
+        }];
+        [UIView addKeyframeWithRelativeStartTime:0.30 relativeDuration:0.32 animations:^{
+            heart.transform = CGAffineTransformConcat(CGAffineTransformMakeTranslation(0.0, -12.0), CGAffineTransformIdentity);
+        }];
+        [UIView addKeyframeWithRelativeStartTime:0.62 relativeDuration:0.38 animations:^{
+            heart.alpha = 0.0;
+            heart.transform = CGAffineTransformConcat(CGAffineTransformMakeTranslation(0.0, -24.0), CGAffineTransformMakeScale(0.88, 0.88));
+        }];
+    } completion:^(__unused BOOL finished) {
+        [heart removeFromSuperview];
+    }];
+}
+
+static void WCSynchronizeMomentsDoubleTap(WCTimeLineCellView *cell) {
+    if (!cell) return;
+    UITapGestureRecognizer *recognizer = objc_getAssociatedObject(cell, &WCMomentsDoubleTapRecognizerKey);
+    BOOL enabled = WCGestureEnabled(WCMomentsDoubleTapLikeKey) &&
+                   !WCMomentsIsNativeDetailContext(cell);
+    if (enabled && !recognizer) {
+        recognizer = [[UITapGestureRecognizer alloc] initWithTarget:cell action:@selector(wc_handleMomentsDoubleTap)];
+        recognizer.numberOfTapsRequired = 2;
+        recognizer.cancelsTouchesInView = NO;
+        [cell addGestureRecognizer:recognizer];
+        objc_setAssociatedObject(cell, &WCMomentsDoubleTapRecognizerKey, recognizer, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    } else if (!enabled && recognizer) {
+        [cell removeGestureRecognizer:recognizer];
+        objc_setAssociatedObject(cell, &WCMomentsDoubleTapRecognizerKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+}
+
+%hook WCTimeLineCellView
+
+- (void)didMoveToWindow {
+    %orig;
+    WCSynchronizeMomentsDoubleTap(self);
+}
+
+- (void)setViewModel:(id)viewModel {
+    %orig;
+    WCSynchronizeMomentsDoubleTap(self);
+}
+
+- (void)prepareForReuse {
+    %orig;
+    WCSynchronizeMomentsDoubleTap(self);
+}
+
+%new
+- (void)wc_handleMomentsDoubleTap {
+    if (!WCGestureEnabled(WCMomentsDoubleTapLikeKey) ||
+        WCMomentsIsNativeDetailContext(self)) return;
+    UITapGestureRecognizer *recognizer = objc_getAssociatedObject(self, &WCMomentsDoubleTapRecognizerKey);
+    [self onAccessibilityLike];
+    WCShowMomentsHeart(self, recognizer);
+    if ([[NSUserDefaults standardUserDefaults] boolForKey:WCMomentsLikeHapticKey]) {
+        UIImpactFeedbackGenerator *feedback = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleMedium];
+        [feedback prepare];
+        [feedback impactOccurred];
+    }
+}
+
+%end
+
 #pragma mark - Settings change observer
 
 %ctor {
@@ -1070,7 +1347,7 @@ static void WCSynchronizeVisibleReplyGestures(void) {
                         while (stack.count) {
                             UIView *view = stack.lastObject;
                             [stack removeLastObject];
-                            if ([view isKindOfClass:growClass]) WCSynchronizeInputSwipeActions((MMGrowTextView *)view);
+                            if ([view isKindOfClass:growClass]) WCSynchronizeInputGestures((MMGrowTextView *)view);
                             [stack addObjectsFromArray:view.subviews];
                         }
                     }
