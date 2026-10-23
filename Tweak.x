@@ -808,7 +808,10 @@ static void WCSynchronizeInputSwipeActions(MMGrowTextView *view) {
 
 static void WCSynchronizeReplyGesturesInView(UIView *view) {
     if (!view) return;
-    if ([view isKindOfClass:[CommonMessageCellView class]]) {
+    static Class cellViewClass = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{ cellViewClass = NSClassFromString(@"CommonMessageCellView"); });
+    if (cellViewClass && [view isKindOfClass:cellViewClass]) {
         WCSynchronizeReplyGesture((CommonMessageCellView *)view);
     }
     for (UIView *subview in view.subviews) WCSynchronizeReplyGesturesInView(subview);
@@ -995,17 +998,15 @@ static void WCSynchronizeVisibleReplyGestures(void) {
 
 %end
 
-@interface WCTableViewCellManager : NSObject
-+ (id)normalCellForSel:(SEL)sel target:(id)target leftImage:(UIImage *)image title:(NSString *)title WithDisclosureIndicator:(BOOL)indicator;
-@end
-
 @interface MoreViewController : UIViewController
 - (void)addFunctionSection;
 @end
 
 // Adds a "微信手势" row to WeChat's Me page (MoreViewController). We also
 // register through WCPluginsMgr when available; either entry opens the
-// settings sheet. The cell factory mirrors WeChat's own WCTableViewCellManager.
+// settings sheet. The cell factory uses NSClassFromString to reach WeChat's
+// WCTableViewCellManager without creating a link-time class-symbol reference
+// (private classes are only registered at runtime).
 %hook MoreViewController
 
 - (void)addFunctionSection {
@@ -1014,11 +1015,12 @@ static void WCSynchronizeVisibleReplyGestures(void) {
         id tableManager = [self valueForKey:@"m_tableViewMgr"];
         if (![tableManager respondsToSelector:NSSelectorFromString(@"getSectionAt:")]) return;
         UIImage *icon = [UIImage systemImageNamed:@"hand.draw.fill"] ?: [UIImage systemImageNamed:@"hand.draw"];
+        Class cellClass = NSClassFromString(@"WCTableViewCellManager");
         SEL factory = NSSelectorFromString(@"normalCellForSel:target:leftImage:title:WithDisclosureIndicator:");
         id cell = nil;
-        if ([[WCTableViewCellManager class] respondsToSelector:factory]) {
+        if (cellClass && [cellClass respondsToSelector:factory]) {
             cell = ((id (*)(id, SEL, SEL, id, UIImage *, NSString *, BOOL))objc_msgSend)
-                ([WCTableViewCellManager class], factory,
+                (cellClass, factory,
                  @selector(wc_pushGestureSettings), self, icon ?: [UIImage new], @"微信手势", YES);
         }
         if (!cell) return;
