@@ -1,0 +1,9 @@
+Package: com.qiu7c.wcgesture
+Name: WCGesture
+Depends: mobilesubstrate
+Version: 1.0.0
+Architecture: iphoneos-arm
+Description: WeChat message and input-box gestures, extracted from WCAtlas.
+Maintainer: qiu7c
+Author: qiu7c
+Section: Tweaks

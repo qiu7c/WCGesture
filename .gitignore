@@ -1,0 +1,14 @@
+.theos/
+packages/
+*.deb
+.DS_Store
+
+# Local third-party projects used only as implementation references.
+参考/
+.codex-analysis/
+
+# Local maintenance handoff notes; never publish to the repository.
+HANDOFF.md
+
+# Local network environment.
+.env
