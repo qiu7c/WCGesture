@@ -1322,6 +1322,7 @@ static BOOL WCKeyboardEnhanceLastFrameValid = NO;
 static NSTimer *WCKeyboardEnhanceReassertTimer = nil;
 static __weak UIWindow *WCCapturedKeyboardWindow = nil;
 static __weak UIView *WCCapturedKeyboardDockView = nil;
+static BOOL WCKeyboardEnhanceDockRejected = NO;
 
 static void WCKeyboardEnhanceStartReassertTimer(void);
 static void WCKeyboardEnhanceStopReassertTimer(void);
@@ -1368,6 +1369,16 @@ static void WCInstallKeyboardWindowCapture(void) {
     }
 }
 
+// A dock only counts as a host when the user can actually see it: iOS keeps
+// hidden UIKeyboardDockView instances around (iPad dock, hardware-keyboard
+// dock), and attaching there makes the strip invisible.
+static BOOL WCViewHierarchyVisible(UIView *view) {
+    for (UIView *v = view; v; v = v.superview) {
+        if (v.hidden || v.alpha <= 0.01) return NO;
+    }
+    return YES;
+}
+
 // The reliable way to float content over the keyboard (as used by working dock
 // tweaks): become a subview of UIKeyboardDockView. The dock is laid out by the
 // keyboard itself every time it appears, so the strip rides along and nothing
@@ -1380,6 +1391,7 @@ static void WCInstallKeyboardDockHook(void) {
     WCAddInstanceMethod(cls, @selector(layoutSubviews),
                         imp_implementationWithBlock(^(UIView *dock) {
         ((void (*)(id, SEL))originalLayoutSubviews)(dock, @selector(layoutSubviews));
+        if (dock.window == nil || !WCViewHierarchyVisible(dock)) return;
         WCCapturedKeyboardDockView = dock;
         WCKeyboardEnhanceApplyInDock(dock);
     }), &originalLayoutSubviews);
@@ -1391,7 +1403,10 @@ static UIView *WCKeyboardDockViewInWindow(UIWindow *window) {
     while (stack.count) {
         UIView *view = stack.lastObject;
         [stack removeLastObject];
-        if ([NSStringFromClass(view.class) isEqualToString:@"UIKeyboardDockView"]) return view;
+        if ([NSStringFromClass(view.class) isEqualToString:@"UIKeyboardDockView"] &&
+            WCViewHierarchyVisible(view) && CGRectGetWidth(view.bounds) > 100.0) {
+            return view;
+        }
         [stack addObjectsFromArray:view.subviews];
     }
     return nil;
@@ -1525,7 +1540,15 @@ static BOOL WCKeyboardEnhanceApplyInDock(UIView *dock) {
     // bottom edge. Some builds place the dock above the safe-area band; if so,
     // our coordinates would drift up into the key row, so fall back instead.
     CGRect dockInWindow = [dock convertRect:dock.bounds toView:dock.window];
-    if (CGRectGetMaxY(dockInWindow) < CGRectGetHeight(dock.window.bounds) - 1.0) return NO;
+    CGFloat windowHeight = CGRectGetHeight(dock.window.bounds);
+    CGFloat bottomDelta = CGRectGetMaxY(dockInWindow) - windowHeight;
+    if (bottomDelta < -1.0 || bottomDelta > 1.0) return NO;
+    if (!WCViewHierarchyVisible(dock)) return NO;
+    if (CGRectGetWidth(dock.bounds) < 100.0) return NO;
+    // Never host inside a dock that belongs to a *different* keyboard window
+    // (e.g. an inactive or lower-level one), or the strip renders off-screen.
+    UIWindow *topKeyboardWindow = WCSystemKeyboardWindow();
+    if (topKeyboardWindow && dock.window != topKeyboardWindow) return NO;
     CGFloat band = MAX(18.0, safeBottom - 14.0);
 
     WCKeyboardEnhanceEnsureView();
@@ -1546,6 +1569,13 @@ static BOOL WCKeyboardEnhanceApplyInDock(UIView *dock) {
 
     if (WCKeyboardEnhanceView.hidden) WCKeyboardEnhanceView.hidden = NO;
     if (!WCKeyboardEnhanceWindow.hidden) WCKeyboardEnhanceWindow.hidden = YES;
+    // Final safety net: if the dock or one of its ancestors turns out to be
+    // invisible, hand the strip back to WCKeyboardEnhanceApply, which falls
+    // back to the keyboard window instead of leaving an invisible strip.
+    if (WCKeyboardEnhanceView.window == nil || !WCViewHierarchyVisible(WCKeyboardEnhanceView)) {
+        [WCKeyboardEnhanceView removeFromSuperview];
+        return NO;
+    }
     WCKeyboardEnhanceSetDebugText([NSString stringWithFormat:@"触控区 %.0f×%.0f D %.0f",
                                    CGRectGetWidth(target), band, dockHeight]);
     WCKeyboardEnhanceStartReassertTimer();
@@ -1593,12 +1623,14 @@ static void WCKeyboardEnhanceApply(CGRect keyboardFrame) {
         dock = WCKeyboardDockViewInWindow(keyboardWindow);
     }
     if (dock && dock.window && WCKeyboardEnhanceApplyInDock(dock)) return;
+    WCKeyboardEnhanceDockRejected = (dock != nil);
 
     if (keyboardWindow) {
         // ApplyInDock declined to host the strip (geometry guard), so take it
-        // back out of the dock before positioning it in window coordinates.
-        UIView *currentDock = WCCapturedKeyboardDockView;
-        if (currentDock && WCKeyboardEnhanceView.superview == currentDock) {
+        // back out of any dock before positioning it in window coordinates.
+        UIView *host = WCKeyboardEnhanceView.superview;
+        Class dockClass = NSClassFromString(@"UIKeyboardDockView");
+        if (host && dockClass && [host isKindOfClass:dockClass] && host != keyboardWindow) {
             [WCKeyboardEnhanceView removeFromSuperview];
         }
         // Live inside the keyboard window, which is above every normal window.
@@ -1618,8 +1650,9 @@ static void WCKeyboardEnhanceApply(CGRect keyboardFrame) {
             WCKeyboardEnhanceView.frame = target;
         }
         WCKeyboardEnhanceWindow.hidden = YES;
-        NSString *labelText = [NSString stringWithFormat:@"触控区 %.0f×%.0f K %.0f",
-                               CGRectGetWidth(kb), band, keyboardWindow.windowLevel];
+        NSString *labelText = [NSString stringWithFormat:@"触控区 %.0f×%.0f K %.0f%@",
+                               CGRectGetWidth(kb), band, keyboardWindow.windowLevel,
+                               WCKeyboardEnhanceDockRejected ? @" dock×" : @""];
         if (![WCKeyboardEnhanceDebugLabel.text isEqualToString:labelText]) {
             WCKeyboardEnhanceDebugLabel.text = labelText;
         }
