@@ -41,6 +41,7 @@ FOUNDATION_EXPORT NSString *const WCKeyboardTripleTapActionKey;
 /// Debug aid: paints the keyboard gesture strip red and labels its size so the
 /// touchable band is visible while tuning gesture positions.
 FOUNDATION_EXPORT NSString *const WCKeyboardDebugFrameKey;
+FOUNDATION_EXPORT NSString *const WCKeyboardDebugTextKey;
 
 /// Translation engine selection and optional custom (OpenAI-compatible) endpoint.
 typedef NS_ENUM(NSInteger, WCTranslateEngine) {
