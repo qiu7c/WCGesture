@@ -1462,7 +1462,7 @@ static void WCKeyboardEnhanceApply(CGRect keyboardFrame) {
             WCKeyboardEnhanceWindow = window;
             WCKeyboardEnhanceContainer = container;
         }
-        WCKeyboardEnhanceWindow.wcOverrideLevel = desiredLevel;
+        [(WCKeyboardOverlayWindow *)WCKeyboardEnhanceWindow setWcOverrideLevel:desiredLevel];
         WCKeyboardEnhanceWindow.windowLevel = desiredLevel;
         WCKeyboardEnhanceWindow.frame = strip;
         if (WCKeyboardEnhanceView.superview != WCKeyboardEnhanceContainer) {
