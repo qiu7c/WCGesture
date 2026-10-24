@@ -1299,9 +1299,10 @@ static void WCKeyboardEnhancePerform(NSString *actionKey) {
 // The system keyboard lives in UIRemoteKeyboardWindow at level ~10,000,000,
 // far above UIWindowLevelAlert (2000). A plain overlay window is therefore
 // hidden *behind* the keyboard and never receives touches — which is why the
-// strip did nothing. Two paths now: put the strip directly inside the keyboard
-// window (primary), or, when it cannot be found, use an overlay window whose
-// windowLevel getter is overridden (iOS 11+ clamps assignments to the setter).
+// strip did nothing. Attaching the strip inside the keyboard window made it
+// appear briefly and then vanish when the keyboard re-added its own views, so
+// the strip now uses an overlay window whose windowLevel getter returns a level
+// above the keyboard (iOS 11+ clamps assignments to the setter, not the getter).
 @interface WCKeyboardOverlayWindow : UIWindow
 @property (nonatomic, assign) CGFloat wcOverrideLevel;
 @end
@@ -1313,6 +1314,7 @@ static void WCKeyboardEnhancePerform(NSString *actionKey) {
 @end
 
 static UIWindow *WCKeyboardEnhanceWindow = nil;
+static UIView *WCKeyboardEnhanceContainer = nil;
 static UIView *WCKeyboardEnhanceView = nil;
 static UILabel *WCKeyboardEnhanceDebugLabel = nil;
 static CGRect WCKeyboardEnhanceLastFrame = {0};
@@ -1320,6 +1322,8 @@ static BOOL WCKeyboardEnhanceLastFrameValid = NO;
 
 static UIWindow *WCSystemKeyboardWindow(void) {
     NSMutableArray<UIWindow *> *candidates = [NSMutableArray array];
+    UIWindow *best = nil;
+    CGFloat bestLevel = -1.0;
     for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
         if ([scene isKindOfClass:[UIWindowScene class]]) {
             [candidates addObjectsFromArray:((UIWindowScene *)scene).windows];
@@ -1330,9 +1334,14 @@ static UIWindow *WCSystemKeyboardWindow(void) {
     for (UIWindow *window in candidates) {
         if (![window isKindOfClass:[UIWindow class]]) continue;
         if (![NSStringFromClass(window.class) containsString:@"Keyboard"]) continue;
-        if (window.windowLevel >= UIWindowLevelAlert) return window;
+        if (window.windowLevel < UIWindowLevelAlert) continue;
+        // Skip stale, torn-down keyboard windows: only a visible, laid-out
+        // window can be the one the user is typing on.
+        if (window.hidden || window.alpha <= 0.0) continue;
+        if (CGRectGetHeight(window.bounds) <= 0.0) continue;
+        if (window.windowLevel >= bestLevel) { best = window; bestLevel = window.windowLevel; }
     }
-    return nil;
+    return best;
 }
 
 static void WCKeyboardEnhanceHide(void) {
@@ -1410,26 +1419,32 @@ static void WCKeyboardEnhanceApply(CGRect keyboardFrame) {
         ? UIColor.systemRedColor.CGColor : UIColor.clearColor.CGColor;
     WCKeyboardEnhanceDebugLabel.hidden = !debug;
 
+    // The band sits right under the keyboard's key rows and ends 14pt above the
+    // screen bottom, so the home indicator keeps its own swipe area.
+    CGFloat band = MAX(18.0, safeBottom - 14.0);
+
     if (keyboardWindow) {
-        // Primary path: become a direct subview of the system keyboard window,
-        // so the strip is above the keys and receives touches regardless of
-        // window levels.
+        // Same idea as the dock tweaks that work: live inside the keyboard
+        // window, which is above every normal window. The keyboard re-adds its
+        // own views on show, so keep the strip on top (also re-fronted from the
+        // global layoutSubviews hook below).
         if (WCKeyboardEnhanceView.superview != keyboardWindow) {
             [WCKeyboardEnhanceView removeFromSuperview];
             [keyboardWindow addSubview:WCKeyboardEnhanceView];
         } else {
             [keyboardWindow bringSubviewToFront:WCKeyboardEnhanceView];
         }
-        CGRect bounds = keyboardWindow.bounds;
-        CGFloat band = MIN(safeBottom, CGRectGetHeight(bounds));
-        WCKeyboardEnhanceView.frame = CGRectMake(0, CGRectGetHeight(bounds) - band,
-                                                 CGRectGetWidth(bounds), band);
+        CGRect kb = keyboardWindow.bounds;
+        WCKeyboardEnhanceView.frame = CGRectMake(0, CGRectGetHeight(kb) - safeBottom,
+                                                 CGRectGetWidth(kb), band);
         WCKeyboardEnhanceWindow.hidden = YES;
-        WCKeyboardEnhanceDebugLabel.text = [NSString stringWithFormat:@"键盘触控区 %.0f×%.0f",
-                                            CGRectGetWidth(bounds), band];
+        WCKeyboardEnhanceDebugLabel.text = [NSString stringWithFormat:@"触控区 %.0f×%.0f K",
+                                            CGRectGetWidth(kb), band];
     } else {
+        // Fallback: our own window above the keyboard window level.
         CGRect strip = CGRectMake(0, CGRectGetMaxY(keyboardFrame) - safeBottom,
-                                  appWindow.bounds.size.width, safeBottom);
+                                  appWindow.bounds.size.width, band);
+        CGFloat desiredLevel = 10000001.0;
         if (!WCKeyboardEnhanceWindow) {
             WCKeyboardOverlayWindow *window = nil;
             if (@available(iOS 13.0, *)) {
@@ -1437,20 +1452,26 @@ static void WCKeyboardEnhanceApply(CGRect keyboardFrame) {
                 if (scene) window = [[WCKeyboardOverlayWindow alloc] initWithWindowScene:scene];
             }
             if (!window) window = [[WCKeyboardOverlayWindow alloc] initWithFrame:strip];
-            window.wcOverrideLevel = 10000001.0;
-            window.windowLevel = 10000001.0;
             window.backgroundColor = UIColor.clearColor;
             window.hidden = YES;
+            UIViewController *root = [UIViewController new];
+            UIView *container = [[UIView alloc] initWithFrame:CGRectZero];
+            container.backgroundColor = UIColor.clearColor;
+            root.view = container;
+            window.rootViewController = root;
             WCKeyboardEnhanceWindow = window;
+            WCKeyboardEnhanceContainer = container;
         }
-        if (WCKeyboardEnhanceView.superview != WCKeyboardEnhanceWindow) {
-            [WCKeyboardEnhanceView removeFromSuperview];
-            [WCKeyboardEnhanceWindow addSubview:WCKeyboardEnhanceView];
-        }
+        WCKeyboardEnhanceWindow.wcOverrideLevel = desiredLevel;
+        WCKeyboardEnhanceWindow.windowLevel = desiredLevel;
         WCKeyboardEnhanceWindow.frame = strip;
+        if (WCKeyboardEnhanceView.superview != WCKeyboardEnhanceContainer) {
+            [WCKeyboardEnhanceView removeFromSuperview];
+            [WCKeyboardEnhanceContainer addSubview:WCKeyboardEnhanceView];
+        }
         WCKeyboardEnhanceView.frame = CGRectMake(0, 0, strip.size.width, strip.size.height);
         WCKeyboardEnhanceWindow.hidden = NO;
-        WCKeyboardEnhanceDebugLabel.text = [NSString stringWithFormat:@"窗口触控区 %.0f×%.0f",
+        WCKeyboardEnhanceDebugLabel.text = [NSString stringWithFormat:@"触控区 %.0f×%.0f W",
                                             strip.size.width, strip.size.height];
     }
     WCKeyboardEnhanceView.hidden = NO;
@@ -2062,6 +2083,11 @@ static BOOL WCViewLooksLikeGlobalSeparator(UIView *view) {
 
 - (void)layoutSubviews {
     %orig;
+    // The keyboard window re-adds its own content on show; keep the gesture
+    // strip above it so it neither disappears nor stops receiving touches.
+    if (WCKeyboardEnhanceView && self == WCKeyboardEnhanceView.superview) {
+        [self bringSubviewToFront:WCKeyboardEnhanceView];
+    }
     NSNumber *originalHidden = objc_getAssociatedObject(self, &WCSeparatorOriginalHiddenKey);
     BOOL shouldHide = WCGestureEnabled(WCHideSeparatorLinesKey) && WCViewLooksLikeGlobalSeparator(self);
     if (shouldHide) {
@@ -2095,6 +2121,12 @@ static BOOL WCViewLooksLikeGlobalSeparator(UIView *view) {
                                                            queue:[NSOperationQueue mainQueue]
                                                       usingBlock:^(NSNotification *note) {
             WCKeyboardEnhanceUpdate(note);
+        }];
+        [[NSNotificationCenter defaultCenter] addObserverForName:UIKeyboardDidShowNotification
+                                                          object:nil
+                                                           queue:[NSOperationQueue mainQueue]
+                                                      usingBlock:^(__unused NSNotification *note) {
+            WCKeyboardEnhanceRefresh();
         }];
         [[NSNotificationCenter defaultCenter] addObserverForName:UIKeyboardWillHideNotification
                                                           object:nil
