@@ -63,6 +63,7 @@ typedef NS_ENUM(NSInteger, WCPopupMode) {
 @property (nonatomic, copy) NSArray<WCPopupOption *> *options;
 @property (nonatomic, strong) id selectedValue;
 @property (nonatomic, copy) NSString *inputText;
+@property (nonatomic, assign) BOOL secureInput;
 @property (nonatomic, copy) NSString *placeholder;
 @property (nonatomic, assign) UIKeyboardType keyboard;
 @property (nonatomic, copy) NSString *codeText;
@@ -317,6 +318,7 @@ typedef NS_ENUM(NSInteger, WCPopupMode) {
     field.text = self.inputText;
     field.placeholder = self.placeholder;
     field.keyboardType = self.keyboard;
+    field.secureTextEntry = self.secureInput;
     field.font = [UIFont systemFontOfSize:16];
     field.textColor = UIColor.labelColor;
     field.backgroundColor = UIColor.tertiarySystemGroupedBackgroundColor;
@@ -513,6 +515,24 @@ typedef NS_ENUM(NSInteger, WCPopupMode) {
     c.inputText = text;
     c.placeholder = placeholder;
     c.keyboard = keyboard;
+    c.onInput = completion;
+    [self presentController:c];
+}
+
++ (void)showSecureInputWithTitle:(NSString *)title
+                         message:(nullable NSString *)message
+                            text:(nullable NSString *)text
+                     placeholder:(nullable NSString *)placeholder
+                        keyboard:(UIKeyboardType)keyboard
+                      completion:(void (^)(NSString *text))completion {
+    WCPopupController *c = [WCPopupController new];
+    c.mode = WCPopupModeInput;
+    c.popupTitle = title;
+    c.popupMessage = message;
+    c.inputText = text;
+    c.placeholder = placeholder;
+    c.keyboard = keyboard;
+    c.secureInput = YES;
     c.onInput = completion;
     [self presentController:c];
 }

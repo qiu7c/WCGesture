@@ -37,6 +37,7 @@ FOUNDATION_EXPORT NSString *const WCKeyboardSwipeLeftActionKey;
 FOUNDATION_EXPORT NSString *const WCKeyboardSwipeRightActionKey;
 FOUNDATION_EXPORT NSString *const WCKeyboardDoubleTapActionKey;
 FOUNDATION_EXPORT NSString *const WCKeyboardTripleTapActionKey;
+FOUNDATION_EXPORT NSString *const WCKeyboardLongPressActionKey;
 
 /// Debug aid: paints the keyboard gesture strip red and shows its live size at
 /// the top of the screen so the touchable band is visible while tuning.
@@ -50,17 +51,83 @@ FOUNDATION_EXPORT NSString *const WCKeyboardStripHeightKey;
 FOUNDATION_EXPORT NSString *const WCKeyboardStripOffsetXKey;
 FOUNDATION_EXPORT NSString *const WCKeyboardStripOffsetYKey;
 
-/// Translation engine selection and optional custom (OpenAI-compatible) endpoint.
+/// Same geometry for third-party keyboards (搜狗/百度/讯飞…), which lay their
+/// keys out differently. Chosen automatically: when no system key view can be
+/// found in the keyboard, these values are used instead of the ones above.
+FOUNDATION_EXPORT NSString *const WCKeyboardStripWidthKeyThirdParty;
+FOUNDATION_EXPORT NSString *const WCKeyboardStripHeightKeyThirdParty;
+FOUNDATION_EXPORT NSString *const WCKeyboardStripOffsetXKeyThirdParty;
+FOUNDATION_EXPORT NSString *const WCKeyboardStripOffsetYKeyThirdParty;
+
+/// Optional small caption drawn in the middle of the gesture strip, e.g. a
+/// nickname or a short signature. Empty text turns it off.
+FOUNDATION_EXPORT NSString *const WCKeyboardSignatureTextKey;
+/// Font size of that caption in points (scaled with the keyboard width).
+FOUNDATION_EXPORT NSString *const WCKeyboardSignatureSizeKey;
+/// Typeface of that caption. Uses the Chinese faces built into iOS and falls
+/// back to the system font when a face is missing on the device.
+FOUNDATION_EXPORT NSString *const WCKeyboardSignatureFontKey;
+/// Ornament wrapped around the caption ("— 文字 —", "◇ 文字 ◇"…) plus the
+/// spaced/outlined variants.
+FOUNDATION_EXPORT NSString *const WCKeyboardSignatureDecorationKey;
+
+typedef NS_ENUM(NSInteger, WCKeyboardSignatureFontFace) {
+    WCKeyboardSignatureFontSystem = 0,    // 系统字
+    WCKeyboardSignatureFontKaiti = 1,     // 楷体
+    WCKeyboardSignatureFontXingkai = 2,   // 行楷
+    WCKeyboardSignatureFontSongti = 3,    // 宋体
+    WCKeyboardSignatureFontYuanti = 4,    // 圆体
+    WCKeyboardSignatureFontHannotate = 5, // 手写体
+    WCKeyboardSignatureFontWawati = 6,    // 娃娃体
+};
+
+typedef NS_ENUM(NSInteger, WCKeyboardSignatureDecoration) {
+    WCKeyboardSignatureDecorationNone = 0,    // 无装饰
+    WCKeyboardSignatureDecorationSpaced = 1,  // 拉开字距
+    WCKeyboardSignatureDecorationOutline = 2, // 描边空心
+    WCKeyboardSignatureDecorationDivider = 3, // — 文字 —
+    WCKeyboardSignatureDecorationDiamond = 4, // ◇ 文字 ◇
+    WCKeyboardSignatureDecorationDot = 5,     // · 文字 ·
+    WCKeyboardSignatureDecorationStar = 6,    // ✦ 文字 ✦
+    WCKeyboardSignatureDecorationQuote = 7,   // 「文字」
+};
+
+/// Translation engine selection.
 typedef NS_ENUM(NSInteger, WCTranslateEngine) {
     WCTranslateEngineEdge = 0,     // 微软 Edge(免费,无需 key)
     WCTranslateEngineMyMemory = 1, // MyMemory(免费,无需 key)
-    WCTranslateEngineCustom = 2,   // 自定义(OpenAI 兼容接口)
+    WCTranslateEngineAI = 2,       // 已配置的 AI(预设翻译提示词)
 };
 
 FOUNDATION_EXPORT NSString *const WCTranslateEngineKey;
-FOUNDATION_EXPORT NSString *const WCTranslateCustomURLKey;
-FOUNDATION_EXPORT NSString *const WCTranslateCustomKeyKey;
-FOUNDATION_EXPORT NSString *const WCTranslateCustomModelKey;
+/// Language code of the other side of the translation pair, e.g. "en" means
+/// 中文 ↔ English: one action translates into it, the other one into Chinese.
+FOUNDATION_EXPORT NSString *const WCTranslatePairTargetKey;
+
+/// AI assistant (OpenAI-compatible chat completions). The provider picks a
+/// template for endpoint and model; both can be overridden by the user.
+typedef NS_ENUM(NSInteger, WCGestureAIProvider) {
+    WCGestureAIProviderDeepSeek = 0,
+    WCGestureAIProviderQwen = 1,        // 千问 (DashScope compatible-mode)
+    WCGestureAIProviderBailian = 2,     // 百炼
+    WCGestureAIProviderSiliconFlow = 3, // 硅基流动
+    WCGestureAIProviderCustom = 4,
+};
+
+FOUNDATION_EXPORT NSString *const WCGestureAIProviderKey;
+/// Empty means "use the provider template".
+FOUNDATION_EXPORT NSString *const WCGestureAIBaseURLKey;
+FOUNDATION_EXPORT NSString *const WCGestureAIModelKey;
+FOUNDATION_EXPORT NSString *const WCGestureAIAPIKeyKey;
+/// Three reusable prompt presets (方案 1/2/3). Each holds an extra instruction
+/// appended to the task prompt, e.g. "简短、口语化"; empty means default.
+FOUNDATION_EXPORT NSString *const WCGestureAIPresetPrompt1Key;
+FOUNDATION_EXPORT NSString *const WCGestureAIPresetPrompt2Key;
+FOUNDATION_EXPORT NSString *const WCGestureAIPresetPrompt3Key;
+/// Which preset (0/1/2) each AI action uses.
+FOUNDATION_EXPORT NSString *const WCGestureAIReplyPresetKey;
+FOUNDATION_EXPORT NSString *const WCGestureAIAnswerPresetKey;
+FOUNDATION_EXPORT NSString *const WCGestureAIPolishPresetKey;
 
 /// Moments (朋友圈) double-tap like.
 FOUNDATION_EXPORT NSString *const WCMomentsDoubleTapLikeKey;
@@ -101,11 +168,13 @@ typedef NS_ENUM(NSInteger, WCInputAction) {
     WCInputActionPaste = 2,   // 粘贴剪贴板
     WCInputActionCopy = 3,    // 复制输入框内容
     WCInputActionCut = 4,     // 剪切输入框内容
-    WCInputActionTranslateToEnglish = 5, // 翻译:中译英,替换输入框
-    WCInputActionTranslateToChinese = 6, // 翻译:英译中,替换输入框
+    WCInputActionTranslateToTarget = 5,  // 翻译:译成互译语言,替换输入框
+    WCInputActionTranslateToChinese = 6, // 翻译:译成中文,替换输入框
     WCInputActionUppercase = 7,          // 转大写
     WCInputActionLowercase = 8,          // 转小写
     WCInputActionTrim = 9,               // 去空格/换行
+    WCInputActionAIAnswer = 10,          // AI 回答输入框里的问题
+    WCInputActionAIPolish = 11,          // AI 润色输入框文字
 };
 
 /// Notification posted when an enhancement key changes, so gesture recognizers
@@ -123,6 +192,7 @@ typedef NS_ENUM(NSInteger, WCReplySwipeAction) {
     WCReplySwipeActionFavorite = 7,
     WCReplySwipeActionSpeak = 8,
     WCReplySwipeActionTranslate = 9,
+    WCReplySwipeActionAIReply = 10, // AI 根据这条消息生成回复并填入输入框
 };
 
 /// Global multi-finger long-press action.

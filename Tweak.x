@@ -11,6 +11,7 @@
 #import "Sources/WCGestureSettingsVC.h"
 #import "Sources/WCPopup.h"
 #import "Sources/WCGestureTranslate.h"
+#import "Sources/WCGestureAI.h"
 
 #pragma mark - WeChat private class interfaces
 
@@ -77,6 +78,8 @@
 static void WCPlayConfiguredHaptic(void);
 static UIImpactFeedbackStyle WCHapticStyleFromConfig(void);
 static void WCShowToast(NSString *text);
+static void WCAIReplyToMessage(CommonMessageCellView *cell);
+static void WCAIPerformInputTask(MMGrowTextView *view, WCGestureAITask task);
 
 static id WCTweakSafeValue(id object, NSString *key) {
     if (!object || key.length == 0) return nil;
@@ -839,6 +842,11 @@ static BOOL WCPerformMessageGestureAction(CommonMessageCellView *cell, WCReplySw
             performed = WCInvokeFirstMessageCellAction(cell,
                 @[@"onSpeakMsg", @"onTextTranslateSpeak:", @"onSpeakMsgFromTextTranslate:"]);
             break;
+        case WCReplySwipeActionAIReply:
+            // Async: the reply lands in the input box when the model answers.
+            WCAIReplyToMessage(cell);
+            performed = YES;
+            break;
         case WCReplySwipeActionNone:
             break;
     }
@@ -887,11 +895,13 @@ static void WCApplyTranslation(MMGrowTextView *view, NSString *translated, NSStr
     WCShowToast(@"已翻译");
 }
 
-// Uses the configurable translation engine (Edge / MyMemory / custom).
-static void WCTranslateInputText(MMGrowTextView *view, BOOL toEnglish) {
+// Uses the configurable translation engine (Edge / MyMemory / AI). `toTarget`
+// translates into the configured pair language, otherwise into Chinese.
+static void WCTranslateInputText(MMGrowTextView *view, BOOL toTarget) {
     NSString *text = WCInputText(view);
     if (text.length == 0) { WCShowToast(@"输入框为空"); return; }
-    WCGestureTranslateText(text, toEnglish, ^(NSString *translated, NSString *errorMessage) {
+    NSString *targetCode = toTarget ? WCTranslatePairTargetCode() : @"zh-Hans";
+    WCGestureTranslateText(text, targetCode, ^(NSString *translated, NSString *errorMessage) {
         WCApplyTranslation(view, translated, errorMessage);
     });
 }
@@ -963,8 +973,10 @@ static void WCPerformInputAction(MMGrowTextView *view, WCInputAction action) {
         if (trimmed.length) WCReplaceInputText(view, trimmed);
         return;
     }
-    if (action == WCInputActionTranslateToEnglish) { WCTranslateInputText(view, YES); return; }
+    if (action == WCInputActionTranslateToTarget) { WCTranslateInputText(view, YES); return; }
     if (action == WCInputActionTranslateToChinese) { WCTranslateInputText(view, NO); return; }
+    if (action == WCInputActionAIAnswer) { WCAIPerformInputTask(view, WCGestureAITaskAnswer); return; }
+    if (action == WCInputActionAIPolish) { WCAIPerformInputTask(view, WCGestureAITaskPolish); return; }
 }
 
 static void WCSynchronizeInputGestures(MMGrowTextView *view) {
@@ -1237,7 +1249,7 @@ static void WCSynchronizeVisibleReplyGestures(void) {
 
 %end
 
-#pragma mark - Keyboard enhancement (键盘增强)
+#pragma mark - Keyboard bottom gestures (键盘底部手势)
 
 // Finds the chat input's MMGrowTextView whose inner text view is first responder.
 static MMGrowTextView *WCFirstResponderGrowTextView(void) {
@@ -1256,6 +1268,88 @@ static MMGrowTextView *WCFirstResponderGrowTextView(void) {
         [stack addObjectsFromArray:view.subviews];
     }
     return nil;
+}
+
+#pragma mark - AI assistant (AI 回复 / 回答 / 润色)
+
+static MMGrowTextView *WCGrowTextViewInHierarchy(UIView *root) {
+    Class growClass = NSClassFromString(@"MMGrowTextView");
+    if (!growClass || !root) return nil;
+    NSMutableArray<UIView *> *stack = [NSMutableArray arrayWithObject:root];
+    while (stack.count) {
+        UIView *view = stack.lastObject;
+        [stack removeLastObject];
+        if ([view isKindOfClass:growClass]) return (MMGrowTextView *)view;
+        [stack addObjectsFromArray:view.subviews];
+    }
+    return nil;
+}
+
+// The chat input may not be first responder when a message gesture fires, so
+// fall back to the visible chat controller and then the whole window.
+static MMGrowTextView *WCChatInputView(void) {
+    MMGrowTextView *view = WCFirstResponderGrowTextView();
+    if (view) return view;
+    if (WCVisibleChatController) {
+        view = WCGrowTextViewInHierarchy(WCVisibleChatController.view);
+        if (view) return view;
+    }
+    return WCGrowTextViewInHierarchy(WCActiveWindow());
+}
+
+// Text the model should react to. Media and app messages carry XML, so only a
+// plain text body (or a shared link's <title>) is usable.
+static NSString *WCMessageTextForAI(id message) {
+    NSString *content = WCTweakSafeValue(message, @"m_nsContent");
+    if (![content isKindOfClass:[NSString class]] || content.length == 0) return nil;
+    if ([content hasPrefix:@"<"]) {
+        NSRange start = [content rangeOfString:@"<title>"];
+        NSRange end = [content rangeOfString:@"</title>"];
+        if (start.location != NSNotFound && end.location != NSNotFound
+            && end.location > NSMaxRange(start)) {
+            NSString *title = [content substringWithRange:
+                NSMakeRange(NSMaxRange(start), end.location - NSMaxRange(start))];
+            return title.length > 0 ? title : nil;
+        }
+        return nil;
+    }
+    return content;
+}
+
+static void WCAIReplyToMessage(CommonMessageCellView *cell) {
+    if (!cell) return;
+    if (!WCGestureAIIsConfigured()) { WCShowToast(@"请先在插件设置中配置 AI"); return; }
+    NSString *content = WCMessageTextForAI(WCMessageWrapForCell(cell));
+    if (content.length == 0) { WCShowToast(@"这条消息不支持 AI 回复"); return; }
+    MMGrowTextView *input = WCChatInputView();
+    if (!input) { WCShowToast(@"找不到聊天输入框"); return; }
+    WCShowToast(@"AI 回复生成中…");
+    WCGestureAIPerform(WCGestureAITaskReply, content, ^(NSString *reply, NSString *errorMessage) {
+        if (reply.length == 0) {
+            WCShowToast(errorMessage.length > 0 ? errorMessage : @"AI 回复失败");
+            return;
+        }
+        WCReplaceInputText(input, reply);
+        UITextView *textView = WCInnerTextView(input);
+        if (textView && !textView.isFirstResponder) [textView becomeFirstResponder];
+        WCShowToast(@"AI 回复已填入输入框");
+    });
+}
+
+static void WCAIPerformInputTask(MMGrowTextView *view, WCGestureAITask task) {
+    if (!view) return;
+    if (!WCGestureAIIsConfigured()) { WCShowToast(@"请先在插件设置中配置 AI"); return; }
+    NSString *text = WCInputText(view);
+    if (text.length == 0) { WCShowToast(@"输入框为空"); return; }
+    WCShowToast(task == WCGestureAITaskPolish ? @"AI 润色中…" : @"AI 回答中…");
+    WCGestureAIPerform(task, text, ^(NSString *result, NSString *errorMessage) {
+        if (result.length == 0) {
+            WCShowToast(errorMessage.length > 0 ? errorMessage : @"AI 请求失败");
+            return;
+        }
+        WCReplaceInputText(view, result);
+        WCShowToast(task == WCGestureAITaskPolish ? @"已润色" : @"已生成回答");
+    });
 }
 
 static void WCKeyboardEnhancePerform(NSString *actionKey) {
@@ -1294,6 +1388,14 @@ static void WCKeyboardEnhancePerform(NSString *actionKey) {
     WCKeyboardEnhancePerform(key);
 }
 
+// The strip is a dead zone for the keyboard itself, so a long press there
+// cannot collide with any system keyboard behavior.
+- (void)handleLongPress:(UILongPressGestureRecognizer *)recognizer {
+    if (recognizer.state == UIGestureRecognizerStateBegan) {
+        WCKeyboardEnhancePerform(WCKeyboardLongPressActionKey);
+    }
+}
+
 @end
 
 // The system keyboard lives in UIRemoteKeyboardWindow at level ~10,000,000,
@@ -1316,6 +1418,15 @@ static void WCKeyboardEnhancePerform(NSString *actionKey) {
 static UIWindow *WCKeyboardEnhanceWindow = nil;
 static UIView *WCKeyboardEnhanceContainer = nil;
 static UIView *WCKeyboardEnhanceView = nil;
+// Optional caption drawn inside the strip (a short signature). Non-interactive,
+// so it never blocks the strip's gesture recognizers.
+static UILabel *WCKeyboardEnhanceSignatureLabel = nil;
+// Last attributed caption pushed into the label, so the re-assert timer does
+// not rebuild and reassign the same string every tick.
+static NSString *WCKeyboardSignatureRenderedText = nil;
+static NSInteger WCKeyboardSignatureRenderedFont = -1;
+static NSInteger WCKeyboardSignatureRenderedDecoration = -1;
+static CGFloat WCKeyboardSignatureRenderedSize = 0.0;
 // The debug caption lives at the top of the screen rather than inside the
 // strip, so it never hides the band the user is trying to position.
 static UIView *WCKeyboardEnhanceHintView = nil;
@@ -1339,28 +1450,48 @@ static const CGFloat WCKeyboardEnhanceBandRaise = 14.0;
 // may only overlap by a couple of points.
 static const CGFloat WCKeyboardEnhanceThirdPartyBandRaise = 2.0;
 
-// User-tunable geometry (settings → 键盘增强). Width 0 = full keyboard width;
+// User-tunable geometry (settings → 键盘底部手势). Width 0 = full keyboard width;
 // the offsets move the strip from its default spot (positive X = right,
-// positive Y = up). Values are in points.
-static CGFloat WCKeyboardEnhanceConfiguredWidth(CGFloat hostWidth) {
-    CGFloat configured = [[NSUserDefaults standardUserDefaults] doubleForKey:WCKeyboardStripWidthKey];
-    if (configured <= 0.0) return hostWidth;
-    return MIN(configured, hostWidth);
+// positive Y = up). Values are in points, tuned on an iPhone 14 Pro (393pt
+// wide), and are scaled by the actual keyboard width at layout time so other
+// screen sizes keep the same proportions (the factor is 1.0 on the 14 Pro).
+//
+// Third-party keyboards keep a second set of values: their key rows do not sit
+// where the system keyboard's do, so one set cannot fit both.
+static const CGFloat WCKeyboardEnhanceReferenceWidth = 393.0;
+
+static CGFloat WCKeyboardEnhanceScale(CGFloat hostWidth) {
+    if (hostWidth <= 0.0) return 1.0;
+    return hostWidth / WCKeyboardEnhanceReferenceWidth;
 }
 
-static CGFloat WCKeyboardEnhanceConfiguredHeight(CGFloat hostHeight) {
-    CGFloat configured = [[NSUserDefaults standardUserDefaults] doubleForKey:WCKeyboardStripHeightKey];
+static NSString *WCKeyboardStripKey(NSString *systemKey, NSString *thirdPartyKey, BOOL thirdParty) {
+    return thirdParty ? thirdPartyKey : systemKey;
+}
+
+static CGFloat WCKeyboardEnhanceConfiguredWidth(CGFloat hostWidth, CGFloat scale, BOOL thirdParty) {
+    NSString *key = WCKeyboardStripKey(WCKeyboardStripWidthKey, WCKeyboardStripWidthKeyThirdParty, thirdParty);
+    CGFloat configured = [[NSUserDefaults standardUserDefaults] doubleForKey:key];
+    if (configured <= 0.0) return hostWidth;
+    return MIN(configured * scale, hostWidth);
+}
+
+static CGFloat WCKeyboardEnhanceConfiguredHeight(CGFloat hostHeight, CGFloat scale, BOOL thirdParty) {
+    NSString *key = WCKeyboardStripKey(WCKeyboardStripHeightKey, WCKeyboardStripHeightKeyThirdParty, thirdParty);
+    CGFloat configured = [[NSUserDefaults standardUserDefaults] doubleForKey:key] * scale;
     if (configured < 20.0) configured = 20.0;
     if (hostHeight > 0.0 && configured > hostHeight) configured = hostHeight;
     return configured;
 }
 
-static CGFloat WCKeyboardEnhanceHorizontalOffset(void) {
-    return [[NSUserDefaults standardUserDefaults] doubleForKey:WCKeyboardStripOffsetXKey];
+static CGFloat WCKeyboardEnhanceHorizontalOffset(BOOL thirdParty) {
+    NSString *key = WCKeyboardStripKey(WCKeyboardStripOffsetXKey, WCKeyboardStripOffsetXKeyThirdParty, thirdParty);
+    return [[NSUserDefaults standardUserDefaults] doubleForKey:key];
 }
 
-static CGFloat WCKeyboardEnhanceVerticalOffset(void) {
-    return [[NSUserDefaults standardUserDefaults] doubleForKey:WCKeyboardStripOffsetYKey];
+static CGFloat WCKeyboardEnhanceVerticalOffset(BOOL thirdParty) {
+    NSString *key = WCKeyboardStripKey(WCKeyboardStripOffsetYKey, WCKeyboardStripOffsetYKeyThirdParty, thirdParty);
+    return [[NSUserDefaults standardUserDefaults] doubleForKey:key];
 }
 
 static void WCKeyboardEnhanceStartReassertTimer(void);
@@ -1529,8 +1660,161 @@ static void WCKeyboardEnhanceEnsureView(void) {
     tripleTap.cancelsTouchesInView = NO;
     [view addGestureRecognizer:tripleTap];
     [doubleTap requireGestureRecognizerToFail:tripleTap];
+    UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc]
+        initWithTarget:controller action:@selector(handleLongPress:)];
+    longPress.minimumPressDuration = 0.45;
+    longPress.allowableMovement = 12.0;
+    longPress.cancelsTouchesInView = NO;
+    [view addGestureRecognizer:longPress];
+
+    UILabel *signature = [[UILabel alloc] initWithFrame:CGRectZero];
+    signature.font = [UIFont systemFontOfSize:11.0 weight:UIFontWeightMedium];
+    signature.textColor = [UIColor.labelColor colorWithAlphaComponent:0.5];
+    signature.textAlignment = NSTextAlignmentCenter;
+    signature.numberOfLines = 1;
+    signature.adjustsFontSizeToFitWidth = YES;
+    signature.minimumScaleFactor = 0.5;
+    signature.userInteractionEnabled = NO;
+    signature.hidden = YES;
+    signature.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    [view addSubview:signature];
+    WCKeyboardEnhanceSignatureLabel = signature;
 
     WCKeyboardEnhanceView = view;
+}
+
+// iOS ships several Chinese faces; `fontWithName:` accepts the family or the
+// PostScript name, so try both and fall back to the system font when a face is
+// missing (e.g. on a non-Chinese device).
+static UIFont *WCKeyboardSignatureNamedFont(NSArray<NSString *> *names, CGFloat size) {
+    for (NSString *name in names) {
+        UIFont *font = [UIFont fontWithName:name size:size];
+        if (font) return font;
+    }
+    return nil;
+}
+
+static UIFont *WCKeyboardSignatureFont(CGFloat size, NSInteger face) {
+    UIFont *named = nil;
+    switch (face) {
+        case WCKeyboardSignatureFontKaiti:
+            named = WCKeyboardSignatureNamedFont(@[@"Kaiti SC", @"KaitiSC-Regular", @"STKaiti"], size);
+            break;
+        case WCKeyboardSignatureFontXingkai:
+            named = WCKeyboardSignatureNamedFont(@[@"Xingkai SC", @"XingkaiSC-Regular", @"STXingkai"], size);
+            break;
+        case WCKeyboardSignatureFontSongti:
+            named = WCKeyboardSignatureNamedFont(@[@"Songti SC", @"SongtiSC-Regular", @"STSongti-SC-Regular"], size);
+            break;
+        case WCKeyboardSignatureFontYuanti:
+            named = WCKeyboardSignatureNamedFont(@[@"Yuanti SC", @"YuantiSC-Regular", @"STYuanti-SC-Regular"], size);
+            break;
+        case WCKeyboardSignatureFontHannotate:
+            named = WCKeyboardSignatureNamedFont(@[@"Hannotate SC", @"HannotateSC-W5", @"HanziPen SC", @"HanziPenSC-W3"], size);
+            break;
+        case WCKeyboardSignatureFontWawati:
+            named = WCKeyboardSignatureNamedFont(@[@"Wawati SC", @"WawatiSC-Regular"], size);
+            break;
+        default:
+            break;
+    }
+    if (named) return named;
+    UIFont *font = [UIFont systemFontOfSize:size weight:UIFontWeightMedium];
+    if (@available(iOS 13.0, *)) {
+        // Latin-only fallback with the same flavor as the missing CJK face.
+        UIFontDescriptorSystemDesign design = nil;
+        if (face == WCKeyboardSignatureFontYuanti) {
+            design = UIFontDescriptorSystemDesignRounded;
+        } else if (face == WCKeyboardSignatureFontSongti) {
+            design = UIFontDescriptorSystemDesignSerif;
+        }
+        if (design) {
+            UIFontDescriptor *descriptor = [font.fontDescriptor fontDescriptorWithDesign:design];
+            if (descriptor) font = [UIFont fontWithDescriptor:descriptor size:size];
+        }
+    }
+    return font;
+}
+
+// Signature text is user-supplied and may be empty: then the label stays
+// hidden. `scale` follows the keyboard width so the type keeps its relative
+// size on other screens.
+static void WCKeyboardEnhanceUpdateSignature(CGFloat scale) {
+    UILabel *label = WCKeyboardEnhanceSignatureLabel;
+    if (!label) return;
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSString *text = [defaults stringForKey:WCKeyboardSignatureTextKey] ?: @"";
+    text = [text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+    if (text.length == 0) {
+        if (!label.hidden) label.hidden = YES;
+        return;
+    }
+    NSInteger face = [defaults integerForKey:WCKeyboardSignatureFontKey];
+    NSInteger decoration = [defaults integerForKey:WCKeyboardSignatureDecorationKey];
+    CGFloat size = [defaults doubleForKey:WCKeyboardSignatureSizeKey];
+    if (size < 6.0) size = 6.0;
+    size *= (scale > 0.0 ? scale : 1.0);
+
+    // Ornament styles wrap the user's words in marks that every CJK font
+    // covers, so nothing renders as a missing-glyph box.
+    NSString *display = text;
+    switch (decoration) {
+        case WCKeyboardSignatureDecorationDivider:
+            display = [NSString stringWithFormat:@"— %@ —", text];
+            break;
+        case WCKeyboardSignatureDecorationDiamond:
+            display = [NSString stringWithFormat:@"◇ %@ ◇", text];
+            break;
+        case WCKeyboardSignatureDecorationDot:
+            display = [NSString stringWithFormat:@"· %@ ·", text];
+            break;
+        case WCKeyboardSignatureDecorationStar:
+            display = [NSString stringWithFormat:@"✦ %@ ✦", text];
+            break;
+        case WCKeyboardSignatureDecorationQuote:
+            display = [NSString stringWithFormat:@"「%@」", text];
+            break;
+        default:
+            break;
+    }
+
+    BOOL unchanged = [WCKeyboardSignatureRenderedText isEqualToString:display]
+        && WCKeyboardSignatureRenderedFont == face
+        && WCKeyboardSignatureRenderedDecoration == decoration
+        && fabs(WCKeyboardSignatureRenderedSize - size) < 0.1;
+    if (!unchanged) {
+        UIColor *color = [UIColor.labelColor colorWithAlphaComponent:0.5];
+        NSMutableAttributedString *attributed = [[NSMutableAttributedString alloc] initWithString:display];
+        NSRange range = NSMakeRange(0, display.length);
+        NSMutableParagraphStyle *paragraph = [[NSMutableParagraphStyle alloc] init];
+        paragraph.alignment = NSTextAlignmentCenter;
+        paragraph.lineBreakMode = NSLineBreakByTruncatingTail;
+        [attributed addAttribute:NSParagraphStyleAttributeName value:paragraph range:range];
+        [attributed addAttribute:NSFontAttributeName value:WCKeyboardSignatureFont(size, face) range:range];
+        [attributed addAttribute:NSForegroundColorAttributeName value:color range:range];
+        if (decoration == WCKeyboardSignatureDecorationSpaced) {
+            [attributed addAttribute:NSKernAttributeName
+                               value:@(MAX(1.0, size * 0.12)) range:range];
+        } else if (decoration == WCKeyboardSignatureDecorationOutline) {
+            // Negative width fills and strokes; a clear fill leaves a hollow,
+            // engraved-looking glyph.
+            [attributed addAttribute:NSStrokeWidthAttributeName value:@(-2.0) range:range];
+            [attributed addAttribute:NSStrokeColorAttributeName
+                               value:[UIColor.labelColor colorWithAlphaComponent:0.6] range:range];
+            [attributed addAttribute:NSForegroundColorAttributeName value:UIColor.clearColor range:range];
+        }
+        label.attributedText = attributed;
+        WCKeyboardSignatureRenderedText = display;
+        WCKeyboardSignatureRenderedFont = face;
+        WCKeyboardSignatureRenderedDecoration = decoration;
+        WCKeyboardSignatureRenderedSize = size;
+    }
+
+    // Keep the caption filling the strip so adjustsFontSizeToFitWidth has a
+    // width to work with.
+    UIView *host = label.superview;
+    if (host && !CGRectEqualToRect(label.frame, host.bounds)) label.frame = host.bounds;
+    if (label.hidden) label.hidden = NO;
 }
 
 static void WCKeyboardEnhanceUpdateDebugStyle(BOOL debug) {
@@ -1655,11 +1939,16 @@ static CGRect WCKeyboardEnhanceStripFrame(UIView *host, UIView *scanRoot,
                                           CGFloat *keyBottomOut, BOOL *thirdPartyOut) {
     CGFloat height = CGRectGetHeight(host.bounds);
     CGFloat width = CGRectGetWidth(host.bounds);
-    CGFloat band = WCKeyboardEnhanceConfiguredHeight(height);
     BOOL systemKey = NO;
     CGFloat keyBottom = WCKeyboardEnhanceLowestKeyBottom(host, scanRoot, &systemKey);
+    // No system key views anywhere means a third-party keyboard (or a layout
+    // UIKit renders differently); pick that keyboard's own geometry set. The
+    // system keyboard always exposes UIKBKeyView, so this is safe.
+    BOOL thirdParty = !systemKey;
     if (keyBottomOut) *keyBottomOut = keyBottom;
-    if (thirdPartyOut) *thirdPartyOut = (keyBottom > 0.0 && !systemKey);
+    if (thirdPartyOut) *thirdPartyOut = thirdParty;
+    CGFloat scale = WCKeyboardEnhanceScale(width);
+    CGFloat band = WCKeyboardEnhanceConfiguredHeight(height, scale, thirdParty);
 
     CGFloat top = MAX(0.0, height - WCKeyboardEnhanceBandBottomMargin - band);
     if (keyBottom > 0.0 && keyBottom <= height + 1.0) {
@@ -1670,12 +1959,12 @@ static CGRect WCKeyboardEnhanceStripFrame(UIView *host, UIView *scanRoot,
         CGFloat raisedTop = keyBottom - raise;
         if (raisedTop >= 0.0) top = raisedTop;
     }
-    top -= WCKeyboardEnhanceVerticalOffset();
+    top -= WCKeyboardEnhanceVerticalOffset(thirdParty) * scale;
     if (top < 0.0) top = 0.0;
     if (top + band > height - 4.0) top = MAX(0.0, height - 4.0 - band);
 
-    CGFloat stripWidth = WCKeyboardEnhanceConfiguredWidth(width);
-    CGFloat x = (width - stripWidth) / 2.0 + WCKeyboardEnhanceHorizontalOffset();
+    CGFloat stripWidth = WCKeyboardEnhanceConfiguredWidth(width, scale, thirdParty);
+    CGFloat x = (width - stripWidth) / 2.0 + WCKeyboardEnhanceHorizontalOffset(thirdParty) * scale;
     if (x < 0.0) x = 0.0;
     if (x + stripWidth > width) x = MAX(0.0, width - stripWidth);
     return CGRectMake(x, top, stripWidth, band);
@@ -1730,6 +2019,7 @@ static BOOL WCKeyboardEnhanceApplyInDock(UIView *dock) {
     if (!CGRectEqualToRect(WCKeyboardEnhanceView.frame, target)) {
         WCKeyboardEnhanceView.frame = target;
     }
+    WCKeyboardEnhanceUpdateSignature(WCKeyboardEnhanceScale(CGRectGetWidth(dock.bounds)));
 
     if (WCKeyboardEnhanceView.hidden) WCKeyboardEnhanceView.hidden = NO;
     if (!WCKeyboardEnhanceWindow.hidden) WCKeyboardEnhanceWindow.hidden = YES;
@@ -1815,6 +2105,7 @@ static void WCKeyboardEnhanceApply(CGRect keyboardFrame) {
         if (!CGRectEqualToRect(WCKeyboardEnhanceView.frame, target)) {
             WCKeyboardEnhanceView.frame = target;
         }
+        WCKeyboardEnhanceUpdateSignature(WCKeyboardEnhanceScale(CGRectGetWidth(keyboardWindow.bounds)));
         WCKeyboardEnhanceWindow.hidden = YES;
         NSString *labelText = [NSString stringWithFormat:@"触控区 %.0f×%.0f K %.0f 键%.0f%@%@",
                                CGRectGetWidth(kb), CGRectGetHeight(target),
@@ -1826,14 +2117,15 @@ static void WCKeyboardEnhanceApply(CGRect keyboardFrame) {
         // Fallback: our own window above the keyboard window level.
         CGFloat appWidth = appWindow.bounds.size.width;
         CGFloat keyboardHeight = CGRectGetHeight(keyboardFrame);
-        CGFloat band = WCKeyboardEnhanceConfiguredHeight(keyboardHeight > 0.0 ? keyboardHeight : 400.0);
-        CGFloat stripWidth = WCKeyboardEnhanceConfiguredWidth(appWidth);
-        CGFloat stripX = (appWidth - stripWidth) / 2.0 + WCKeyboardEnhanceHorizontalOffset();
+        CGFloat scale = WCKeyboardEnhanceScale(appWidth);
+        CGFloat band = WCKeyboardEnhanceConfiguredHeight(keyboardHeight > 0.0 ? keyboardHeight : 400.0, scale, NO);
+        CGFloat stripWidth = WCKeyboardEnhanceConfiguredWidth(appWidth, scale, NO);
+        CGFloat stripX = (appWidth - stripWidth) / 2.0 + WCKeyboardEnhanceHorizontalOffset(NO) * scale;
         if (stripX < 0.0) stripX = 0.0;
         if (stripX + stripWidth > appWidth) stripX = MAX(0.0, appWidth - stripWidth);
         CGRect strip = CGRectMake(stripX,
                                   CGRectGetMaxY(keyboardFrame) - WCKeyboardEnhanceBandBottomMargin
-                                      - band - WCKeyboardEnhanceVerticalOffset(),
+                                      - band - WCKeyboardEnhanceVerticalOffset(NO) * scale,
                                   stripWidth, band);
         CGFloat desiredLevel = 10000001.0;
         if (!WCKeyboardEnhanceWindow) {
@@ -1861,6 +2153,7 @@ static void WCKeyboardEnhanceApply(CGRect keyboardFrame) {
             [WCKeyboardEnhanceContainer addSubview:WCKeyboardEnhanceView];
         }
         WCKeyboardEnhanceView.frame = CGRectMake(0, 0, strip.size.width, strip.size.height);
+        WCKeyboardEnhanceUpdateSignature(scale);
         WCKeyboardEnhanceWindow.hidden = NO;
         NSString *labelText = [NSString stringWithFormat:@"触控区 %.0f×%.0f W",
                                strip.size.width, strip.size.height];
@@ -2196,6 +2489,7 @@ static void WCShowToast(NSString *text) {
         UIView *toast = [[UIView alloc] init];
         toast.backgroundColor = [UIColor colorWithWhite:0.0 alpha:0.82];
         toast.layer.cornerRadius = 12.0;
+        toast.layer.zPosition = 10000.0;
         toast.userInteractionEnabled = NO;
         toast.alpha = 0.0;
         toast.translatesAutoresizingMaskIntoConstraints = NO;
@@ -2216,7 +2510,9 @@ static void WCShowToast(NSString *text) {
             [label.leadingAnchor constraintEqualToAnchor:toast.leadingAnchor constant:16.0],
             [label.trailingAnchor constraintEqualToAnchor:toast.trailingAnchor constant:-16.0],
             [toast.centerXAnchor constraintEqualToAnchor:window.centerXAnchor],
-            [toast.centerYAnchor constraintEqualToAnchor:window.centerYAnchor],
+            // Banner position: just under the navigation bar, out of the way of
+            // whatever the user is reading in the middle of the screen.
+            [toast.topAnchor constraintEqualToAnchor:window.safeAreaLayoutGuide.topAnchor constant:56.0],
             [toast.widthAnchor constraintLessThanOrEqualToAnchor:window.widthAnchor constant:-64.0],
         ]];
 

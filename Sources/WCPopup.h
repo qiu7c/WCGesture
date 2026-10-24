@@ -27,6 +27,14 @@ NS_ASSUME_NONNULL_BEGIN
                   keyboard:(UIKeyboardType)keyboard
                 completion:(void (^)(NSString *text))completion;
 
+/// Same as the plain input, but the field masks its contents (API keys).
++ (void)showSecureInputWithTitle:(NSString *)title
+                         message:(nullable NSString *)message
+                            text:(nullable NSString *)text
+                     placeholder:(nullable NSString *)placeholder
+                        keyboard:(UIKeyboardType)keyboard
+                      completion:(void (^)(NSString *text))completion;
+
 /// Read-only selectable text with copy + close buttons.
 + (void)showTextWithTitle:(NSString *)title
                   message:(nullable NSString *)message

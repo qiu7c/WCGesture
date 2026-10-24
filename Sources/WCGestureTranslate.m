@@ -1,5 +1,81 @@
 #import "WCGestureTranslate.h"
 #import "WCGestureConfig.h"
+#import "WCGestureAI.h"
+
+// Languages offered as the other side of the translation pair. "zh-Hans" is
+// intentionally absent: it is always the Chinese side of the pair.
+static NSArray<NSDictionary *> *WCTranslateLanguageTable(void) {
+    return @[
+        @{ @"code": @"en", @"title": @"英语", @"edge": @"en", @"memory": @"en", @"ai": @"英语" },
+        @{ @"code": @"ja", @"title": @"日语", @"edge": @"ja", @"memory": @"ja", @"ai": @"日语" },
+        @{ @"code": @"ko", @"title": @"韩语", @"edge": @"ko", @"memory": @"ko", @"ai": @"韩语" },
+        @{ @"code": @"fr", @"title": @"法语", @"edge": @"fr", @"memory": @"fr", @"ai": @"法语" },
+        @{ @"code": @"de", @"title": @"德语", @"edge": @"de", @"memory": @"de", @"ai": @"德语" },
+        @{ @"code": @"ru", @"title": @"俄语", @"edge": @"ru", @"memory": @"ru", @"ai": @"俄语" },
+        @{ @"code": @"es", @"title": @"西班牙语", @"edge": @"es", @"memory": @"es", @"ai": @"西班牙语" },
+        @{ @"code": @"pt", @"title": @"葡萄牙语", @"edge": @"pt", @"memory": @"pt", @"ai": @"葡萄牙语" },
+        @{ @"code": @"zh-Hant", @"title": @"繁体中文", @"edge": @"zh-Hant", @"memory": @"zh-TW", @"ai": @"繁体中文" },
+    ];
+}
+
+static NSDictionary *WCTranslateLanguageEntry(NSString *code) {
+    if (code.length == 0) return nil;
+    for (NSDictionary *entry in WCTranslateLanguageTable()) {
+        if ([entry[@"code"] isEqualToString:code]) return entry;
+    }
+    return nil;
+}
+
+NSArray<NSDictionary *> *WCTranslateLanguageOptions(void) {
+    return WCTranslateLanguageTable();
+}
+
+NSString *WCTranslatePairTargetCode(void) {
+    NSString *code = [[NSUserDefaults standardUserDefaults] stringForKey:WCTranslatePairTargetKey];
+    return WCTranslateLanguageEntry(code) ? code : @"en";
+}
+
+NSString *WCTranslateLanguageName(NSString *code) {
+    if ([code isEqualToString:@"zh-Hans"]) return @"中文";
+    NSDictionary *entry = WCTranslateLanguageEntry(code);
+    return entry ? entry[@"title"] : @"英语";
+}
+
+static NSString *WCTranslateEntryValue(NSString *code, NSString *field, NSString *fallback) {
+    NSDictionary *entry = WCTranslateLanguageEntry(code);
+    NSString *value = entry[field];
+    return value.length > 0 ? value : fallback;
+}
+
+// 中文 → pair: source is Chinese; pair → 中文: source is the pair language.
+static NSString *WCTranslateEdgeSource(NSString *targetCode) {
+    if ([targetCode isEqualToString:@"zh-Hans"]) {
+        return WCTranslateEntryValue(WCTranslatePairTargetCode(), @"edge", @"en");
+    }
+    return @"zh-Hans";
+}
+
+static NSString *WCTranslateEdgeTarget(NSString *targetCode) {
+    if ([targetCode isEqualToString:@"zh-Hans"]) return @"zh-Hans";
+    return WCTranslateEntryValue(targetCode, @"edge", @"en");
+}
+
+static NSString *WCTranslateMemorySource(NSString *targetCode) {
+    if ([targetCode isEqualToString:@"zh-Hans"]) {
+        return WCTranslateEntryValue(WCTranslatePairTargetCode(), @"memory", @"en");
+    }
+    return @"zh-CN";
+}
+
+static NSString *WCTranslateMemoryTarget(NSString *targetCode) {
+    if ([targetCode isEqualToString:@"zh-Hans"]) return @"zh-CN";
+    return WCTranslateEntryValue(targetCode, @"memory", @"en");
+}
+
+static NSString *WCTranslateAILanguageName(NSString *targetCode) {
+    if ([targetCode isEqualToString:@"zh-Hans"]) return @"简体中文";
+    return WCTranslateEntryValue(targetCode, @"ai", @"英语");
+}
 
 // Parse the Edge "translatetext" response: array of items, each either
 // {translations:[{text}]} or {text}.
@@ -20,39 +96,10 @@ static NSString *WCExtractEdgeTranslation(id object) {
     return [text isKindOfClass:[NSString class]] ? text : nil;
 }
 
-static NSString *WCExtractCustomTranslation(id object) {
-    if (![object isKindOfClass:[NSDictionary class]]) return nil;
-    id choices = ((NSDictionary *)object)[@"choices"];
-    if (![choices isKindOfClass:[NSArray class]] || [choices count] == 0) return nil;
-    id first = [(NSArray *)choices firstObject];
-    if (![first isKindOfClass:[NSDictionary class]]) return nil;
-    id message = ((NSDictionary *)first)[@"message"];
-    if (![message isKindOfClass:[NSDictionary class]]) return nil;
-    id content = ((NSDictionary *)message)[@"content"];
-    if ([content isKindOfClass:[NSString class]]) return content;
-    // Some providers return content as an array of parts.
-    if ([content isKindOfClass:[NSArray class]]) {
-        NSMutableString *joined = [NSMutableString string];
-        for (id part in (NSArray *)content) {
-            if ([part isKindOfClass:[NSDictionary class]]) {
-                id text = ((NSDictionary *)part)[@"text"];
-                if ([text isKindOfClass:[NSString class]]) [joined appendString:text];
-            }
-        }
-        return joined.length > 0 ? joined : nil;
-    }
-    return nil;
-}
-
-static NSString *WCEdgeLanguage(BOOL toEnglish, BOOL source) {
-    if (toEnglish) return source ? @"zh-Hans" : @"en";
-    return source ? @"en" : @"zh-Hans";
-}
-
-static void WCTranslateEdge(NSString *text, BOOL toEnglish, void (^handler)(NSString *)) {
+static void WCTranslateEdge(NSString *text, NSString *targetCode, void (^handler)(NSString *)) {
     NSString *urlString = [NSString stringWithFormat:
         @"https://edge.microsoft.com/translate/translatetext?from=%@&to=%@&isEnterpriseClient=false",
-        WCEdgeLanguage(toEnglish, YES), WCEdgeLanguage(toEnglish, NO)];
+        WCTranslateEdgeSource(targetCode), WCTranslateEdgeTarget(targetCode)];
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:urlString]];
     request.HTTPMethod = @"POST";
     request.timeoutInterval = 12.0;
@@ -67,9 +114,14 @@ static void WCTranslateEdge(NSString *text, BOOL toEnglish, void (^handler)(NSSt
     }] resume];
 }
 
-static void WCTranslateMyMemory(NSString *text, BOOL toEnglish, void (^handler)(NSString *)) {
-    NSString *encoded = [text stringByAddingPercentEncodingWithAllowedCharacters:NSCharacterSet.URLQueryAllowedCharacterSet] ?: @"";
-    NSString *pair = toEnglish ? @"zh-CN|en" : @"en|zh-CN";
+static void WCTranslateMyMemory(NSString *text, NSString *targetCode, void (^handler)(NSString *)) {
+    // URLQueryAllowedCharacterSet keeps "&", "+" and "=", which would break the
+    // query string for text that contains them.
+    NSMutableCharacterSet *allowed = [NSCharacterSet.URLQueryAllowedCharacterSet mutableCopy];
+    [allowed removeCharactersInString:@"&+=?#"];
+    NSString *encoded = [text stringByAddingPercentEncodingWithAllowedCharacters:allowed] ?: @"";
+    NSString *pair = [NSString stringWithFormat:@"%@|%@",
+        WCTranslateMemorySource(targetCode), WCTranslateMemoryTarget(targetCode)];
     NSString *urlString = [NSString stringWithFormat:@"https://api.mymemory.translated.net/get?q=%@&langpair=%@", encoded, pair];
     NSURLRequest *request = [NSURLRequest requestWithURL:[NSURL URLWithString:urlString]
                                              cachePolicy:NSURLRequestReloadIgnoringLocalCacheData
@@ -91,65 +143,43 @@ static void WCTranslateMyMemory(NSString *text, BOOL toEnglish, void (^handler)(
     }] resume];
 }
 
-static void WCTranslateCustom(NSString *text, BOOL toEnglish, void (^handler)(NSString *)) {
-    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    NSString *urlString = [defaults stringForKey:WCTranslateCustomURLKey];
-    NSString *apiKey = [defaults stringForKey:WCTranslateCustomKeyKey];
-    NSString *model = [defaults stringForKey:WCTranslateCustomModelKey];
-    if (urlString.length == 0) { if (handler) handler(nil); return; }
-    if (model.length == 0) model = @"gpt-4o-mini";
-    NSString *prompt = toEnglish
-        ? @"Translate the user's text to English. Output only the translation, without quotes or explanation."
-        : @"Translate the user's text to Chinese. Output only the translation, without quotes or explanation.";
-    NSDictionary *body = @{
-        @"model": model,
-        @"messages": @[
-            @{ @"role": @"system", @"content": prompt },
-            @{ @"role": @"user", @"content": text },
-        ],
-        @"temperature": @0,
-    };
-    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:urlString]];
-    request.HTTPMethod = @"POST";
-    request.timeoutInterval = 20.0;
-    [request setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
-    if (apiKey.length > 0) {
-        [request setValue:[NSString stringWithFormat:@"Bearer %@", apiKey] forHTTPHeaderField:@"Authorization"];
-    }
-    request.HTTPBody = [NSJSONSerialization dataWithJSONObject:body options:0 error:nil];
-    [[[NSURLSession sharedSession] dataTaskWithRequest:request
-        completionHandler:^(NSData *data, __unused NSURLResponse *response, __unused NSError *error) {
-        NSString *translated = WCExtractCustomTranslation(data.length ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil] : nil);
+// The former custom endpoint is gone: the AI engine reuses the configured AI
+// provider with a preset translation prompt.
+static void WCTranslateAI(NSString *text, NSString *targetCode, void (^handler)(NSString *)) {
+    WCGestureAITranslate(text, WCTranslateAILanguageName(targetCode),
+                         ^(NSString *translated, __unused NSString *errorMessage) {
         if (handler) handler(translated);
-    }] resume];
+    });
 }
 
-void WCGestureTranslateText(NSString *text, BOOL toEnglish, WCGestureTranslateCompletion completion) {
+void WCGestureTranslateText(NSString *text, NSString *targetCode,
+                            WCGestureTranslateCompletion completion) {
     void (^deliver)(NSString *, NSString *) = ^(NSString *translated, NSString *errorMessage) {
         if (!completion) return;
         dispatch_async(dispatch_get_main_queue(), ^{ completion(translated, errorMessage); });
     };
     if (text.length == 0) { deliver(nil, @"输入为空"); return; }
+    if (targetCode.length == 0) targetCode = WCTranslatePairTargetCode();
 
     NSInteger engine = [[NSUserDefaults standardUserDefaults] integerForKey:WCTranslateEngineKey];
-    if (engine == WCTranslateEngineCustom) {
-        WCTranslateCustom(text, toEnglish, ^(NSString *custom) {
-            if (custom.length) { deliver(custom, nil); return; }
-            // Fall back to the free engines when the custom endpoint fails.
-            WCTranslateEdge(text, toEnglish, ^(NSString *edge) {
+    if (engine == WCTranslateEngineAI) {
+        WCTranslateAI(text, targetCode, ^(NSString *ai) {
+            if (ai.length) { deliver(ai, nil); return; }
+            // AI unconfigured or failed: keep translating with a free engine.
+            WCTranslateEdge(text, targetCode, ^(NSString *edge) {
                 if (edge.length) { deliver(edge, nil); return; }
-                WCTranslateMyMemory(text, toEnglish, ^(NSString *mm) {
+                WCTranslateMyMemory(text, targetCode, ^(NSString *mm) {
                     if (mm.length) deliver(mm, nil);
-                    else deliver(nil, @"翻译失败（自定义接口与备用接口均不可用）");
+                    else deliver(nil, @"翻译失败（AI 与备用接口均不可用）");
                 });
             });
         });
         return;
     }
     if (engine == WCTranslateEngineMyMemory) {
-        WCTranslateMyMemory(text, toEnglish, ^(NSString *mm) {
+        WCTranslateMyMemory(text, targetCode, ^(NSString *mm) {
             if (mm.length) { deliver(mm, nil); return; }
-            WCTranslateEdge(text, toEnglish, ^(NSString *edge) {
+            WCTranslateEdge(text, targetCode, ^(NSString *edge) {
                 if (edge.length) deliver(edge, nil);
                 else deliver(nil, @"翻译失败");
             });
@@ -157,9 +187,9 @@ void WCGestureTranslateText(NSString *text, BOOL toEnglish, WCGestureTranslateCo
         return;
     }
     // Default: Edge primary, MyMemory fallback.
-    WCTranslateEdge(text, toEnglish, ^(NSString *edge) {
+    WCTranslateEdge(text, targetCode, ^(NSString *edge) {
         if (edge.length) { deliver(edge, nil); return; }
-        WCTranslateMyMemory(text, toEnglish, ^(NSString *mm) {
+        WCTranslateMyMemory(text, targetCode, ^(NSString *mm) {
             if (mm.length) deliver(mm, nil);
             else deliver(nil, @"翻译失败");
         });

@@ -2,6 +2,7 @@
 #import "WCGestureConfig.h"
 #import "WCGestureAccount.h"
 #import "WCGestureTranslate.h"
+#import "WCGestureAI.h"
 #import "WCPopup.h"
 #import <objc/message.h>
 #import <objc/runtime.h>
@@ -20,6 +21,9 @@ static NSArray<NSDictionary *> *WCActionOptions(BOOL selfMessage) {
     [options addObject:@{ @"title": @"收藏", @"value": @(WCReplySwipeActionFavorite) }];
     [options addObject:@{ @"title": @"消息处理（转文字翻译）", @"value": @(WCReplySwipeActionTranslate) }];
     [options addObject:@{ @"title": @"朗读", @"value": @(WCReplySwipeActionSpeak) }];
+    // Replying to your own message makes no sense, so only offer it for the
+    // other side's messages.
+    if (!selfMessage) [options addObject:@{ @"title": @"AI 回复", @"value": @(WCReplySwipeActionAIReply) }];
     return options;
 }
 
@@ -116,9 +120,12 @@ static void WCPresentTriggerDistanceEditor(__unused UIViewController *presenter)
 static void WCPresentKeyboardNumberEditor(__unused UIViewController *presenter,
                                          NSString *title, NSString *defaultsKey) {
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    BOOL isWidth = [defaultsKey isEqualToString:WCKeyboardStripWidthKey];
+    BOOL isWidth = [defaultsKey isEqualToString:WCKeyboardStripWidthKey]
+        || [defaultsKey isEqualToString:WCKeyboardStripWidthKeyThirdParty];
     BOOL isOffset = [defaultsKey isEqualToString:WCKeyboardStripOffsetXKey]
-        || [defaultsKey isEqualToString:WCKeyboardStripOffsetYKey];
+        || [defaultsKey isEqualToString:WCKeyboardStripOffsetYKey]
+        || [defaultsKey isEqualToString:WCKeyboardStripOffsetXKeyThirdParty]
+        || [defaultsKey isEqualToString:WCKeyboardStripOffsetYKeyThirdParty];
     double minValue = isWidth ? 0.0 : (isOffset ? -400.0 : 20.0);
     double maxValue = isWidth ? 1000.0 : (isOffset ? 400.0 : 200.0);
     NSString *message;
@@ -145,6 +152,115 @@ static void WCPresentKeyboardNumberEditor(__unused UIViewController *presenter,
         if (d > maxValue) d = maxValue;
         [defaults setDouble:d forKey:defaultsKey];
         WCPostChange(defaultsKey);
+    }];
+}
+
+#pragma mark - Keyboard signature
+
+static NSArray<NSDictionary *> *WCSignatureFontOptions(void) {
+    return @[
+        @{ @"title": @"系统字", @"value": @(WCKeyboardSignatureFontSystem) },
+        @{ @"title": @"楷体", @"value": @(WCKeyboardSignatureFontKaiti) },
+        @{ @"title": @"行楷", @"value": @(WCKeyboardSignatureFontXingkai) },
+        @{ @"title": @"宋体", @"value": @(WCKeyboardSignatureFontSongti) },
+        @{ @"title": @"圆体", @"value": @(WCKeyboardSignatureFontYuanti) },
+        @{ @"title": @"手写体", @"value": @(WCKeyboardSignatureFontHannotate) },
+        @{ @"title": @"娃娃体", @"value": @(WCKeyboardSignatureFontWawati) },
+    ];
+}
+
+static NSString *WCSignatureFontName(NSInteger face) {
+    for (NSDictionary *option in WCSignatureFontOptions()) {
+        if ([option[@"value"] integerValue] == face) return option[@"title"];
+    }
+    return @"系统字";
+}
+
+static void WCPresentSignatureFontPicker(__unused UIViewController *presenter) {
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSInteger current = [defaults integerForKey:WCKeyboardSignatureFontKey];
+    NSMutableArray<WCPopupOption *> *options = [NSMutableArray array];
+    for (NSDictionary *option in WCSignatureFontOptions()) {
+        [options addObject:[WCPopupOption optionWithTitle:option[@"title"] value:option[@"value"]]];
+    }
+    [WCPopup showOptionsWithTitle:@"签名字体"
+                          message:@"使用系统自带中文字体；设备缺少该字体时回退为系统字"
+                          options:options
+                         selected:@(current)
+                       completion:^(id value) {
+        if (!value) return;
+        WCSetInteger([value integerValue], WCKeyboardSignatureFontKey);
+    }];
+}
+
+static NSArray<NSDictionary *> *WCSignatureDecorationOptions(void) {
+    return @[
+        @{ @"title": @"无装饰", @"value": @(WCKeyboardSignatureDecorationNone) },
+        @{ @"title": @"拉开字距", @"value": @(WCKeyboardSignatureDecorationSpaced) },
+        @{ @"title": @"描边空心", @"value": @(WCKeyboardSignatureDecorationOutline) },
+        @{ @"title": @"— 横线 —", @"value": @(WCKeyboardSignatureDecorationDivider) },
+        @{ @"title": @"◇ 菱形 ◇", @"value": @(WCKeyboardSignatureDecorationDiamond) },
+        @{ @"title": @"· 圆点 ·", @"value": @(WCKeyboardSignatureDecorationDot) },
+        @{ @"title": @"✦ 星芒 ✦", @"value": @(WCKeyboardSignatureDecorationStar) },
+        @{ @"title": @"「引号」", @"value": @(WCKeyboardSignatureDecorationQuote) },
+    ];
+}
+
+static NSString *WCSignatureDecorationName(NSInteger decoration) {
+    for (NSDictionary *option in WCSignatureDecorationOptions()) {
+        if ([option[@"value"] integerValue] == decoration) return option[@"title"];
+    }
+    return @"无装饰";
+}
+
+static void WCPresentSignatureDecorationPicker(__unused UIViewController *presenter) {
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSInteger current = [defaults integerForKey:WCKeyboardSignatureDecorationKey];
+    NSMutableArray<WCPopupOption *> *options = [NSMutableArray array];
+    for (NSDictionary *option in WCSignatureDecorationOptions()) {
+        [options addObject:[WCPopupOption optionWithTitle:option[@"title"] value:option[@"value"]]];
+    }
+    [WCPopup showOptionsWithTitle:@"签名装饰"
+                          message:@"装饰符会加在签名两侧，文字本身保持不变"
+                          options:options
+                         selected:@(current)
+                       completion:^(id value) {
+        if (!value) return;
+        WCSetInteger([value integerValue], WCKeyboardSignatureDecorationKey);
+    }];
+}
+
+static void WCPresentSignatureEditor(__unused UIViewController *presenter) {
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSString *text = [defaults stringForKey:WCKeyboardSignatureTextKey] ?: @"";
+    [WCPopup showInputWithTitle:@"触控区签名"
+                        message:@"显示在触发范围中间；要关闭请用「清除签名」"
+                           text:text
+                    placeholder:@"例如：秋 🌾"
+                       keyboard:UIKeyboardTypeDefault
+                     completion:^(NSString *value) {
+        NSString *trimmed = [value stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet] ?: @"";
+        [defaults setObject:trimmed forKey:WCKeyboardSignatureTextKey];
+        WCPostChange(WCKeyboardSignatureTextKey);
+    }];
+}
+
+static void WCPresentSignatureSizeEditor(__unused UIViewController *presenter) {
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSString *text = [NSString stringWithFormat:@"%.0f", [defaults doubleForKey:WCKeyboardSignatureSizeKey]];
+    [WCPopup showInputWithTitle:@"签名字号"
+                        message:@"输入 6 到 24 之间的数值；会随键盘宽度等比缩放"
+                           text:text
+                    placeholder:@"6 - 24"
+                       keyboard:UIKeyboardTypeDecimalPad
+                     completion:^(NSString *value) {
+        NSString *trimmed = [value stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+        if (trimmed.length == 0) return;
+        double d = [trimmed doubleValue];
+        if (d < 6.0) d = 6.0;
+        if (d > 24.0) d = 24.0;
+        [defaults setDouble:d forKey:WCKeyboardSignatureSizeKey];
+        WCPostChange(WCKeyboardSignatureSizeKey);
     }];
 }
 
@@ -205,7 +321,7 @@ static NSArray<NSDictionary *> *WCTranslateEngineOptions(void) {
     return @[
         @{ @"title": @"微软翻译", @"value": @(WCTranslateEngineEdge) },
         @{ @"title": @"MyMemory", @"value": @(WCTranslateEngineMyMemory) },
-        @{ @"title": @"自定义接口", @"value": @(WCTranslateEngineCustom) },
+        @{ @"title": @"已配置的 AI", @"value": @(WCTranslateEngineAI) },
     ];
 }
 
@@ -223,7 +339,7 @@ static void WCPresentTranslateEnginePicker(__unused UIViewController *presenter)
         [options addObject:[WCPopupOption optionWithTitle:option[@"title"] value:option[@"value"]]];
     }
     [WCPopup showOptionsWithTitle:@"翻译引擎"
-                          message:@"微软翻译与 MyMemory 免费且无需 key；自定义接口需 OpenAI 兼容地址"
+                          message:@"微软翻译与 MyMemory 免费且无需 key；「已配置的 AI」使用上方 AI 服务商，按预设提示词翻译"
                           options:options
                          selected:@(current)
                        completion:^(id value) {
@@ -232,9 +348,81 @@ static void WCPresentTranslateEnginePicker(__unused UIViewController *presenter)
     }];
 }
 
-static void WCPresentTranslateTextEditor(__unused UIViewController *presenter,
-                                         NSString *title, NSString *message,
-                                         NSString *defaultsKey, NSString *placeholder) {
+// The pair is 中文 ↔ 目标语言: one action translates into the target, the other
+// one back into Chinese.
+static void WCPresentTranslatePairPicker(__unused UIViewController *presenter) {
+    NSString *current = WCTranslatePairTargetCode();
+    NSMutableArray<WCPopupOption *> *options = [NSMutableArray array];
+    for (NSDictionary *language in WCTranslateLanguageOptions()) {
+        [options addObject:[WCPopupOption optionWithTitle:
+            [NSString stringWithFormat:@"中文 ↔ %@", language[@"title"]]
+                                                    value:language[@"code"]]];
+    }
+    [WCPopup showOptionsWithTitle:@"互译语言"
+                          message:@"两个翻译动作会跟着切换：译成所选语言、译成中文"
+                          options:options
+                         selected:current
+                       completion:^(id value) {
+        if (![value isKindOfClass:[NSString class]]) return;
+        [[NSUserDefaults standardUserDefaults] setObject:value forKey:WCTranslatePairTargetKey];
+        WCPostChange(WCTranslatePairTargetKey);
+    }];
+}
+
+static void WCPresentTranslateTest(__unused UIViewController *presenter) {
+    NSString *engineName = WCTranslateEngineName(
+        [[NSUserDefaults standardUserDefaults] integerForKey:WCTranslateEngineKey]);
+    NSString *targetCode = WCTranslatePairTargetCode();
+    NSString *targetName = WCTranslateLanguageName(targetCode);
+    WCGestureTranslateText(@"你好世界", targetCode, ^(NSString *translated, NSString *errorMessage) {
+        if (translated.length > 0) {
+            [WCPopup showMessage:[NSString stringWithFormat:@"翻译测试成功 · %@", engineName]
+                         message:[NSString stringWithFormat:@"你好世界 → %@：%@", targetName, translated]];
+        } else {
+            [WCPopup showMessage:[NSString stringWithFormat:@"翻译测试失败 · %@", engineName]
+                         message:errorMessage ?: @"未知错误"];
+        }
+    });
+}
+
+#pragma mark - AI assistant (AI 回复 / 回答 / 润色)
+
+static NSArray<NSDictionary *> *WCAIProviderOptions(void) {
+    return @[
+        @{ @"title": @"DeepSeek", @"value": @(WCGestureAIProviderDeepSeek) },
+        @{ @"title": @"千问", @"value": @(WCGestureAIProviderQwen) },
+        @{ @"title": @"百炼", @"value": @(WCGestureAIProviderBailian) },
+        @{ @"title": @"硅基流动", @"value": @(WCGestureAIProviderSiliconFlow) },
+        @{ @"title": @"自定义", @"value": @(WCGestureAIProviderCustom) },
+    ];
+}
+
+static void WCPresentAIProviderPicker(__unused UIViewController *presenter) {
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSInteger current = [defaults integerForKey:WCGestureAIProviderKey];
+    NSMutableArray<WCPopupOption *> *options = [NSMutableArray array];
+    for (NSDictionary *option in WCAIProviderOptions()) {
+        [options addObject:[WCPopupOption optionWithTitle:option[@"title"] value:option[@"value"]]];
+    }
+    [WCPopup showOptionsWithTitle:@"AI 服务商"
+                          message:@"选择模板会自动填好接口地址和模型；切换后需重新填写对应的 API Key"
+                          options:options
+                         selected:@(current)
+                       completion:^(id value) {
+        if (!value) return;
+        NSInteger provider = [value integerValue];
+        [defaults setInteger:provider forKey:WCGestureAIProviderKey];
+        // The endpoint/model belong to the template; drop manual overrides so
+        // the new provider's defaults take effect.
+        [defaults setObject:@"" forKey:WCGestureAIBaseURLKey];
+        [defaults setObject:@"" forKey:WCGestureAIModelKey];
+        WCPostChange(WCGestureAIProviderKey);
+    }];
+}
+
+static void WCPresentAITextEditor(__unused UIViewController *presenter,
+                                  NSString *title, NSString *message,
+                                  NSString *defaultsKey, NSString *placeholder) {
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     NSString *text = [defaults stringForKey:defaultsKey] ?: @"";
     [WCPopup showInputWithTitle:title
@@ -249,15 +437,76 @@ static void WCPresentTranslateTextEditor(__unused UIViewController *presenter,
     }];
 }
 
-static void WCPresentTranslateTest(__unused UIViewController *presenter) {
-    NSString *engineName = WCTranslateEngineName(
-        [[NSUserDefaults standardUserDefaults] integerForKey:WCTranslateEngineKey]);
-    WCGestureTranslateText(@"你好世界", YES, ^(NSString *translated, NSString *errorMessage) {
-        if (translated.length > 0) {
-            [WCPopup showMessage:[NSString stringWithFormat:@"翻译测试成功 · %@", engineName]
-                         message:[NSString stringWithFormat:@"%@ → %@", @"你好世界", translated]];
+static void WCPresentAIAPIKeyEditor(__unused UIViewController *presenter) {
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    [WCPopup showSecureInputWithTitle:@"AI API Key"
+                              message:@"输入新的 Key 会覆盖旧值；取消则保持不变"
+                                 text:@""
+                          placeholder:@"sk-..."
+                             keyboard:UIKeyboardTypeDefault
+                           completion:^(NSString *value) {
+        NSString *trimmed = [value stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet] ?: @"";
+        if (trimmed.length == 0) return;
+        [defaults setObject:trimmed forKey:WCGestureAIAPIKeyKey];
+        WCPostChange(WCGestureAIAPIKeyKey);
+    }];
+}
+
+// A preset only holds an extra instruction; the task prompt stays built in.
+static NSArray<NSDictionary *> *WCAIPresetOptions(void) {
+    return @[
+        @{ @"title": @"方案 1", @"value": @0 },
+        @{ @"title": @"方案 2", @"value": @1 },
+        @{ @"title": @"方案 3", @"value": @2 },
+    ];
+}
+
+static NSString *WCAIPresetName(NSInteger index) {
+    if (index < 0 || index > 2) index = 0;
+    return [NSString stringWithFormat:@"方案 %ld", (long)index + 1];
+}
+
+static void WCPresentAIPresetPicker(__unused UIViewController *presenter,
+                                    NSString *title, NSString *defaultsKey) {
+    NSInteger current = [[NSUserDefaults standardUserDefaults] integerForKey:defaultsKey];
+    NSMutableArray<WCPopupOption *> *options = [NSMutableArray array];
+    for (NSDictionary *option in WCAIPresetOptions()) {
+        [options addObject:[WCPopupOption optionWithTitle:option[@"title"] value:option[@"value"]]];
+    }
+    [WCPopup showOptionsWithTitle:title
+                          message:@"方案只是追加到该动作提示词后面的补充要求，可在上方编辑"
+                          options:options
+                         selected:@(current)
+                       completion:^(id value) {
+        if (!value) return;
+        WCSetInteger([value integerValue], defaultsKey);
+    }];
+}
+
+static NSString *WCAIPresetPromptKey(NSInteger index) {
+    if (index == 1) return WCGestureAIPresetPrompt2Key;
+    if (index == 2) return WCGestureAIPresetPrompt3Key;
+    return WCGestureAIPresetPrompt1Key;
+}
+
+static void WCPresentAIPresetPromptEditor(__unused UIViewController *presenter, NSInteger index) {
+    if (index < 0 || index > 2) return;
+    NSString *key = WCAIPresetPromptKey(index);
+    WCPresentAITextEditor(presenter,
+        [NSString stringWithFormat:@"%@ 提示词", WCAIPresetName(index)],
+        @"追加在该动作的提示词后面，例如：简短、口语化；清空请用「清除方案提示词」",
+        key, @"例如：简短、口语化");
+}
+
+static void WCPresentAITest(__unused UIViewController *presenter) {
+    NSString *providerName = WCGestureAIProviderName(
+        [[NSUserDefaults standardUserDefaults] integerForKey:WCGestureAIProviderKey]);
+    WCGestureAIPerform(WCGestureAITaskAnswer, @"用一句话介绍你自己", ^(NSString *text, NSString *errorMessage) {
+        if (text.length > 0) {
+            [WCPopup showMessage:[NSString stringWithFormat:@"AI 测试成功 · %@", providerName]
+                         message:text];
         } else {
-            [WCPopup showMessage:[NSString stringWithFormat:@"翻译测试失败 · %@", engineName]
+            [WCPopup showMessage:[NSString stringWithFormat:@"AI 测试失败 · %@", providerName]
                          message:errorMessage ?: @"未知错误"];
         }
     });
@@ -302,6 +551,7 @@ static NSDictionary<NSString *, NSString *> *WCConfigShareKeys(void) {
         @"E": WCKeyboardDoubleTapActionKey,
         @"F": WCKeyboardTripleTapActionKey,
         @"G": WCKeyboardHapticKey,
+        @"H": WCKeyboardLongPressActionKey,
     };
 }
 
@@ -363,17 +613,23 @@ static void WCPresentImportConfig(__unused UIViewController *presenter) {
 #pragma mark - Input action options
 
 static NSArray<NSDictionary *> *WCInputActionOptions(void) {
+    // Translation titles follow the configured language pair, so switching the
+    // pair updates both actions without touching their stored values.
+    NSString *targetName = WCTranslateLanguageName(WCTranslatePairTargetCode());
+    NSString *translateToTarget = [NSString stringWithFormat:@"翻译 · 译成%@", targetName];
     return @[
         @{ @"title": @"不设置", @"value": @(WCInputActionNone) },
         @{ @"title": @"清空", @"value": @(WCInputActionClear) },
         @{ @"title": @"粘贴", @"value": @(WCInputActionPaste) },
         @{ @"title": @"复制", @"value": @(WCInputActionCopy) },
         @{ @"title": @"剪切", @"value": @(WCInputActionCut) },
-        @{ @"title": @"翻译 · 中译英", @"value": @(WCInputActionTranslateToEnglish) },
-        @{ @"title": @"翻译 · 英译中", @"value": @(WCInputActionTranslateToChinese) },
+        @{ @"title": translateToTarget, @"value": @(WCInputActionTranslateToTarget) },
+        @{ @"title": @"翻译 · 译成中文", @"value": @(WCInputActionTranslateToChinese) },
         @{ @"title": @"转大写", @"value": @(WCInputActionUppercase) },
         @{ @"title": @"转小写", @"value": @(WCInputActionLowercase) },
         @{ @"title": @"去空格换行", @"value": @(WCInputActionTrim) },
+        @{ @"title": @"AI 润色", @"value": @(WCInputActionAIPolish) },
+        @{ @"title": @"AI 回答", @"value": @(WCInputActionAIAnswer) },
     ];
 }
 
@@ -411,13 +667,29 @@ typedef NS_ENUM(NSInteger, WCRowKind) {
     WCRowKindGlobalAction,  // tap → global action picker
     WCRowKindDistance,      // tap → number editor
     WCRowKindKeyboardNumber,// tap → number editor for the keyboard strip geometry
+    WCRowKindSignatureText, // tap → strip signature editor
+    WCRowKindSignatureSize, // tap → signature font size editor
+    WCRowKindSignatureFont, // tap → signature typeface picker
+    WCRowKindSignatureDecoration, // tap → signature ornament picker
+    WCRowKindSignatureClear,// tap → remove the signature
+    WCRowKindAIProvider,    // tap → AI provider template picker
+    WCRowKindAIBaseURL,     // tap → OpenAI-compatible endpoint editor
+    WCRowKindAIModel,       // tap → model name editor
+    WCRowKindAIAPIKey,      // tap → secure API key editor
+    WCRowKindAIPreset1Prompt, // tap → edit 方案 1 prompt
+    WCRowKindAIPreset2Prompt, // tap → edit 方案 2 prompt
+    WCRowKindAIPreset3Prompt, // tap → edit 方案 3 prompt
+    WCRowKindAIReplyPreset,   // tap → pick the preset used by AI 回复
+    WCRowKindAIAnswerPreset,  // tap → pick the preset used by AI 回答
+    WCRowKindAIPolishPreset,  // tap → pick the preset used by AI 润色
+    WCRowKindAIPresetClear,   // tap → clear all preset prompts
+    WCRowKindAIReset,       // tap → clear AI endpoint/model/key/presets
+    WCRowKindAITest,        // tap → test the AI endpoint
     WCRowKindPluginName,    // tap → plugin name editor
     WCRowKindHapticStyle,   // tap → haptic style picker
     WCRowKindCustomPages, // tap → custom page class name editor
     WCRowKindTranslateEngine,     // tap → translation engine picker
-    WCRowKindTranslateCustomURL,  // tap → custom endpoint editor
-    WCRowKindTranslateCustomKey,  // tap → custom API key editor
-    WCRowKindTranslateCustomModel,// tap → custom model editor
+    WCRowKindTranslatePair,       // tap → 中文 ↔ language picker
     WCRowKindTranslateTest,       // tap → test translation engine
     WCRowKindExport,         // tap → export config
     WCRowKindImport,        // tap → import config
@@ -550,19 +822,9 @@ static NSString *WCRowDetailText(WCRow *row) {
         }
         case WCRowKindTranslateEngine:
             return WCTranslateEngineName([d integerForKey:WCTranslateEngineKey]);
-        case WCRowKindTranslateCustomURL: {
-            NSString *url = [d stringForKey:WCTranslateCustomURLKey];
-            return url.length > 0 ? url : @"未设置";
-        }
-        case WCRowKindTranslateCustomKey: {
-            NSString *key = [d stringForKey:WCTranslateCustomKeyKey];
-            if (key.length == 0) return @"未设置";
-            return [NSString stringWithFormat:@"已设置(%lu 位)", (unsigned long)key.length];
-        }
-        case WCRowKindTranslateCustomModel: {
-            NSString *model = [d stringForKey:WCTranslateCustomModelKey];
-            return model.length > 0 ? model : @"gpt-4o-mini";
-        }
+        case WCRowKindTranslatePair:
+            return [NSString stringWithFormat:@"中文 ↔ %@",
+                    WCTranslateLanguageName(WCTranslatePairTargetCode())];
         case WCRowKindTranslateTest:
             return @"";
         case WCRowKindExport:
@@ -573,12 +835,57 @@ static NSString *WCRowDetailText(WCRow *row) {
             return [NSString stringWithFormat:@"%.0f", v <= 0 ? 56.0 : v];
         }
         case WCRowKindKeyboardNumber: {
-            if ([row.defaultsKey isEqualToString:WCKeyboardStripWidthKey]) {
-                double w = [d doubleForKey:WCKeyboardStripWidthKey];
+            if ([row.defaultsKey isEqualToString:WCKeyboardStripWidthKey]
+                || [row.defaultsKey isEqualToString:WCKeyboardStripWidthKeyThirdParty]) {
+                double w = [d doubleForKey:row.defaultsKey];
                 return w > 0 ? [NSString stringWithFormat:@"%.0f", w] : @"满宽";
             }
             return [NSString stringWithFormat:@"%.0f", [d doubleForKey:row.defaultsKey]];
         }
+        case WCRowKindSignatureText: {
+            NSString *text = [d stringForKey:WCKeyboardSignatureTextKey] ?: @"";
+            return text.length > 0 ? text : @"未设置";
+        }
+        case WCRowKindSignatureSize:
+            return [NSString stringWithFormat:@"%.0f", [d doubleForKey:WCKeyboardSignatureSizeKey]];
+        case WCRowKindSignatureFont:
+            return WCSignatureFontName([d integerForKey:WCKeyboardSignatureFontKey]);
+        case WCRowKindSignatureDecoration:
+            return WCSignatureDecorationName([d integerForKey:WCKeyboardSignatureDecorationKey]);
+        case WCRowKindSignatureClear:
+            return @"";
+        case WCRowKindAIProvider:
+            return WCGestureAIProviderName([d integerForKey:WCGestureAIProviderKey]);
+        case WCRowKindAIBaseURL:
+            return WCGestureAIResolvedBaseURL();
+        case WCRowKindAIModel:
+            return WCGestureAIResolvedModel();
+        case WCRowKindAIAPIKey: {
+            NSString *key = [d stringForKey:WCGestureAIAPIKeyKey] ?: @"";
+            return key.length > 0
+                ? [NSString stringWithFormat:@"已设置(%lu 位)", (unsigned long)key.length]
+                : @"未设置";
+        }
+        case WCRowKindAIPreset1Prompt:
+        case WCRowKindAIPreset2Prompt:
+        case WCRowKindAIPreset3Prompt: {
+            NSInteger index = row.kind == WCRowKindAIPreset2Prompt ? 1
+                : (row.kind == WCRowKindAIPreset3Prompt ? 2 : 0);
+            NSString *prompt = [d stringForKey:WCAIPresetPromptKey(index)] ?: @"";
+            if (prompt.length == 0) return @"默认";
+            return prompt.length > 16
+                ? [[prompt substringToIndex:16] stringByAppendingString:@"…"] : prompt;
+        }
+        case WCRowKindAIReplyPreset:
+            return WCAIPresetName([d integerForKey:WCGestureAIReplyPresetKey]);
+        case WCRowKindAIAnswerPreset:
+            return WCAIPresetName([d integerForKey:WCGestureAIAnswerPresetKey]);
+        case WCRowKindAIPolishPreset:
+            return WCAIPresetName([d integerForKey:WCGestureAIPolishPresetKey]);
+        case WCRowKindAIPresetClear:
+        case WCRowKindAIReset:
+        case WCRowKindAITest:
+            return @"";
     }
     return @"";
 }
@@ -950,19 +1257,37 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
         [collapsible addObject:@YES];
         [collapseKeys addObject:[prefix stringByAppendingString:@".chat.input"]];
         NSMutableArray *keyboard = [NSMutableArray array];
-        [keyboard addObject:WCSwitchRow(@"键盘增强", WCKeyboardEnhanceEnabledKey)];
+        [keyboard addObject:WCSwitchRow(@"键盘底部手势", WCKeyboardEnhanceEnabledKey)];
         if ([d boolForKey:WCKeyboardEnhanceEnabledKey]) {
             [keyboard addObject:WCSwitchRow(@"震动", WCKeyboardHapticKey)];
             [keyboard addObject:WCInputActionRow(@"左滑动作", WCKeyboardSwipeLeftActionKey)];
             [keyboard addObject:WCInputActionRow(@"右滑动作", WCKeyboardSwipeRightActionKey)];
             [keyboard addObject:WCInputActionRow(@"双击动作", WCKeyboardDoubleTapActionKey)];
             [keyboard addObject:WCInputActionRow(@"三击动作", WCKeyboardTripleTapActionKey)];
+            [keyboard addObject:WCInputActionRow(@"长按动作", WCKeyboardLongPressActionKey)];
             [keyboard addObject:WCSwitchRow(@"显示触发范围", WCKeyboardDebugFrameKey)];
+            // Optional caption inside the strip. Its size/style rows only show
+            // up once there is text, so the section stays short by default.
+            [keyboard addObject:WCPlainRow(@"触控区签名", WCRowKindSignatureText)];
+            NSString *signature = [d stringForKey:WCKeyboardSignatureTextKey] ?: @"";
+            if (signature.length > 0) {
+                [keyboard addObject:WCPlainRow(@"签名字号", WCRowKindSignatureSize)];
+                [keyboard addObject:WCPlainRow(@"签名字体", WCRowKindSignatureFont)];
+                [keyboard addObject:WCPlainRow(@"签名装饰", WCRowKindSignatureDecoration)];
+                // The input popup treats an empty text field as cancel, so
+                // clearing needs its own row.
+                [keyboard addObject:WCPlainRow(@"清除签名", WCRowKindSignatureClear)];
+            }
             // Tap to type a value and see the strip move without rebuilding.
-            [keyboard addObject:WCNumberRow(@"触控区宽度", WCKeyboardStripWidthKey)];
-            [keyboard addObject:WCNumberRow(@"触控区高度", WCKeyboardStripHeightKey)];
-            [keyboard addObject:WCNumberRow(@"触控区左右偏移", WCKeyboardStripOffsetXKey)];
-            [keyboard addObject:WCNumberRow(@"触控区上下偏移", WCKeyboardStripOffsetYKey)];
+            // Two sets: the system keyboard and third-party keyboards.
+            [keyboard addObject:WCNumberRow(@"触控区宽度（官方）", WCKeyboardStripWidthKey)];
+            [keyboard addObject:WCNumberRow(@"触控区高度（官方）", WCKeyboardStripHeightKey)];
+            [keyboard addObject:WCNumberRow(@"左右偏移（官方）", WCKeyboardStripOffsetXKey)];
+            [keyboard addObject:WCNumberRow(@"上下偏移（官方）", WCKeyboardStripOffsetYKey)];
+            [keyboard addObject:WCNumberRow(@"触控区宽度（第三方）", WCKeyboardStripWidthKeyThirdParty)];
+            [keyboard addObject:WCNumberRow(@"触控区高度（第三方）", WCKeyboardStripHeightKeyThirdParty)];
+            [keyboard addObject:WCNumberRow(@"左右偏移（第三方）", WCKeyboardStripOffsetXKeyThirdParty)];
+            [keyboard addObject:WCNumberRow(@"上下偏移（第三方）", WCKeyboardStripOffsetYKeyThirdParty)];
         }
         [sections addObject:keyboard];
         [collapsible addObject:@YES];
@@ -1002,13 +1327,34 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
         [sections addObject:plugin];
         [collapsible addObject:@NO];
         [collapseKeys addObject:[prefix stringByAppendingString:@".plugin"]];
+        NSMutableArray *ai = [NSMutableArray array];
+        [ai addObject:WCPlainRow(@"AI 服务商", WCRowKindAIProvider)];
+        [ai addObject:WCPlainRow(@"接口地址", WCRowKindAIBaseURL)];
+        [ai addObject:WCPlainRow(@"模型", WCRowKindAIModel)];
+        [ai addObject:WCPlainRow(@"API Key", WCRowKindAIAPIKey)];
+        // Three reusable prompt presets; each AI action picks one of them.
+        [ai addObject:WCPlainRow(@"方案 1 提示词", WCRowKindAIPreset1Prompt)];
+        [ai addObject:WCPlainRow(@"方案 2 提示词", WCRowKindAIPreset2Prompt)];
+        [ai addObject:WCPlainRow(@"方案 3 提示词", WCRowKindAIPreset3Prompt)];
+        [ai addObject:WCPlainRow(@"AI 回复方案", WCRowKindAIReplyPreset)];
+        [ai addObject:WCPlainRow(@"AI 回答方案", WCRowKindAIAnswerPreset)];
+        [ai addObject:WCPlainRow(@"AI 润色方案", WCRowKindAIPolishPreset)];
+        BOOL hasPresetPrompt = [d stringForKey:WCGestureAIPresetPrompt1Key].length > 0
+            || [d stringForKey:WCGestureAIPresetPrompt2Key].length > 0
+            || [d stringForKey:WCGestureAIPresetPrompt3Key].length > 0;
+        if (hasPresetPrompt) [ai addObject:WCPlainRow(@"清除方案提示词", WCRowKindAIPresetClear)];
+        BOOL aiConfigured = [d stringForKey:WCGestureAIBaseURLKey].length > 0
+            || [d stringForKey:WCGestureAIModelKey].length > 0
+            || [d stringForKey:WCGestureAIAPIKeyKey].length > 0
+            || hasPresetPrompt;
+        if (aiConfigured) [ai addObject:WCPlainRow(@"清除 AI 配置", WCRowKindAIReset)];
+        [ai addObject:WCPlainRow(@"测试 AI", WCRowKindAITest)];
+        [sections addObject:ai];
+        [collapsible addObject:@NO];
+        [collapseKeys addObject:[prefix stringByAppendingString:@".ai"]];
         NSMutableArray *translate = [NSMutableArray array];
         [translate addObject:WCPlainRow(@"翻译引擎", WCRowKindTranslateEngine)];
-        if ([d integerForKey:WCTranslateEngineKey] == WCTranslateEngineCustom) {
-            [translate addObject:WCPlainRow(@"接口地址", WCRowKindTranslateCustomURL)];
-            [translate addObject:WCPlainRow(@"API Key", WCRowKindTranslateCustomKey)];
-            [translate addObject:WCPlainRow(@"模型", WCRowKindTranslateCustomModel)];
-        }
+        [translate addObject:WCPlainRow(@"互译语言", WCRowKindTranslatePair)];
         [translate addObject:WCPlainRow(@"测试翻译", WCRowKindTranslateTest)];
         [sections addObject:translate];
         [collapsible addObject:@NO];
@@ -1168,20 +1514,8 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
         case WCRowKindTranslateEngine:
             WCPresentTranslateEnginePicker(self);
             break;
-        case WCRowKindTranslateCustomURL:
-            WCPresentTranslateTextEditor(self, @"接口地址",
-                @"OpenAI 兼容的 chat/completions 地址",
-                WCTranslateCustomURLKey, @"https://api.openai.com/v1/chat/completions");
-            break;
-        case WCRowKindTranslateCustomKey:
-            WCPresentTranslateTextEditor(self, @"API Key",
-                @"以 Bearer 方式发送；留空则不发送鉴权头",
-                WCTranslateCustomKeyKey, @"sk-...");
-            break;
-        case WCRowKindTranslateCustomModel:
-            WCPresentTranslateTextEditor(self, @"模型",
-                @"留空默认 gpt-4o-mini",
-                WCTranslateCustomModelKey, @"gpt-4o-mini");
+        case WCRowKindTranslatePair:
+            WCPresentTranslatePairPicker(self);
             break;
         case WCRowKindTranslateTest:
             WCPresentTranslateTest(self);
@@ -1197,6 +1531,86 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
             break;
         case WCRowKindKeyboardNumber:
             WCPresentKeyboardNumberEditor(self, row.title, row.defaultsKey);
+            break;
+        case WCRowKindSignatureText:
+            WCPresentSignatureEditor(self);
+            break;
+        case WCRowKindSignatureSize:
+            WCPresentSignatureSizeEditor(self);
+            break;
+        case WCRowKindSignatureFont:
+            WCPresentSignatureFontPicker(self);
+            break;
+        case WCRowKindSignatureDecoration:
+            WCPresentSignatureDecorationPicker(self);
+            break;
+        case WCRowKindSignatureClear:
+            [[NSUserDefaults standardUserDefaults] setObject:@"" forKey:WCKeyboardSignatureTextKey];
+            WCPostChange(WCKeyboardSignatureTextKey);
+            break;
+        case WCRowKindAIProvider:
+            WCPresentAIProviderPicker(self);
+            break;
+        case WCRowKindAIBaseURL: {
+            NSInteger provider = [[NSUserDefaults standardUserDefaults] integerForKey:WCGestureAIProviderKey];
+            NSString *fallback = WCGestureAIProviderDefaultBaseURL(provider);
+            WCPresentAITextEditor(self, @"AI 接口地址",
+                @"OpenAI 兼容地址；取消则保持当前值，切换服务商可恢复模板默认",
+                WCGestureAIBaseURLKey,
+                fallback.length > 0 ? fallback : @"https://api.example.com/v1");
+            break;
+        }
+        case WCRowKindAIModel: {
+            NSInteger provider = [[NSUserDefaults standardUserDefaults] integerForKey:WCGestureAIProviderKey];
+            NSString *fallback = WCGestureAIProviderDefaultModel(provider);
+            WCPresentAITextEditor(self, @"AI 模型",
+                @"填写服务商提供的模型名称；取消则保持当前值",
+                WCGestureAIModelKey,
+                fallback.length > 0 ? fallback : @"模型名称");
+            break;
+        }
+        case WCRowKindAIAPIKey:
+            WCPresentAIAPIKeyEditor(self);
+            break;
+        case WCRowKindAIPreset1Prompt:
+            WCPresentAIPresetPromptEditor(self, 0);
+            break;
+        case WCRowKindAIPreset2Prompt:
+            WCPresentAIPresetPromptEditor(self, 1);
+            break;
+        case WCRowKindAIPreset3Prompt:
+            WCPresentAIPresetPromptEditor(self, 2);
+            break;
+        case WCRowKindAIReplyPreset:
+            WCPresentAIPresetPicker(self, @"AI 回复方案", WCGestureAIReplyPresetKey);
+            break;
+        case WCRowKindAIAnswerPreset:
+            WCPresentAIPresetPicker(self, @"AI 回答方案", WCGestureAIAnswerPresetKey);
+            break;
+        case WCRowKindAIPolishPreset:
+            WCPresentAIPresetPicker(self, @"AI 润色方案", WCGestureAIPolishPresetKey);
+            break;
+        case WCRowKindAIPresetClear: {
+            NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+            [defaults setObject:@"" forKey:WCGestureAIPresetPrompt1Key];
+            [defaults setObject:@"" forKey:WCGestureAIPresetPrompt2Key];
+            [defaults setObject:@"" forKey:WCGestureAIPresetPrompt3Key];
+            WCPostChange(WCGestureAIPresetPrompt1Key);
+            break;
+        }
+        case WCRowKindAIReset: {
+            NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+            [defaults setObject:@"" forKey:WCGestureAIBaseURLKey];
+            [defaults setObject:@"" forKey:WCGestureAIModelKey];
+            [defaults setObject:@"" forKey:WCGestureAIAPIKeyKey];
+            [defaults setObject:@"" forKey:WCGestureAIPresetPrompt1Key];
+            [defaults setObject:@"" forKey:WCGestureAIPresetPrompt2Key];
+            [defaults setObject:@"" forKey:WCGestureAIPresetPrompt3Key];
+            WCPostChange(WCGestureAIProviderKey);
+            break;
+        }
+        case WCRowKindAITest:
+            WCPresentAITest(self);
             break;
     }
 }
