@@ -823,11 +823,21 @@ static BOOL WCPerformMessageGestureAction(CommonMessageCellView *cell, WCReplySw
         case WCReplySwipeActionFavorite:
             performed = WCInvokeFirstMessageCellAction(cell, @[@"onFavorite:", @"doFavorite"]);
             break;
-        case WCReplySwipeActionTranslate:
-            performed = WCInvokeFirstMessageCellAction(cell, @[@"onTranslateMsg:", @"translateMsg"]);
+        case WCReplySwipeActionTranslate: {
+            id message = WCMessageWrapForCell(cell);
+            NSInteger messageType = [WCTweakSafeValue(message, @"m_uiMessageType") integerValue];
+            Class voiceClass = NSClassFromString(@"VoiceMessageCellView");
+            BOOL isVoice = messageType == 34 || (voiceClass && [cell isKindOfClass:voiceClass]);
+            if (isVoice) {
+                performed = WCInvokeFirstMessageCellAction(cell, @[@"onVoiceTrans:", @"onVoiceTrans"]);
+            } else {
+                performed = WCInvokeFirstMessageCellAction(cell, @[@"onTranslateMsg:", @"translateMsg"]);
+            }
             break;
+        }
         case WCReplySwipeActionSpeak:
-            performed = WCInvokeFirstMessageCellAction(cell, @[@"onSpeakMsg", @"onTextTranslateSpeak:"]);
+            performed = WCInvokeFirstMessageCellAction(cell,
+                @[@"onSpeakMsg", @"onTextTranslateSpeak:", @"onSpeakMsgFromTextTranslate:"]);
             break;
         case WCReplySwipeActionNone:
             break;
