@@ -1,6 +1,7 @@
 #import "WCGestureSettingsVC.h"
 #import "WCGestureConfig.h"
 #import "WCGestureAccount.h"
+#import "WCGestureTranslate.h"
 #import "WCPopup.h"
 #import <objc/message.h>
 #import <objc/runtime.h>
@@ -31,21 +32,26 @@ static NSString *WCActionName(NSInteger action, BOOL selfMessage) {
 }
 
 static UIWindow *WCActiveWindow(void) {
+    NSArray<UIWindow *> *windows = nil;
     for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
         if (scene.activationState != UISceneActivationStateForegroundActive ||
             ![scene isKindOfClass:[UIWindowScene class]]) continue;
-        for (UIWindow *window in ((UIWindowScene *)scene).windows) {
-            NSString *className = NSStringFromClass(window.class);
-            if (window.isKeyWindow && window.windowLevel == UIWindowLevelNormal &&
-                ![className containsString:@"iConsole"]) return window;
-        }
-        for (UIWindow *window in ((UIWindowScene *)scene).windows) {
-            NSString *className = NSStringFromClass(window.class);
-            if (!window.hidden && window.alpha > 0.0 && window.windowLevel == UIWindowLevelNormal &&
-                ![className containsString:@"iConsole"]) return window;
-        }
+        windows = ((UIWindowScene *)scene).windows;
+        if (windows.count) break;
     }
-    return nil;
+    if (windows.count == 0) {
+        id all = nil;
+        @try { all = [UIApplication.sharedApplication valueForKey:@"windows"]; }
+        @catch (__unused NSException *exception) {}
+        if ([all isKindOfClass:[NSArray class]]) windows = all;
+    }
+    for (UIWindow *window in windows) {
+        if (window.isKeyWindow && !window.hidden && window.alpha > 0.0) return window;
+    }
+    for (UIWindow *window in windows) {
+        if (!window.hidden && window.alpha > 0.0 && window.rootViewController) return window;
+    }
+    return windows.firstObject;
 }
 
 static UIViewController *WCTopViewController(void) {
@@ -155,6 +161,70 @@ static void WCPresentPluginNameEditor(__unused UIViewController *presenter) {
     }];
 }
 
+#pragma mark - Translation engine
+
+static NSArray<NSDictionary *> *WCTranslateEngineOptions(void) {
+    return @[
+        @{ @"title": @"微软翻译", @"value": @(WCTranslateEngineEdge) },
+        @{ @"title": @"MyMemory", @"value": @(WCTranslateEngineMyMemory) },
+        @{ @"title": @"自定义接口", @"value": @(WCTranslateEngineCustom) },
+    ];
+}
+
+static NSString *WCTranslateEngineName(NSInteger engine) {
+    for (NSDictionary *option in WCTranslateEngineOptions()) {
+        if ([option[@"value"] integerValue] == engine) return option[@"title"];
+    }
+    return @"微软翻译";
+}
+
+static void WCPresentTranslateEnginePicker(__unused UIViewController *presenter) {
+    NSInteger current = [[NSUserDefaults standardUserDefaults] integerForKey:WCTranslateEngineKey];
+    NSMutableArray<WCPopupOption *> *options = [NSMutableArray array];
+    for (NSDictionary *option in WCTranslateEngineOptions()) {
+        [options addObject:[WCPopupOption optionWithTitle:option[@"title"] value:option[@"value"]]];
+    }
+    [WCPopup showOptionsWithTitle:@"翻译引擎"
+                          message:@"微软翻译与 MyMemory 免费且无需 key；自定义接口需 OpenAI 兼容地址"
+                          options:options
+                         selected:@(current)
+                       completion:^(id value) {
+        if (!value) return;
+        WCSetInteger([value integerValue], WCTranslateEngineKey);
+    }];
+}
+
+static void WCPresentTranslateTextEditor(__unused UIViewController *presenter,
+                                         NSString *title, NSString *message,
+                                         NSString *defaultsKey, NSString *placeholder) {
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSString *text = [defaults stringForKey:defaultsKey] ?: @"";
+    [WCPopup showInputWithTitle:title
+                        message:message
+                           text:text
+                    placeholder:placeholder
+                       keyboard:UIKeyboardTypeDefault
+                     completion:^(NSString *value) {
+        NSString *trimmed = [value stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet] ?: @"";
+        [defaults setObject:trimmed forKey:defaultsKey];
+        WCPostChange(defaultsKey);
+    }];
+}
+
+static void WCPresentTranslateTest(__unused UIViewController *presenter) {
+    NSString *engineName = WCTranslateEngineName(
+        [[NSUserDefaults standardUserDefaults] integerForKey:WCTranslateEngineKey]);
+    WCGestureTranslateText(@"你好世界", YES, ^(NSString *translated, NSString *errorMessage) {
+        if (translated.length > 0) {
+            [WCPopup showMessage:[NSString stringWithFormat:@"翻译测试成功 · %@", engineName]
+                         message:[NSString stringWithFormat:@"%@ → %@", @"你好世界", translated]];
+        } else {
+            [WCPopup showMessage:[NSString stringWithFormat:@"翻译测试失败 · %@", engineName]
+                         message:errorMessage ?: @"未知错误"];
+        }
+    });
+}
+
 #pragma mark - Config export/import (compact share code)
 
 // Short alias → full defaults key. Only these keys are exported; defaults are
@@ -188,6 +258,11 @@ static NSDictionary<NSString *, NSString *> *WCConfigShareKeys(void) {
         @"y": WCGestureHapticStyleKey,
         @"z": WCCustomPagesKey,
         @"A": WCHideSeparatorLinesKey,
+        @"B": WCKeyboardEnhanceEnabledKey,
+        @"C": WCKeyboardSwipeLeftActionKey,
+        @"D": WCKeyboardSwipeRightActionKey,
+        @"E": WCKeyboardDoubleTapActionKey,
+        @"F": WCKeyboardTripleTapActionKey,
     };
 }
 
@@ -255,6 +330,11 @@ static NSArray<NSDictionary *> *WCInputActionOptions(void) {
         @{ @"title": @"粘贴", @"value": @(WCInputActionPaste) },
         @{ @"title": @"复制", @"value": @(WCInputActionCopy) },
         @{ @"title": @"剪切", @"value": @(WCInputActionCut) },
+        @{ @"title": @"翻译 · 中译英", @"value": @(WCInputActionTranslateToEnglish) },
+        @{ @"title": @"翻译 · 英译中", @"value": @(WCInputActionTranslateToChinese) },
+        @{ @"title": @"转大写", @"value": @(WCInputActionUppercase) },
+        @{ @"title": @"转小写", @"value": @(WCInputActionLowercase) },
+        @{ @"title": @"去空格换行", @"value": @(WCInputActionTrim) },
     ];
 }
 
@@ -294,6 +374,11 @@ typedef NS_ENUM(NSInteger, WCRowKind) {
     WCRowKindPluginName,    // tap → plugin name editor
     WCRowKindHapticStyle,   // tap → haptic style picker
     WCRowKindCustomPages, // tap → custom page class name editor
+    WCRowKindTranslateEngine,     // tap → translation engine picker
+    WCRowKindTranslateCustomURL,  // tap → custom endpoint editor
+    WCRowKindTranslateCustomKey,  // tap → custom API key editor
+    WCRowKindTranslateCustomModel,// tap → custom model editor
+    WCRowKindTranslateTest,       // tap → test translation engine
     WCRowKindExport,         // tap → export config
     WCRowKindImport,        // tap → import config
 };
@@ -415,6 +500,23 @@ static NSString *WCRowDetailText(WCRow *row) {
             NSUInteger count = [pages isKindOfClass:[NSArray class]] ? pages.count : 0;
             return count > 0 ? [NSString stringWithFormat:@"%lu 个", (unsigned long)count] : @"未添加";
         }
+        case WCRowKindTranslateEngine:
+            return WCTranslateEngineName([d integerForKey:WCTranslateEngineKey]);
+        case WCRowKindTranslateCustomURL: {
+            NSString *url = [d stringForKey:WCTranslateCustomURLKey];
+            return url.length > 0 ? url : @"未设置";
+        }
+        case WCRowKindTranslateCustomKey: {
+            NSString *key = [d stringForKey:WCTranslateCustomKeyKey];
+            if (key.length == 0) return @"未设置";
+            return [NSString stringWithFormat:@"已设置(%lu 位)", (unsigned long)key.length];
+        }
+        case WCRowKindTranslateCustomModel: {
+            NSString *model = [d stringForKey:WCTranslateCustomModelKey];
+            return model.length > 0 ? model : @"gpt-4o-mini";
+        }
+        case WCRowKindTranslateTest:
+            return @"";
         case WCRowKindExport:
         case WCRowKindImport:
             return @"";
@@ -792,6 +894,18 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
         [sections addObject:input];
         [collapsible addObject:@YES];
         [collapseKeys addObject:[prefix stringByAppendingString:@".chat.input"]];
+        NSMutableArray *keyboard = [NSMutableArray array];
+        [keyboard addObject:WCSwitchRow(@"键盘增强", WCKeyboardEnhanceEnabledKey)];
+        if ([d boolForKey:WCKeyboardEnhanceEnabledKey]) {
+            [keyboard addObject:WCSwitchRow(@"震动", WCInputGestureHapticKey)];
+            [keyboard addObject:WCInputActionRow(@"左滑动作", WCKeyboardSwipeLeftActionKey)];
+            [keyboard addObject:WCInputActionRow(@"右滑动作", WCKeyboardSwipeRightActionKey)];
+            [keyboard addObject:WCInputActionRow(@"双击动作", WCKeyboardDoubleTapActionKey)];
+            [keyboard addObject:WCInputActionRow(@"三击动作", WCKeyboardTripleTapActionKey)];
+        }
+        [sections addObject:keyboard];
+        [collapsible addObject:@YES];
+        [collapseKeys addObject:[prefix stringByAppendingString:@".chat.keyboard"]];
     } else if (self.category == WCGestureCategoryOther) {
         NSMutableArray *moments = [NSMutableArray array];
         [moments addObject:WCSwitchRow(@"朋友圈双击点赞", WCMomentsDoubleTapLikeKey)];
@@ -827,6 +941,17 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
         [sections addObject:plugin];
         [collapsible addObject:@NO];
         [collapseKeys addObject:[prefix stringByAppendingString:@".plugin"]];
+        NSMutableArray *translate = [NSMutableArray array];
+        [translate addObject:WCPlainRow(@"翻译引擎", WCRowKindTranslateEngine)];
+        if ([d integerForKey:WCTranslateEngineKey] == WCTranslateEngineCustom) {
+            [translate addObject:WCPlainRow(@"接口地址", WCRowKindTranslateCustomURL)];
+            [translate addObject:WCPlainRow(@"API Key", WCRowKindTranslateCustomKey)];
+            [translate addObject:WCPlainRow(@"模型", WCRowKindTranslateCustomModel)];
+        }
+        [translate addObject:WCPlainRow(@"测试翻译", WCRowKindTranslateTest)];
+        [sections addObject:translate];
+        [collapsible addObject:@NO];
+        [collapseKeys addObject:[prefix stringByAppendingString:@".translate"]];
         NSMutableArray *config = [NSMutableArray array];
         [config addObject:WCPlainRow(@"导出配置", WCRowKindExport)];
         [config addObject:WCPlainRow(@"导入配置", WCRowKindImport)];
@@ -978,6 +1103,27 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
         case WCRowKindCustomPages:
             [self.navigationController pushViewController:
                 [[WCCustomPagesController alloc] initWithStyle:UITableViewStyleInsetGrouped] animated:YES];
+            break;
+        case WCRowKindTranslateEngine:
+            WCPresentTranslateEnginePicker(self);
+            break;
+        case WCRowKindTranslateCustomURL:
+            WCPresentTranslateTextEditor(self, @"接口地址",
+                @"OpenAI 兼容的 chat/completions 地址",
+                WCTranslateCustomURLKey, @"https://api.openai.com/v1/chat/completions");
+            break;
+        case WCRowKindTranslateCustomKey:
+            WCPresentTranslateTextEditor(self, @"API Key",
+                @"以 Bearer 方式发送；留空则不发送鉴权头",
+                WCTranslateCustomKeyKey, @"sk-...");
+            break;
+        case WCRowKindTranslateCustomModel:
+            WCPresentTranslateTextEditor(self, @"模型",
+                @"留空默认 gpt-4o-mini",
+                WCTranslateCustomModelKey, @"gpt-4o-mini");
+            break;
+        case WCRowKindTranslateTest:
+            WCPresentTranslateTest(self);
             break;
         case WCRowKindExport:
             WCPresentExportConfig(self);

@@ -19,6 +19,15 @@ NSString *const WCInputSwipeLeftActionKey = @"com.qiu7c.wcgesture.chat.input-ges
 NSString *const WCInputSwipeRightActionKey = @"com.qiu7c.wcgesture.chat.input-gesture.swipe.right";
 NSString *const WCInputDoubleTapActionKey = @"com.qiu7c.wcgesture.chat.input-gesture.double-tap";
 NSString *const WCInputTripleTapActionKey = @"com.qiu7c.wcgesture.chat.input-gesture.triple-tap";
+NSString *const WCKeyboardEnhanceEnabledKey = @"com.qiu7c.wcgesture.input.keyboard-enhance";
+NSString *const WCKeyboardSwipeLeftActionKey = @"com.qiu7c.wcgesture.input.keyboard.swipe-left";
+NSString *const WCKeyboardSwipeRightActionKey = @"com.qiu7c.wcgesture.input.keyboard.swipe-right";
+NSString *const WCKeyboardDoubleTapActionKey = @"com.qiu7c.wcgesture.input.keyboard.double-tap";
+NSString *const WCKeyboardTripleTapActionKey = @"com.qiu7c.wcgesture.input.keyboard.triple-tap";
+NSString *const WCTranslateEngineKey = @"com.qiu7c.wcgesture.translate.engine";
+NSString *const WCTranslateCustomURLKey = @"com.qiu7c.wcgesture.translate.custom-url";
+NSString *const WCTranslateCustomKeyKey = @"com.qiu7c.wcgesture.translate.custom-key";
+NSString *const WCTranslateCustomModelKey = @"com.qiu7c.wcgesture.translate.custom-model";
 
 NSString *const WCMomentsDoubleTapLikeKey = @"com.qiu7c.wcgesture.moments.double-tap-like";
 NSString *const WCMomentsLikeHapticKey = @"com.qiu7c.wcgesture.moments.like-haptic";
@@ -57,6 +66,15 @@ void WCGestureRegisterDefaults(void) {
             WCInputSwipeRightActionKey: @(WCInputActionPaste),
             WCInputDoubleTapActionKey: @(WCInputActionNone),
             WCInputTripleTapActionKey: @(WCInputActionNone),
+            WCKeyboardEnhanceEnabledKey: @NO,
+            WCKeyboardSwipeLeftActionKey: @(WCInputActionTranslateToEnglish),
+            WCKeyboardSwipeRightActionKey: @(WCInputActionTranslateToChinese),
+            WCKeyboardDoubleTapActionKey: @(WCInputActionNone),
+            WCKeyboardTripleTapActionKey: @(WCInputActionNone),
+            WCTranslateEngineKey: @(WCTranslateEngineEdge),
+            WCTranslateCustomURLKey: @"",
+            WCTranslateCustomKeyKey: @"",
+            WCTranslateCustomModelKey: @"",
             WCMomentsDoubleTapLikeKey: @NO,
             WCMomentsLikeHapticKey: @YES,
             WCMessageGestureHapticKey: @YES,

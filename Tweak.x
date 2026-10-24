@@ -10,6 +10,7 @@
 #import "Sources/WCGesturePrivateAPI.h"
 #import "Sources/WCGestureSettingsVC.h"
 #import "Sources/WCPopup.h"
+#import "Sources/WCGestureTranslate.h"
 
 #pragma mark - WeChat private class interfaces
 
@@ -75,6 +76,7 @@
 // Moments double-tap handler which appears earlier in the file.
 static void WCPlayConfiguredHaptic(void);
 static UIImpactFeedbackStyle WCHapticStyleFromConfig(void);
+static void WCShowToast(NSString *text);
 
 static id WCTweakSafeValue(id object, NSString *key) {
     if (!object || key.length == 0) return nil;
@@ -202,31 +204,29 @@ static CGFloat WCReplySwipeTriggerDistance(void) {
 #pragma mark - Active window (multi-scene safe)
 
 // keyWindow is deprecated since iOS 13 and compiled with -Werror; this walks
-// connected scenes the same way WCAtlas does, with a windows fallback.
+// connected scenes. Do NOT filter by class name or window level: some WeChat
+// environments host the app UI in a window whose class contains "iConsole"
+// (see runtime dumps: window = iConsoleWindow). Filtering it out returned nil
+// and made screenshots/pushes/toasts silently do nothing.
 static UIWindow *WCActiveWindow(void) {
+    NSArray<UIWindow *> *windows = nil;
     for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
         if (scene.activationState != UISceneActivationStateForegroundActive ||
             ![scene isKindOfClass:[UIWindowScene class]]) continue;
-        NSArray<UIWindow *> *windows = ((UIWindowScene *)scene).windows;
-        for (UIWindow *window in windows) {
-            NSString *className = NSStringFromClass(window.class);
-            if (window.isKeyWindow && window.windowLevel == UIWindowLevelNormal &&
-                ![className containsString:@"iConsole"]) return window;
-        }
-        for (UIWindow *window in windows) {
-            NSString *className = NSStringFromClass(window.class);
-            if (!window.hidden && window.alpha > 0.0 && window.windowLevel == UIWindowLevelNormal &&
-                ![className containsString:@"iConsole"]) return window;
-        }
+        windows = ((UIWindowScene *)scene).windows;
+        if (windows.count) break;
     }
-    id windows = WCTweakSafeValue(UIApplication.sharedApplication, @"windows");
-    if ([windows isKindOfClass:[NSArray class]]) {
-        for (UIWindow *window in windows) {
-            if (!window.hidden && window.alpha > 0.0 && window.windowLevel == UIWindowLevelNormal &&
-                ![NSStringFromClass(window.class) containsString:@"iConsole"]) return window;
-        }
+    if (windows.count == 0) {
+        id all = WCTweakSafeValue(UIApplication.sharedApplication, @"windows");
+        if ([all isKindOfClass:[NSArray class]]) windows = all;
     }
-    return nil;
+    for (UIWindow *window in windows) {
+        if (window.isKeyWindow && !window.hidden && window.alpha > 0.0) return window;
+    }
+    for (UIWindow *window in windows) {
+        if (!window.hidden && window.alpha > 0.0 && window.rootViewController) return window;
+    }
+    return windows.firstObject;
 }
 
 #pragma mark - Navigation return gesture detection
@@ -854,6 +854,48 @@ static UITextView *WCInnerTextView(id growTextView) {
     return [textView isKindOfClass:[UITextView class]] ? textView : nil;
 }
 
+static NSString *WCInputText(MMGrowTextView *view) {
+    NSString *text = WCTweakSafeValue(view, @"text");
+    if (![text isKindOfClass:[NSString class]]) {
+        UITextView *textView = WCInnerTextView(view);
+        text = textView.text;
+    }
+    return text ?: @"";
+}
+
+static void WCReplaceInputText(MMGrowTextView *view, NSString *text) {
+    if (!view) return;
+    NSString *value = text ?: @"";
+    WCTweakSetValue(view, @"text", value);
+    UITextView *textView = WCInnerTextView(view);
+    if (textView) {
+        textView.text = value;
+        textView.selectedRange = NSMakeRange(value.length, 0);
+        SEL changeSelector = NSSelectorFromString(@"textViewDidChange:");
+        if ([view respondsToSelector:changeSelector]) {
+            ((void (*)(id, SEL, id))objc_msgSend)(view, changeSelector, textView);
+        }
+    }
+}
+
+static void WCApplyTranslation(MMGrowTextView *view, NSString *translated, NSString *errorMessage) {
+    if (![translated isKindOfClass:[NSString class]] || translated.length == 0) {
+        WCShowToast(errorMessage.length > 0 ? errorMessage : @"翻译失败");
+        return;
+    }
+    WCReplaceInputText(view, translated);
+    WCShowToast(@"已翻译");
+}
+
+// Uses the configurable translation engine (Edge / MyMemory / custom).
+static void WCTranslateInputText(MMGrowTextView *view, BOOL toEnglish) {
+    NSString *text = WCInputText(view);
+    if (text.length == 0) { WCShowToast(@"输入框为空"); return; }
+    WCGestureTranslateText(text, toEnglish, ^(NSString *translated, NSString *errorMessage) {
+        WCApplyTranslation(view, translated, errorMessage);
+    });
+}
+
 // Performs a configured input-gesture action on the grow-text-view.
 static void WCPerformInputAction(MMGrowTextView *view, WCInputAction action) {
     if (action == WCInputActionNone) return;
@@ -902,7 +944,27 @@ static void WCPerformInputAction(MMGrowTextView *view, WCInputAction action) {
                 }
             }
         }
+        return;
     }
+    if (action == WCInputActionUppercase) {
+        NSString *text = WCInputText(view);
+        if (text.length) WCReplaceInputText(view, [text uppercaseString]);
+        return;
+    }
+    if (action == WCInputActionLowercase) {
+        NSString *text = WCInputText(view);
+        if (text.length) WCReplaceInputText(view, [text lowercaseString]);
+        return;
+    }
+    if (action == WCInputActionTrim) {
+        NSString *text = WCInputText(view);
+        NSString *trimmed = [[text componentsSeparatedByCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet]
+                             componentsJoinedByString:@""];
+        if (trimmed.length) WCReplaceInputText(view, trimmed);
+        return;
+    }
+    if (action == WCInputActionTranslateToEnglish) { WCTranslateInputText(view, YES); return; }
+    if (action == WCInputActionTranslateToChinese) { WCTranslateInputText(view, NO); return; }
 }
 
 static void WCSynchronizeInputGestures(MMGrowTextView *view) {
@@ -1174,6 +1236,146 @@ static void WCSynchronizeVisibleReplyGestures(void) {
 }
 
 %end
+
+#pragma mark - Keyboard enhancement (键盘增强)
+
+// Finds the chat input's MMGrowTextView whose inner text view is first responder.
+static MMGrowTextView *WCFirstResponderGrowTextView(void) {
+    Class growClass = NSClassFromString(@"MMGrowTextView");
+    if (!growClass) return nil;
+    UIWindow *window = WCActiveWindow();
+    if (!window) return nil;
+    NSMutableArray<UIView *> *stack = [NSMutableArray arrayWithArray:window.subviews];
+    while (stack.count) {
+        UIView *view = stack.lastObject;
+        [stack removeLastObject];
+        if ([view isKindOfClass:growClass]) {
+            UITextView *textView = WCInnerTextView(view);
+            if (textView.isFirstResponder) return (MMGrowTextView *)view;
+        }
+        [stack addObjectsFromArray:view.subviews];
+    }
+    return nil;
+}
+
+static void WCKeyboardEnhancePerform(NSString *actionKey) {
+    WCInputAction action = (WCInputAction)[[NSUserDefaults standardUserDefaults] integerForKey:actionKey];
+    if (action == WCInputActionNone) return;
+    MMGrowTextView *view = WCFirstResponderGrowTextView();
+    if (!view) return;
+    if ([[NSUserDefaults standardUserDefaults] boolForKey:WCInputGestureHapticKey]) WCPlayConfiguredHaptic();
+    WCPerformInputAction(view, action);
+}
+
+@interface WCKeyboardEnhanceController : NSObject
++ (instancetype)sharedController;
+@end
+
+@implementation WCKeyboardEnhanceController
+
++ (instancetype)sharedController {
+    static WCKeyboardEnhanceController *controller;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{ controller = [WCKeyboardEnhanceController new]; });
+    return controller;
+}
+
+- (void)handleSwipeLeft:(UISwipeGestureRecognizer *)recognizer {
+    if (recognizer.state == UIGestureRecognizerStateEnded) WCKeyboardEnhancePerform(WCKeyboardSwipeLeftActionKey);
+}
+
+- (void)handleSwipeRight:(UISwipeGestureRecognizer *)recognizer {
+    if (recognizer.state == UIGestureRecognizerStateEnded) WCKeyboardEnhancePerform(WCKeyboardSwipeRightActionKey);
+}
+
+- (void)handleTap:(UITapGestureRecognizer *)recognizer {
+    if (recognizer.state != UIGestureRecognizerStateRecognized) return;
+    NSString *key = recognizer.numberOfTapsRequired >= 3 ? WCKeyboardTripleTapActionKey : WCKeyboardDoubleTapActionKey;
+    WCKeyboardEnhancePerform(key);
+}
+
+@end
+
+static UIWindow *WCKeyboardEnhanceWindow = nil;
+static UIView *WCKeyboardEnhanceView = nil;
+
+static void WCKeyboardEnhanceHide(void) {
+    WCKeyboardEnhanceWindow.hidden = YES;
+}
+
+// The strip sits in the blank band at the bottom of the keyboard (between the
+// globe and mic keys, above the home indicator), i.e. the keyboard's bottom
+// safe-area. It is a transparent window above the keyboard window, so it only
+// covers the empty band and never the keys.
+static void WCKeyboardEnhanceUpdate(NSNotification *note) {
+    if (!WCGestureEnabled(WCKeyboardEnhanceEnabledKey)) { WCKeyboardEnhanceHide(); return; }
+    UIWindow *appWindow = WCActiveWindow();
+    if (!appWindow) { WCKeyboardEnhanceHide(); return; }
+    CGFloat safeBottom = appWindow.safeAreaInsets.bottom;
+    if (safeBottom <= 0.0) { WCKeyboardEnhanceHide(); return; }
+
+    CGRect keyboardFrame = CGRectZero;
+    id frameValue = note.userInfo[UIKeyboardFrameEndUserInfoKey];
+    if ([frameValue isKindOfClass:[NSValue class]]) keyboardFrame = [(NSValue *)frameValue CGRectValue];
+    if (CGRectIsEmpty(keyboardFrame)) { WCKeyboardEnhanceHide(); return; }
+
+    CGFloat screenHeight = appWindow.bounds.size.height;
+    if (CGRectGetMinY(keyboardFrame) >= screenHeight - 1.0) { WCKeyboardEnhanceHide(); return; }
+
+    CGRect strip = CGRectMake(0, CGRectGetMaxY(keyboardFrame) - safeBottom,
+                              appWindow.bounds.size.width, safeBottom);
+    if (CGRectIsEmpty(strip)) { WCKeyboardEnhanceHide(); return; }
+
+    if (!WCKeyboardEnhanceWindow) {
+        CGFloat level = UIWindowLevelAlert;
+        id allWindows = WCTweakSafeValue(UIApplication.sharedApplication, @"windows");
+        if ([allWindows isKindOfClass:[NSArray class]]) {
+            for (UIWindow *window in (NSArray *)allWindows) {
+                if ([NSStringFromClass(window.class) containsString:@"Keyboard"]) level = MAX(level, window.windowLevel);
+            }
+        }
+        UIWindow *window = nil;
+        if (@available(iOS 13.0, *)) {
+            UIWindowScene *scene = appWindow.windowScene;
+            if (scene) window = [[UIWindow alloc] initWithWindowScene:scene];
+        }
+        if (!window) window = [[UIWindow alloc] initWithFrame:strip];
+        window.windowLevel = level + 1.0;
+        window.backgroundColor = UIColor.clearColor;
+        window.hidden = YES;
+
+        UIViewController *root = [UIViewController new];
+        UIView *view = [[UIView alloc] initWithFrame:strip];
+        view.backgroundColor = UIColor.clearColor;
+        root.view = view;
+        window.rootViewController = root;
+
+        WCKeyboardEnhanceController *controller = [WCKeyboardEnhanceController sharedController];
+        UISwipeGestureRecognizer *left = [[UISwipeGestureRecognizer alloc] initWithTarget:controller action:@selector(handleSwipeLeft:)];
+        left.direction = UISwipeGestureRecognizerDirectionLeft;
+        left.cancelsTouchesInView = NO;
+        [view addGestureRecognizer:left];
+        UISwipeGestureRecognizer *right = [[UISwipeGestureRecognizer alloc] initWithTarget:controller action:@selector(handleSwipeRight:)];
+        right.direction = UISwipeGestureRecognizerDirectionRight;
+        right.cancelsTouchesInView = NO;
+        [view addGestureRecognizer:right];
+        UITapGestureRecognizer *doubleTap = [[UITapGestureRecognizer alloc] initWithTarget:controller action:@selector(handleTap:)];
+        doubleTap.numberOfTapsRequired = 2;
+        doubleTap.cancelsTouchesInView = NO;
+        [view addGestureRecognizer:doubleTap];
+        UITapGestureRecognizer *tripleTap = [[UITapGestureRecognizer alloc] initWithTarget:controller action:@selector(handleTap:)];
+        tripleTap.numberOfTapsRequired = 3;
+        tripleTap.cancelsTouchesInView = NO;
+        [view addGestureRecognizer:tripleTap];
+        [doubleTap requireGestureRecognizerToFail:tripleTap];
+
+        WCKeyboardEnhanceWindow = window;
+        WCKeyboardEnhanceView = view;
+    }
+    WCKeyboardEnhanceWindow.frame = strip;
+    WCKeyboardEnhanceView.frame = WCKeyboardEnhanceWindow.rootViewController.view.bounds;
+    WCKeyboardEnhanceWindow.hidden = NO;
+}
 
 #pragma mark - Voice repeat upload hooks
 
@@ -1792,12 +1994,26 @@ static BOOL WCViewLooksLikeGlobalSeparator(UIView *view) {
         WCGestureRegisterEntry();
         %init;
 
+        [[NSNotificationCenter defaultCenter] addObserverForName:UIKeyboardWillChangeFrameNotification
+                                                          object:nil
+                                                           queue:[NSOperationQueue mainQueue]
+                                                      usingBlock:^(NSNotification *note) {
+            WCKeyboardEnhanceUpdate(note);
+        }];
+        [[NSNotificationCenter defaultCenter] addObserverForName:UIKeyboardWillHideNotification
+                                                          object:nil
+                                                           queue:[NSOperationQueue mainQueue]
+                                                      usingBlock:^(__unused NSNotification *note) {
+            WCKeyboardEnhanceHide();
+        }];
+
         [[NSNotificationCenter defaultCenter] addObserverForName:WCGestureDidChangeNotification
                                                           object:nil
                                                            queue:[NSOperationQueue mainQueue]
                                                       usingBlock:^(NSNotification *note) {
             // Resync on the next runloop so the cell re-reads the new value.
             dispatch_async(dispatch_get_main_queue(), ^{
+                WCKeyboardEnhanceHide();
                 WCSynchronizeVisibleReplyGestures();
                 WCSynchronizeGlobalGestures();
                 // Re-sync input swipe on the active chat too.

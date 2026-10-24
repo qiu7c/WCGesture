@@ -28,6 +28,28 @@ FOUNDATION_EXPORT NSString *const WCInputSwipeRightActionKey;
 FOUNDATION_EXPORT NSString *const WCInputDoubleTapActionKey;
 FOUNDATION_EXPORT NSString *const WCInputTripleTapActionKey;
 
+/// Keyboard enhancement: a transparent gesture strip in the blank area below
+/// the keyboard's bottom row (between the globe and mic keys), above the home
+/// indicator. It has its own action configuration, independent of the input
+/// box gestures.
+FOUNDATION_EXPORT NSString *const WCKeyboardEnhanceEnabledKey;
+FOUNDATION_EXPORT NSString *const WCKeyboardSwipeLeftActionKey;
+FOUNDATION_EXPORT NSString *const WCKeyboardSwipeRightActionKey;
+FOUNDATION_EXPORT NSString *const WCKeyboardDoubleTapActionKey;
+FOUNDATION_EXPORT NSString *const WCKeyboardTripleTapActionKey;
+
+/// Translation engine selection and optional custom (OpenAI-compatible) endpoint.
+typedef NS_ENUM(NSInteger, WCTranslateEngine) {
+    WCTranslateEngineEdge = 0,     // 微软 Edge(免费,无需 key)
+    WCTranslateEngineMyMemory = 1, // MyMemory(免费,无需 key)
+    WCTranslateEngineCustom = 2,   // 自定义(OpenAI 兼容接口)
+};
+
+FOUNDATION_EXPORT NSString *const WCTranslateEngineKey;
+FOUNDATION_EXPORT NSString *const WCTranslateCustomURLKey;
+FOUNDATION_EXPORT NSString *const WCTranslateCustomKeyKey;
+FOUNDATION_EXPORT NSString *const WCTranslateCustomModelKey;
+
 /// Moments (朋友圈) double-tap like.
 FOUNDATION_EXPORT NSString *const WCMomentsDoubleTapLikeKey;
 FOUNDATION_EXPORT NSString *const WCMomentsLikeHapticKey;
@@ -66,6 +88,11 @@ typedef NS_ENUM(NSInteger, WCInputAction) {
     WCInputActionPaste = 2,   // 粘贴剪贴板
     WCInputActionCopy = 3,    // 复制输入框内容
     WCInputActionCut = 4,     // 剪切输入框内容
+    WCInputActionTranslateToEnglish = 5, // 翻译:中译英,替换输入框
+    WCInputActionTranslateToChinese = 6, // 翻译:英译中,替换输入框
+    WCInputActionUppercase = 7,          // 转大写
+    WCInputActionLowercase = 8,          // 转小写
+    WCInputActionTrim = 9,               // 去空格/换行
 };
 
 /// Notification posted when an enhancement key changes, so gesture recognizers
