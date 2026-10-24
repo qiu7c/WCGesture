@@ -38,6 +38,10 @@ FOUNDATION_EXPORT NSString *const WCKeyboardSwipeRightActionKey;
 FOUNDATION_EXPORT NSString *const WCKeyboardDoubleTapActionKey;
 FOUNDATION_EXPORT NSString *const WCKeyboardTripleTapActionKey;
 
+/// Debug aid: paints the keyboard gesture strip red and labels its size so the
+/// touchable band is visible while tuning gesture positions.
+FOUNDATION_EXPORT NSString *const WCKeyboardDebugFrameKey;
+
 /// Translation engine selection and optional custom (OpenAI-compatible) endpoint.
 typedef NS_ENUM(NSInteger, WCTranslateEngine) {
     WCTranslateEngineEdge = 0,     // 微软 Edge(免费,无需 key)

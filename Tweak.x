@@ -1296,85 +1296,181 @@ static void WCKeyboardEnhancePerform(NSString *actionKey) {
 
 @end
 
+// The system keyboard lives in UIRemoteKeyboardWindow at level ~10,000,000,
+// far above UIWindowLevelAlert (2000). A plain overlay window is therefore
+// hidden *behind* the keyboard and never receives touches — which is why the
+// strip did nothing. Two paths now: put the strip directly inside the keyboard
+// window (primary), or, when it cannot be found, use an overlay window whose
+// windowLevel getter is overridden (iOS 11+ clamps assignments to the setter).
+@interface WCKeyboardOverlayWindow : UIWindow
+@property (nonatomic, assign) CGFloat wcOverrideLevel;
+@end
+
+@implementation WCKeyboardOverlayWindow
+- (UIWindowLevel)windowLevel {
+    return self.wcOverrideLevel > 0.0 ? (UIWindowLevel)self.wcOverrideLevel : [super windowLevel];
+}
+@end
+
 static UIWindow *WCKeyboardEnhanceWindow = nil;
 static UIView *WCKeyboardEnhanceView = nil;
+static UILabel *WCKeyboardEnhanceDebugLabel = nil;
+static CGRect WCKeyboardEnhanceLastFrame = {0};
+static BOOL WCKeyboardEnhanceLastFrameValid = NO;
+
+static UIWindow *WCSystemKeyboardWindow(void) {
+    NSMutableArray<UIWindow *> *candidates = [NSMutableArray array];
+    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+        if ([scene isKindOfClass:[UIWindowScene class]]) {
+            [candidates addObjectsFromArray:((UIWindowScene *)scene).windows];
+        }
+    }
+    id all = WCTweakSafeValue(UIApplication.sharedApplication, @"windows");
+    if ([all isKindOfClass:[NSArray class]]) [candidates addObjectsFromArray:(NSArray *)all];
+    for (UIWindow *window in candidates) {
+        if (![window isKindOfClass:[UIWindow class]]) continue;
+        if (![NSStringFromClass(window.class) containsString:@"Keyboard"]) continue;
+        if (window.windowLevel >= UIWindowLevelAlert) return window;
+    }
+    return nil;
+}
 
 static void WCKeyboardEnhanceHide(void) {
+    WCKeyboardEnhanceLastFrameValid = NO;
+    WCKeyboardEnhanceView.hidden = YES;
     WCKeyboardEnhanceWindow.hidden = YES;
+}
+
+static void WCKeyboardEnhanceEnsureView(void) {
+    if (WCKeyboardEnhanceView) return;
+    UIView *view = [[UIView alloc] initWithFrame:CGRectZero];
+    view.backgroundColor = UIColor.clearColor;
+    view.clipsToBounds = NO;
+
+    WCKeyboardEnhanceController *controller = [WCKeyboardEnhanceController sharedController];
+    UISwipeGestureRecognizer *left = [[UISwipeGestureRecognizer alloc] initWithTarget:controller action:@selector(handleSwipeLeft:)];
+    left.direction = UISwipeGestureRecognizerDirectionLeft;
+    left.cancelsTouchesInView = NO;
+    [view addGestureRecognizer:left];
+    UISwipeGestureRecognizer *right = [[UISwipeGestureRecognizer alloc] initWithTarget:controller action:@selector(handleSwipeRight:)];
+    right.direction = UISwipeGestureRecognizerDirectionRight;
+    right.cancelsTouchesInView = NO;
+    [view addGestureRecognizer:right];
+    UITapGestureRecognizer *doubleTap = [[UITapGestureRecognizer alloc] initWithTarget:controller action:@selector(handleTap:)];
+    doubleTap.numberOfTapsRequired = 2;
+    doubleTap.cancelsTouchesInView = NO;
+    [view addGestureRecognizer:doubleTap];
+    UITapGestureRecognizer *tripleTap = [[UITapGestureRecognizer alloc] initWithTarget:controller action:@selector(handleTap:)];
+    tripleTap.numberOfTapsRequired = 3;
+    tripleTap.cancelsTouchesInView = NO;
+    [view addGestureRecognizer:tripleTap];
+    [doubleTap requireGestureRecognizerToFail:tripleTap];
+
+    UILabel *label = [[UILabel alloc] initWithFrame:CGRectZero];
+    label.font = [UIFont boldSystemFontOfSize:10];
+    label.textColor = UIColor.whiteColor;
+    label.textAlignment = NSTextAlignmentCenter;
+    label.userInteractionEnabled = NO;
+    label.hidden = YES;
+    label.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    [view addSubview:label];
+    WCKeyboardEnhanceDebugLabel = label;
+
+    WCKeyboardEnhanceView = view;
 }
 
 // The strip sits in the blank band at the bottom of the keyboard (between the
 // globe and mic keys, above the home indicator), i.e. the keyboard's bottom
-// safe-area. It is a transparent window above the keyboard window, so it only
-// covers the empty band and never the keys.
-static void WCKeyboardEnhanceUpdate(NSNotification *note) {
+// safe-area. It never covers any key.
+static void WCKeyboardEnhanceApply(CGRect keyboardFrame) {
     if (!WCGestureEnabled(WCKeyboardEnhanceEnabledKey)) { WCKeyboardEnhanceHide(); return; }
     UIWindow *appWindow = WCActiveWindow();
     if (!appWindow) { WCKeyboardEnhanceHide(); return; }
-    CGFloat safeBottom = appWindow.safeAreaInsets.bottom;
+
+    UIWindow *keyboardWindow = WCSystemKeyboardWindow();
+    CGFloat safeBottom = MAX(appWindow.safeAreaInsets.bottom,
+                             keyboardWindow.safeAreaInsets.bottom);
+    if (safeBottom <= 0.0 && appWindow.safeAreaInsets.top > 20.0) safeBottom = 34.0;
     if (safeBottom <= 0.0) { WCKeyboardEnhanceHide(); return; }
 
-    CGRect keyboardFrame = CGRectZero;
-    id frameValue = note.userInfo[UIKeyboardFrameEndUserInfoKey];
-    if ([frameValue isKindOfClass:[NSValue class]]) keyboardFrame = [(NSValue *)frameValue CGRectValue];
-    if (CGRectIsEmpty(keyboardFrame)) { WCKeyboardEnhanceHide(); return; }
-
     CGFloat screenHeight = appWindow.bounds.size.height;
+    if (@available(iOS 13.0, *)) {
+        if (appWindow.windowScene) {
+            screenHeight = MAX(screenHeight, appWindow.windowScene.screen.bounds.size.height);
+        }
+    }
     if (CGRectGetMinY(keyboardFrame) >= screenHeight - 1.0) { WCKeyboardEnhanceHide(); return; }
 
-    CGRect strip = CGRectMake(0, CGRectGetMaxY(keyboardFrame) - safeBottom,
-                              appWindow.bounds.size.width, safeBottom);
-    if (CGRectIsEmpty(strip)) { WCKeyboardEnhanceHide(); return; }
+    WCKeyboardEnhanceEnsureView();
+    BOOL debug = [[NSUserDefaults standardUserDefaults] boolForKey:WCKeyboardDebugFrameKey];
+    WCKeyboardEnhanceView.backgroundColor = debug
+        ? [UIColor.systemRedColor colorWithAlphaComponent:0.35] : UIColor.clearColor;
+    WCKeyboardEnhanceView.layer.borderWidth = debug ? 1.0 : 0.0;
+    WCKeyboardEnhanceView.layer.borderColor = debug
+        ? UIColor.systemRedColor.CGColor : UIColor.clearColor.CGColor;
+    WCKeyboardEnhanceDebugLabel.hidden = !debug;
 
-    if (!WCKeyboardEnhanceWindow) {
-        CGFloat level = UIWindowLevelAlert;
-        id allWindows = WCTweakSafeValue(UIApplication.sharedApplication, @"windows");
-        if ([allWindows isKindOfClass:[NSArray class]]) {
-            for (UIWindow *window in (NSArray *)allWindows) {
-                if ([NSStringFromClass(window.class) containsString:@"Keyboard"]) level = MAX(level, window.windowLevel);
+    if (keyboardWindow) {
+        // Primary path: become a direct subview of the system keyboard window,
+        // so the strip is above the keys and receives touches regardless of
+        // window levels.
+        if (WCKeyboardEnhanceView.superview != keyboardWindow) {
+            [WCKeyboardEnhanceView removeFromSuperview];
+            [keyboardWindow addSubview:WCKeyboardEnhanceView];
+        } else {
+            [keyboardWindow bringSubviewToFront:WCKeyboardEnhanceView];
+        }
+        CGRect bounds = keyboardWindow.bounds;
+        CGFloat band = MIN(safeBottom, CGRectGetHeight(bounds));
+        WCKeyboardEnhanceView.frame = CGRectMake(0, CGRectGetHeight(bounds) - band,
+                                                 CGRectGetWidth(bounds), band);
+        WCKeyboardEnhanceWindow.hidden = YES;
+        WCKeyboardEnhanceDebugLabel.text = [NSString stringWithFormat:@"键盘触控区 %.0f×%.0f",
+                                            CGRectGetWidth(bounds), band];
+    } else {
+        CGRect strip = CGRectMake(0, CGRectGetMaxY(keyboardFrame) - safeBottom,
+                                  appWindow.bounds.size.width, safeBottom);
+        if (!WCKeyboardEnhanceWindow) {
+            WCKeyboardOverlayWindow *window = nil;
+            if (@available(iOS 13.0, *)) {
+                UIWindowScene *scene = appWindow.windowScene;
+                if (scene) window = [[WCKeyboardOverlayWindow alloc] initWithWindowScene:scene];
             }
+            if (!window) window = [[WCKeyboardOverlayWindow alloc] initWithFrame:strip];
+            window.wcOverrideLevel = 10000001.0;
+            window.windowLevel = 10000001.0;
+            window.backgroundColor = UIColor.clearColor;
+            window.hidden = YES;
+            WCKeyboardEnhanceWindow = window;
         }
-        UIWindow *window = nil;
-        if (@available(iOS 13.0, *)) {
-            UIWindowScene *scene = appWindow.windowScene;
-            if (scene) window = [[UIWindow alloc] initWithWindowScene:scene];
+        if (WCKeyboardEnhanceView.superview != WCKeyboardEnhanceWindow) {
+            [WCKeyboardEnhanceView removeFromSuperview];
+            [WCKeyboardEnhanceWindow addSubview:WCKeyboardEnhanceView];
         }
-        if (!window) window = [[UIWindow alloc] initWithFrame:strip];
-        window.windowLevel = level + 1.0;
-        window.backgroundColor = UIColor.clearColor;
-        window.hidden = YES;
-
-        UIViewController *root = [UIViewController new];
-        UIView *view = [[UIView alloc] initWithFrame:strip];
-        view.backgroundColor = UIColor.clearColor;
-        root.view = view;
-        window.rootViewController = root;
-
-        WCKeyboardEnhanceController *controller = [WCKeyboardEnhanceController sharedController];
-        UISwipeGestureRecognizer *left = [[UISwipeGestureRecognizer alloc] initWithTarget:controller action:@selector(handleSwipeLeft:)];
-        left.direction = UISwipeGestureRecognizerDirectionLeft;
-        left.cancelsTouchesInView = NO;
-        [view addGestureRecognizer:left];
-        UISwipeGestureRecognizer *right = [[UISwipeGestureRecognizer alloc] initWithTarget:controller action:@selector(handleSwipeRight:)];
-        right.direction = UISwipeGestureRecognizerDirectionRight;
-        right.cancelsTouchesInView = NO;
-        [view addGestureRecognizer:right];
-        UITapGestureRecognizer *doubleTap = [[UITapGestureRecognizer alloc] initWithTarget:controller action:@selector(handleTap:)];
-        doubleTap.numberOfTapsRequired = 2;
-        doubleTap.cancelsTouchesInView = NO;
-        [view addGestureRecognizer:doubleTap];
-        UITapGestureRecognizer *tripleTap = [[UITapGestureRecognizer alloc] initWithTarget:controller action:@selector(handleTap:)];
-        tripleTap.numberOfTapsRequired = 3;
-        tripleTap.cancelsTouchesInView = NO;
-        [view addGestureRecognizer:tripleTap];
-        [doubleTap requireGestureRecognizerToFail:tripleTap];
-
-        WCKeyboardEnhanceWindow = window;
-        WCKeyboardEnhanceView = view;
+        WCKeyboardEnhanceWindow.frame = strip;
+        WCKeyboardEnhanceView.frame = CGRectMake(0, 0, strip.size.width, strip.size.height);
+        WCKeyboardEnhanceWindow.hidden = NO;
+        WCKeyboardEnhanceDebugLabel.text = [NSString stringWithFormat:@"窗口触控区 %.0f×%.0f",
+                                            strip.size.width, strip.size.height];
     }
-    WCKeyboardEnhanceWindow.frame = strip;
-    WCKeyboardEnhanceView.frame = WCKeyboardEnhanceWindow.rootViewController.view.bounds;
-    WCKeyboardEnhanceWindow.hidden = NO;
+    WCKeyboardEnhanceView.hidden = NO;
+}
+
+static void WCKeyboardEnhanceUpdate(NSNotification *note) {
+    CGRect frame = CGRectZero;
+    id value = note.userInfo[UIKeyboardFrameEndUserInfoKey];
+    if ([value isKindOfClass:[NSValue class]]) frame = [(NSValue *)value CGRectValue];
+    if (CGRectIsEmpty(frame)) { WCKeyboardEnhanceHide(); return; }
+    WCKeyboardEnhanceLastFrame = frame;
+    WCKeyboardEnhanceLastFrameValid = YES;
+    WCKeyboardEnhanceApply(frame);
+}
+
+// Re-applies the strip with the last known keyboard frame, e.g. after toggling
+// the debug switch without dismissing the keyboard.
+static void WCKeyboardEnhanceRefresh(void) {
+    if (!WCKeyboardEnhanceLastFrameValid) { WCKeyboardEnhanceHide(); return; }
+    WCKeyboardEnhanceApply(WCKeyboardEnhanceLastFrame);
 }
 
 #pragma mark - Voice repeat upload hooks
@@ -2013,7 +2109,7 @@ static BOOL WCViewLooksLikeGlobalSeparator(UIView *view) {
                                                       usingBlock:^(NSNotification *note) {
             // Resync on the next runloop so the cell re-reads the new value.
             dispatch_async(dispatch_get_main_queue(), ^{
-                WCKeyboardEnhanceHide();
+                WCKeyboardEnhanceRefresh();
                 WCSynchronizeVisibleReplyGestures();
                 WCSynchronizeGlobalGestures();
                 // Re-sync input swipe on the active chat too.

@@ -902,6 +902,7 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
             [keyboard addObject:WCInputActionRow(@"右滑动作", WCKeyboardSwipeRightActionKey)];
             [keyboard addObject:WCInputActionRow(@"双击动作", WCKeyboardDoubleTapActionKey)];
             [keyboard addObject:WCInputActionRow(@"三击动作", WCKeyboardTripleTapActionKey)];
+            [keyboard addObject:WCSwitchRow(@"显示触发范围", WCKeyboardDebugFrameKey)];
         }
         [sections addObject:keyboard];
         [collapsible addObject:@YES];
