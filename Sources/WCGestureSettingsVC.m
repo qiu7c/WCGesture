@@ -182,7 +182,8 @@ static NSDictionary<NSString *, NSString *> *WCConfigShareKeys(void) {
         @"w": WCInputGestureHapticKey,
         @"x": WCGlobalGestureHapticKey,
         @"y": WCGestureHapticStyleKey,
-        @"z": WCCustomPageURLKey,
+        @"z": WCCustomPagesKey,
+        @"A": WCHideSeparatorLinesKey,
     };
 }
 
@@ -288,7 +289,7 @@ typedef NS_ENUM(NSInteger, WCRowKind) {
     WCRowKindDistance,      // tap → number editor
     WCRowKindPluginName,    // tap → plugin name editor
     WCRowKindHapticStyle,   // tap → haptic style picker
-    WCRowKindCustomPageURL, // tap → custom page URL editor
+    WCRowKindCustomPages, // tap → custom page class name editor
     WCRowKindExport,         // tap → export config
     WCRowKindImport,        // tap → import config
 };
@@ -356,6 +357,8 @@ static NSArray<NSDictionary *> *WCGlobalActionOptions(void) {
         @{ @"title": @"扫一扫", @"value": @(WCGlobalActionScanQR) },
         @{ @"title": @"朋友圈", @"value": @(WCGlobalActionMoments) },
         @{ @"title": @"添加朋友", @"value": @(WCGlobalActionAddFriend) },
+        @{ @"title": @"我的二维码", @"value": @(WCGlobalActionMyQRCode) },
+        @{ @"title": @"付款码", @"value": @(WCGlobalActionPayCode) },
         @{ @"title": @"自定义页面", @"value": @(WCGlobalActionCustomPage) },
         @{ @"title": @"截图", @"value": @(WCGlobalActionScreenshot) },
         @{ @"title": @"返回上一页", @"value": @(WCGlobalActionBack) },
@@ -403,9 +406,10 @@ static NSString *WCRowDetailText(WCRow *row) {
             return [d stringForKey:WCPluginNameKey] ?: @"微信手势";
         case WCRowKindHapticStyle:
             return WCHapticStyleName([d integerForKey:WCGestureHapticStyleKey]);
-        case WCRowKindCustomPageURL: {
-            NSString *url = [d stringForKey:WCCustomPageURLKey];
-            return url.length > 0 ? url : @"未设置";
+        case WCRowKindCustomPages: {
+            NSArray *pages = [d arrayForKey:WCCustomPagesKey];
+            NSUInteger count = [pages isKindOfClass:[NSArray class]] ? pages.count : 0;
+            return count > 0 ? [NSString stringWithFormat:@"%lu 个", (unsigned long)count] : @"未添加";
         }
         case WCRowKindExport:
         case WCRowKindImport:
@@ -473,6 +477,7 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
     WCGestureCategoryOther = 1,
     WCGestureCategoryGlobal = 2,
     WCGestureCategoryPlugin = 3,
+    WCGestureCategoryEnhance = 4,
 };
 
 @interface WCGestureSettingsController ()
@@ -489,10 +494,12 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
     CGFloat margin = 16;
     UIView *chatCard = WCMakeCard(@"聊天页手势",
         @"bubble.left", UIColor.systemBlueColor, UIColor.secondarySystemGroupedBackgroundColor);
-    UIView *otherCard = WCMakeCard(@"其他手势",
-        @"heart", UIColor.systemPinkColor, UIColor.secondarySystemGroupedBackgroundColor);
     UIView *globalCard = WCMakeCard(@"全局手势",
         @"hand.tap", UIColor.systemGreenColor, UIColor.secondarySystemGroupedBackgroundColor);
+    UIView *otherCard = WCMakeCard(@"其他手势",
+        @"heart", UIColor.systemPinkColor, UIColor.secondarySystemGroupedBackgroundColor);
+    UIView *enhanceCard = WCMakeCard(@"拓展设置",
+        @"wand.and.stars", UIColor.systemPurpleColor, UIColor.secondarySystemGroupedBackgroundColor);
     UIView *pluginCard = WCMakeCard(@"插件设置",
         @"gearshape", UIColor.systemOrangeColor, UIColor.secondarySystemGroupedBackgroundColor);
 
@@ -527,37 +534,38 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
     brandLabel.textAlignment = NSTextAlignmentCenter;
 
     chatCard.tag = WCGestureCategoryChat;
-    otherCard.tag = WCGestureCategoryOther;
     globalCard.tag = WCGestureCategoryGlobal;
+    otherCard.tag = WCGestureCategoryOther;
+    enhanceCard.tag = WCGestureCategoryEnhance;
     pluginCard.tag = WCGestureCategoryPlugin;
-    for (UIView *v in @[chatCard, otherCard, globalCard, pluginCard, versionLabel, authorCard, brandLabel]) {
+    for (UIView *v in @[chatCard, globalCard, otherCard, enhanceCard, pluginCard, versionLabel, authorCard, brandLabel]) {
         v.translatesAutoresizingMaskIntoConstraints = NO;
         [self.view addSubview:v];
     }
     // Tappable
-    chatCard.userInteractionEnabled = YES;
-    otherCard.userInteractionEnabled = YES;
-    globalCard.userInteractionEnabled = YES;
-    pluginCard.userInteractionEnabled = YES;
-    [chatCard addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(openCategory:)]];
-    [otherCard addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(openCategory:)]];
-    [globalCard addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(openCategory:)]];
-    [pluginCard addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(openCategory:)]];
+    for (UIView *card in @[chatCard, globalCard, otherCard, enhanceCard, pluginCard]) {
+        card.userInteractionEnabled = YES;
+        [card addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(openCategory:)]];
+    }
 
     [NSLayoutConstraint activateConstraints:@[
         [chatCard.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor constant:margin],
         [chatCard.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:margin],
         [chatCard.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-margin],
         [chatCard.heightAnchor constraintEqualToConstant:76],
-        [otherCard.topAnchor constraintEqualToAnchor:chatCard.bottomAnchor constant:margin],
-        [otherCard.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:margin],
-        [otherCard.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-margin],
-        [otherCard.heightAnchor constraintEqualToConstant:76],
-        [globalCard.topAnchor constraintEqualToAnchor:otherCard.bottomAnchor constant:margin],
+        [globalCard.topAnchor constraintEqualToAnchor:chatCard.bottomAnchor constant:margin],
         [globalCard.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:margin],
         [globalCard.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-margin],
         [globalCard.heightAnchor constraintEqualToConstant:76],
-        [pluginCard.topAnchor constraintEqualToAnchor:globalCard.bottomAnchor constant:margin],
+        [otherCard.topAnchor constraintEqualToAnchor:globalCard.bottomAnchor constant:margin],
+        [otherCard.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:margin],
+        [otherCard.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-margin],
+        [otherCard.heightAnchor constraintEqualToConstant:76],
+        [enhanceCard.topAnchor constraintEqualToAnchor:otherCard.bottomAnchor constant:margin],
+        [enhanceCard.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:margin],
+        [enhanceCard.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-margin],
+        [enhanceCard.heightAnchor constraintEqualToConstant:76],
+        [pluginCard.topAnchor constraintEqualToAnchor:enhanceCard.bottomAnchor constant:margin],
         [pluginCard.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:margin],
         [pluginCard.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-margin],
         [pluginCard.heightAnchor constraintEqualToConstant:76],
@@ -581,6 +589,122 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
 
 @end
 
+#pragma mark - Custom pages editor
+
+@interface WCCustomPagesController : UITableViewController
+@end
+
+@interface WCCustomPagesController ()
+@property (nonatomic, strong) NSMutableArray<NSDictionary *> *pages;
+@end
+
+@implementation WCCustomPagesController
+
+- (instancetype)initWithStyle:(UITableViewStyle)style {
+    self = [super initWithStyle:UITableViewStyleInsetGrouped];
+    if (self) self.title = @"自定义页面";
+    return self;
+}
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    self.tableView.backgroundColor = UIColor.systemGroupedBackgroundColor;
+    self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
+    self.tableView.rowHeight = UITableViewAutomaticDimension;
+    self.tableView.estimatedRowHeight = 56;
+    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc]
+        initWithBarButtonSystemItem:UIBarButtonSystemItemAdd target:self action:@selector(addPage)];
+    [self reloadPages];
+}
+
+- (void)reloadPages {
+    NSArray *stored = [[NSUserDefaults standardUserDefaults] arrayForKey:WCCustomPagesKey];
+    self.pages = [stored isKindOfClass:[NSArray class]] ? [stored mutableCopy] : [NSMutableArray array];
+    [self.tableView reloadData];
+}
+
+- (void)savePages {
+    [[NSUserDefaults standardUserDefaults] setObject:[self.pages copy] forKey:WCCustomPagesKey];
+    WCPostChange(WCCustomPagesKey);
+}
+
+- (void)addPage { [self editPageAtIndex:-1]; }
+
+- (void)editPageAtIndex:(NSInteger)index {
+    NSDictionary *existing = (index >= 0 && index < (NSInteger)self.pages.count) ? self.pages[index] : nil;
+    NSString *existingName = [existing[@"name"] isKindOfClass:[NSString class]] ? existing[@"name"] : nil;
+    NSString *existingClass = [existing[@"class"] isKindOfClass:[NSString class]] ? existing[@"class"] : nil;
+    [WCPopup showInputWithTitle:@"页面备注"
+                        message:@"给这个页面起个名字，显示在列表里"
+                           text:existingName
+                    placeholder:@"例如：扫一扫"
+                       keyboard:UIKeyboardTypeDefault
+                     completion:^(NSString *name) {
+        NSString *remark = name.length > 0 ? name : @"自定义页面";
+        [WCPopup showInputWithTitle:@"页面类名"
+                            message:@"可直接 init 的 UIViewController 类名"
+                               text:existingClass
+                        placeholder:@"ViewControllerClassName"
+                           keyboard:UIKeyboardTypeASCIICapable
+                         completion:^(NSString *className) {
+            if (className.length == 0) return;
+            NSDictionary *entry = @{ @"name": remark, @"class": className };
+            NSMutableArray *pages = [self.pages mutableCopy];
+            if (index >= 0 && index < (NSInteger)pages.count) pages[index] = entry;
+            else [pages addObject:entry];
+            self.pages = pages;
+            [self savePages];
+            [self.tableView reloadData];
+        }];
+    }];
+}
+
+- (NSInteger)numberOfSectionsInTableView:(__unused UITableView *)tableView { return 1; }
+
+- (NSInteger)tableView:(__unused UITableView *)tableView numberOfRowsInSection:(__unused NSInteger)section {
+    return self.pages.count;
+}
+
+- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
+    static NSString *cellId = @"WCCustomPageCell";
+    UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:cellId];
+    if (!cell) {
+        cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:cellId];
+        cell.backgroundColor = UIColor.secondarySystemGroupedBackgroundColor;
+    }
+    NSDictionary *entry = self.pages[indexPath.row];
+    cell.textLabel.text = [entry[@"name"] isKindOfClass:[NSString class]] ? entry[@"name"] : @"自定义页面";
+    cell.detailTextLabel.text = [entry[@"class"] isKindOfClass:[NSString class]] ? entry[@"class"] : nil;
+    cell.detailTextLabel.textColor = UIColor.secondaryLabelColor;
+    cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+    return cell;
+}
+
+- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
+    [tableView deselectRowAtIndexPath:indexPath animated:YES];
+    [self editPageAtIndex:indexPath.row];
+}
+
+- (UISwipeActionsConfiguration *)tableView:(UITableView *)tableView
+    trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath {
+    (void)tableView;
+    __weak typeof(self) weakSelf = self;
+    UIContextualAction *del = [UIContextualAction contextualActionWithStyle:UIContextualActionStyleDestructive
+        title:@"删除" handler:^(__unused UIContextualAction *action, __unused UIView *view, void (^completion)(BOOL)) {
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf) { completion(NO); return; }
+        if (indexPath.row < (NSInteger)strongSelf.pages.count) {
+            [strongSelf.pages removeObjectAtIndex:indexPath.row];
+            [strongSelf savePages];
+            [strongSelf.tableView deleteRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationAutomatic];
+        }
+        completion(YES);
+    }];
+    return [UISwipeActionsConfiguration configurationWithActions:@[del]];
+}
+
+@end
+
 #pragma mark - Detail controller
 
 @interface WCGestureDetailController ()
@@ -596,8 +720,13 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
     self = [super initWithStyle:UITableViewStyleInsetGrouped];
     if (self) {
         _category = category;
-        self.title = (category == WCGestureCategoryChat) ? @"聊天页手势"
-            : (category == WCGestureCategoryOther) ? @"其他手势" : @"全局手势";
+        switch (category) {
+            case WCGestureCategoryChat: self.title = @"聊天页手势"; break;
+            case WCGestureCategoryGlobal: self.title = @"全局手势"; break;
+            case WCGestureCategoryOther: self.title = @"其他手势"; break;
+            case WCGestureCategoryEnhance: self.title = @"拓展设置"; break;
+            default: self.title = @"插件设置"; break;
+        }
         [self rebuildRows];
     }
     return self;
@@ -607,6 +736,7 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
     [super viewDidLoad];
     if (@available(iOS 15.0, *)) self.tableView.sectionHeaderTopPadding = 0;
     self.tableView.backgroundColor = [UIColor systemGroupedBackgroundColor];
+    self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
     self.tableView.rowHeight = UITableViewAutomaticDimension;
     self.tableView.estimatedRowHeight = 48;
     [[NSNotificationCenter defaultCenter] addObserver:self
@@ -674,11 +804,17 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
             [global addObject:WCSwitchRow(@"震动", WCGlobalGestureHapticKey)];
             [global addObject:WCGlobalActionRow(@"双指长按", WCGlobalTwoFingerActionKey)];
             [global addObject:WCGlobalActionRow(@"三指长按", WCGlobalThreeFingerActionKey)];
-            [global addObject:WCPlainRow(@"自定义页面地址", WCRowKindCustomPageURL)];
+            [global addObject:WCPlainRow(@"自定义页面", WCRowKindCustomPages)];
         }
         [sections addObject:global];
         [collapsible addObject:@YES];
         [collapseKeys addObject:[prefix stringByAppendingString:@".global"]];
+    } else if (self.category == WCGestureCategoryEnhance) {
+        NSMutableArray *enhance = [NSMutableArray array];
+        [enhance addObject:WCSwitchRow(@"去除所有分割线", WCHideSeparatorLinesKey)];
+        [sections addObject:enhance];
+        [collapsible addObject:@NO];
+        [collapseKeys addObject:[prefix stringByAppendingString:@".enhance"]];
     } else {
         // 插件设置
         NSMutableArray *plugin = [NSMutableArray array];
@@ -835,16 +971,9 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
         case WCRowKindHapticStyle:
             WCPresentHapticStylePicker(self);
             break;
-        case WCRowKindCustomPageURL:
-            [WCPopup showInputWithTitle:@"自定义页面地址"
-                                message:@"双指/三指长按选择「自定义页面」时打开此网址"
-                                   text:[[NSUserDefaults standardUserDefaults] stringForKey:WCCustomPageURLKey]
-                            placeholder:@"https://"
-                               keyboard:UIKeyboardTypeURL
-                             completion:^(NSString *value) {
-                [[NSUserDefaults standardUserDefaults] setObject:value forKey:WCCustomPageURLKey];
-                WCPostChange(WCCustomPageURLKey);
-            }];
+        case WCRowKindCustomPages:
+            [self.navigationController pushViewController:
+                [[WCCustomPagesController alloc] initWithStyle:UITableViewStyleInsetGrouped] animated:YES];
             break;
         case WCRowKindExport:
             WCPresentExportConfig(self);

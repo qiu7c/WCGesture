@@ -31,7 +31,8 @@ NSString *const WCGlobalTwoFingerActionKey = @"com.qiu7c.wcgesture.global.two-fi
 NSString *const WCGlobalThreeFingerActionKey = @"com.qiu7c.wcgesture.global.three-finger-action";
 NSString *const WCGlobalGestureHapticKey = @"com.qiu7c.wcgesture.global.haptic";
 NSString *const WCGestureHapticStyleKey = @"com.qiu7c.wcgesture.haptic-style";
-NSString *const WCCustomPageURLKey = @"com.qiu7c.wcgesture.custom-page-url";
+NSString *const WCCustomPagesKey = @"com.qiu7c.wcgesture.custom-pages";
+NSString *const WCHideSeparatorLinesKey = @"com.qiu7c.wcgesture.interface.hide-separator-lines";
 
 NSString *const WCGestureDidChangeNotification = @"WCGestureDidChangeNotification";
 
@@ -65,7 +66,8 @@ void WCGestureRegisterDefaults(void) {
             WCGlobalThreeFingerActionKey: @(WCGlobalActionNone),
             WCGlobalGestureHapticKey: @YES,
             WCGestureHapticStyleKey: @(WCHapticStyleMedium),
-            WCCustomPageURLKey: @"",
+            WCCustomPagesKey: @[],
+            WCHideSeparatorLinesKey: @NO,
         };
         [[NSUserDefaults standardUserDefaults] registerDefaults:defaults];
     });

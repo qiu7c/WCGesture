@@ -43,8 +43,12 @@ FOUNDATION_EXPORT NSString *const WCGlobalThreeFingerActionKey;
 FOUNDATION_EXPORT NSString *const WCGlobalGestureHapticKey;
 FOUNDATION_EXPORT NSString *const WCGestureHapticStyleKey;
 
-/// URL used by the "custom page" global action.
-FOUNDATION_EXPORT NSString *const WCCustomPageURLKey;
+/// Custom pages used by the "custom page" global action. An array of
+/// dictionaries: { @"name": 备注, @"class": UIViewController 类名 }.
+FOUNDATION_EXPORT NSString *const WCCustomPagesKey;
+
+/// Enhancement switches (拓展设置).
+FOUNDATION_EXPORT NSString *const WCHideSeparatorLinesKey;
 
 /// Haptic intensity levels (maps to UIImpactFeedbackStyle).
 typedef NS_ENUM(NSInteger, WCHapticStyle) {
@@ -89,6 +93,8 @@ typedef NS_ENUM(NSInteger, WCGlobalAction) {
     WCGlobalActionMoments = 7,      // 朋友圈
     WCGlobalActionAddFriend = 8,    // 添加朋友
     WCGlobalActionCustomPage = 9,   // 前往自定义页面
+    WCGlobalActionMyQRCode = 10,    // 我的二维码
+    WCGlobalActionPayCode = 11,     // 付款码
 };
 
 /// Registers the default values for all keys once per process.

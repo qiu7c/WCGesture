@@ -76,7 +76,6 @@ typedef NS_ENUM(NSInteger, WCPopupMode) {
 - (void)buildContent;
 - (UIView *)makeTitleArea;
 - (UILabel *)makeLabel:(NSString *)text font:(UIFont *)font color:(UIColor *)color align:(NSTextAlignment)align;
-- (UIView *)makeSeparator;
 - (UIButton *)makeActionButton:(NSString *)title color:(UIColor *)color primary:(BOOL)primary;
 - (UIView *)makeButtonRowPrimary:(nullable NSString *)primaryTitle
                     primaryBlock:(nullable void (^)(void))primaryBlock
@@ -166,14 +165,6 @@ typedef NS_ENUM(NSInteger, WCPopupMode) {
     return label;
 }
 
-- (UIView *)makeSeparator {
-    UIView *line = [[UIView alloc] init];
-    line.backgroundColor = UIColor.separatorColor;
-    line.translatesAutoresizingMaskIntoConstraints = NO;
-    [line.heightAnchor constraintEqualToConstant:0.5].active = YES;
-    return line;
-}
-
 - (UIButton *)makeActionButton:(NSString *)title color:(UIColor *)color primary:(BOOL)primary {
     UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem];
     [button setTitle:title forState:UIControlStateNormal];
@@ -191,12 +182,6 @@ typedef NS_ENUM(NSInteger, WCPopupMode) {
     row.translatesAutoresizingMaskIntoConstraints = NO;
     [row.heightAnchor constraintEqualToConstant:54].active = YES;
 
-    UIView *topLine = [self makeSeparator];
-    [row addSubview:topLine];
-    [topLine.topAnchor constraintEqualToAnchor:row.topAnchor].active = YES;
-    [topLine.leadingAnchor constraintEqualToAnchor:row.leadingAnchor constant:16].active = YES;
-    [topLine.trailingAnchor constraintEqualToAnchor:row.trailingAnchor constant:-16].active = YES;
-
     UIButton *cancel = [self makeActionButton:(cancelTitle ?: @"取消") color:UIColor.secondaryLabelColor primary:NO];
     __weak typeof(self) weakSelf = self;
     [cancel addAction:[UIAction actionWithHandler:^(__unused UIAction *action) {
@@ -213,15 +198,6 @@ typedef NS_ENUM(NSInteger, WCPopupMode) {
         }] forControlEvents:UIControlEventTouchUpInside];
         [row addSubview:primary];
         [primary.centerYAnchor constraintEqualToAnchor:row.centerYAnchor].active = YES;
-
-        UIView *divider = [[UIView alloc] init];
-        divider.backgroundColor = UIColor.separatorColor;
-        divider.translatesAutoresizingMaskIntoConstraints = NO;
-        [row addSubview:divider];
-        [divider.widthAnchor constraintEqualToConstant:0.5].active = YES;
-        [divider.heightAnchor constraintEqualToConstant:26.0].active = YES;
-        [divider.centerXAnchor constraintEqualToAnchor:row.centerXAnchor].active = YES;
-        [divider.centerYAnchor constraintEqualToAnchor:row.centerYAnchor].active = YES;
 
         [cancel.leadingAnchor constraintEqualToAnchor:row.leadingAnchor].active = YES;
         [cancel.widthAnchor constraintEqualToAnchor:row.widthAnchor multiplier:0.5].active = YES;
@@ -283,17 +259,7 @@ typedef NS_ENUM(NSInteger, WCPopupMode) {
     scrollEq.active = YES;
 
     [self.options enumerateObjectsUsingBlock:^(WCPopupOption *option, NSUInteger index, __unused BOOL *stop) {
-        if (index > 0) {
-            UIView *line = [self makeSeparator];
-            UIView *lineWrap = [[UIView alloc] init];
-            lineWrap.translatesAutoresizingMaskIntoConstraints = NO;
-            [lineWrap addSubview:line];
-            [line.leadingAnchor constraintEqualToAnchor:lineWrap.leadingAnchor constant:20].active = YES;
-            [line.trailingAnchor constraintEqualToAnchor:lineWrap.trailingAnchor].active = YES;
-            [line.centerYAnchor constraintEqualToAnchor:lineWrap.centerYAnchor].active = YES;
-            [lineWrap.heightAnchor constraintEqualToConstant:0.5].active = YES;
-            [rows addArrangedSubview:lineWrap];
-        }
+        (void)index;
         BOOL selected = [option.value isEqual:self.selectedValue];
         UIButton *row = [UIButton buttonWithType:UIButtonTypeSystem];
         row.contentHorizontalAlignment = UIControlContentHorizontalAlignmentLeft;
