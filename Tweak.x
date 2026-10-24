@@ -1263,7 +1263,7 @@ static void WCKeyboardEnhancePerform(NSString *actionKey) {
     if (action == WCInputActionNone) return;
     MMGrowTextView *view = WCFirstResponderGrowTextView();
     if (!view) return;
-    if ([[NSUserDefaults standardUserDefaults] boolForKey:WCInputGestureHapticKey]) WCPlayConfiguredHaptic();
+    if ([[NSUserDefaults standardUserDefaults] boolForKey:WCKeyboardHapticKey]) WCPlayConfiguredHaptic();
     WCPerformInputAction(view, action);
 }
 
@@ -1319,8 +1319,66 @@ static UIView *WCKeyboardEnhanceView = nil;
 static UILabel *WCKeyboardEnhanceDebugLabel = nil;
 static CGRect WCKeyboardEnhanceLastFrame = {0};
 static BOOL WCKeyboardEnhanceLastFrameValid = NO;
+static NSTimer *WCKeyboardEnhanceReassertTimer = nil;
+static __weak UIWindow *WCCapturedKeyboardWindow = nil;
+
+static void WCKeyboardEnhanceStartReassertTimer(void);
+static void WCKeyboardEnhanceStopReassertTimer(void);
+
+// The keyboard window is not always listed in UIApplication/scene windows
+// (iOS 16+ hides it), so capture the instance the moment it becomes visible.
+static void WCCaptureKeyboardWindow(UIWindow *window) {
+    if (![window isKindOfClass:[UIWindow class]]) return;
+    if (![NSStringFromClass(window.class) containsString:@"Keyboard"]) return;
+    WCCapturedKeyboardWindow = window;
+}
+
+static void WCAddInstanceMethod(Class cls, SEL selector, IMP replacement, IMP *original) {
+    Method method = class_getInstanceMethod(cls, selector);
+    if (!method) return;
+    *original = method_getImplementation(method);
+    // class_addMethod only succeeds when the class does not implement the
+    // selector itself; otherwise modify its own method. Never touch an
+    // inherited Method, which would affect every UIView/UIWindow.
+    if (!class_addMethod(cls, selector, replacement, method_getTypeEncoding(method))) {
+        method_setImplementation(method, replacement);
+    }
+}
+
+static void WCInstallKeyboardWindowCapture(void) {
+    Class cls = NSClassFromString(@"UIRemoteKeyboardWindow");
+    if (!cls) return;
+    static IMP originalDidMove = NULL;
+    static IMP originalSetHidden = NULL;
+    if (!originalDidMove) {
+        WCAddInstanceMethod(cls, @selector(didMoveToWindow),
+                            imp_implementationWithBlock(^(UIWindow *window) {
+            ((void (*)(id, SEL))originalDidMove)(window, @selector(didMoveToWindow));
+            WCCaptureKeyboardWindow(window);
+        }), &originalDidMove);
+    }
+    if (!originalSetHidden) {
+        WCAddInstanceMethod(cls, @selector(setHidden:),
+                            imp_implementationWithBlock(^(UIWindow *window, BOOL hidden) {
+            ((void (*)(id, SEL, BOOL))originalSetHidden)(window, @selector(setHidden:), hidden);
+            if (!hidden) WCCaptureKeyboardWindow(window);
+        }), &originalSetHidden);
+    }
+}
 
 static UIWindow *WCSystemKeyboardWindow(void) {
+    UIWindow *appWindow = WCActiveWindow();
+    UIWindow *captured = WCCapturedKeyboardWindow;
+    if (captured && !captured.hidden && captured.alpha > 0.0 &&
+        CGRectGetHeight(captured.bounds) > 0.0) {
+        BOOL sameScene = YES;
+        if (@available(iOS 13.0, *)) {
+            UIWindowScene *appScene = appWindow.windowScene;
+            UIWindowScene *capturedScene = captured.windowScene;
+            if (appScene && capturedScene && capturedScene != appScene) sameScene = NO;
+        }
+        if (sameScene) return captured;
+    }
     NSMutableArray<UIWindow *> *candidates = [NSMutableArray array];
     UIWindow *best = nil;
     CGFloat bestLevel = -1.0;
@@ -1346,6 +1404,7 @@ static UIWindow *WCSystemKeyboardWindow(void) {
 
 static void WCKeyboardEnhanceHide(void) {
     WCKeyboardEnhanceLastFrameValid = NO;
+    WCKeyboardEnhanceStopReassertTimer();
     WCKeyboardEnhanceView.hidden = YES;
     WCKeyboardEnhanceWindow.hidden = YES;
 }
@@ -1355,6 +1414,10 @@ static void WCKeyboardEnhanceEnsureView(void) {
     UIView *view = [[UIView alloc] initWithFrame:CGRectZero];
     view.backgroundColor = UIColor.clearColor;
     view.clipsToBounds = NO;
+    // The keyboard's own content can be re-added above our strip when the
+    // keyboard finishes presenting. zPosition is independent of subview
+    // order, so the strip stays rendered on top.
+    view.layer.zPosition = 10000.0;
 
     WCKeyboardEnhanceController *controller = [WCKeyboardEnhanceController sharedController];
     UISwipeGestureRecognizer *left = [[UISwipeGestureRecognizer alloc] initWithTarget:controller action:@selector(handleSwipeLeft:)];
@@ -1438,8 +1501,8 @@ static void WCKeyboardEnhanceApply(CGRect keyboardFrame) {
         WCKeyboardEnhanceView.frame = CGRectMake(0, CGRectGetHeight(kb) - safeBottom,
                                                  CGRectGetWidth(kb), band);
         WCKeyboardEnhanceWindow.hidden = YES;
-        WCKeyboardEnhanceDebugLabel.text = [NSString stringWithFormat:@"触控区 %.0f×%.0f K",
-                                            CGRectGetWidth(kb), band];
+        WCKeyboardEnhanceDebugLabel.text = [NSString stringWithFormat:@"触控区 %.0f×%.0f K %.0f",
+                                            CGRectGetWidth(kb), band, keyboardWindow.windowLevel];
     } else {
         // Fallback: our own window above the keyboard window level.
         CGRect strip = CGRectMake(0, CGRectGetMaxY(keyboardFrame) - safeBottom,
@@ -1475,6 +1538,7 @@ static void WCKeyboardEnhanceApply(CGRect keyboardFrame) {
                                             strip.size.width, strip.size.height];
     }
     WCKeyboardEnhanceView.hidden = NO;
+    WCKeyboardEnhanceStartReassertTimer();
 }
 
 static void WCKeyboardEnhanceUpdate(NSNotification *note) {
@@ -1492,6 +1556,44 @@ static void WCKeyboardEnhanceUpdate(NSNotification *note) {
 static void WCKeyboardEnhanceRefresh(void) {
     if (!WCKeyboardEnhanceLastFrameValid) { WCKeyboardEnhanceHide(); return; }
     WCKeyboardEnhanceApply(WCKeyboardEnhanceLastFrame);
+}
+
+static BOOL WCKeyboardEnhanceKeyboardOnScreen(void) {
+    if (!WCKeyboardEnhanceLastFrameValid) return NO;
+    if (UIApplication.sharedApplication.applicationState != UIApplicationStateActive) return NO;
+    UIWindow *appWindow = WCActiveWindow();
+    if (!appWindow) return NO;
+    CGFloat screenHeight = appWindow.bounds.size.height;
+    if (@available(iOS 13.0, *)) {
+        if (appWindow.windowScene) {
+            screenHeight = MAX(screenHeight, appWindow.windowScene.screen.bounds.size.height);
+        }
+    }
+    return CGRectGetMinY(WCKeyboardEnhanceLastFrame) < screenHeight - 1.0;
+}
+
+static void WCKeyboardEnhanceStopReassertTimer(void) {
+    [WCKeyboardEnhanceReassertTimer invalidate];
+    WCKeyboardEnhanceReassertTimer = nil;
+}
+
+// The keyboard window re-installs its own content when it finishes presenting,
+// which can remove or cover the strip after UIKeyboardDidShowNotification has
+// already passed. Re-apply periodically while the keyboard is up so the strip
+// always comes back on its own.
+static void WCKeyboardEnhanceStartReassertTimer(void) {
+    if (WCKeyboardEnhanceReassertTimer) return;
+    WCKeyboardEnhanceReassertTimer = [NSTimer scheduledTimerWithTimeInterval:0.4
+                                                                     repeats:YES
+                                                                       block:^(NSTimer *timer) {
+        if (!WCKeyboardEnhanceKeyboardOnScreen()) {
+            [timer invalidate];
+            WCKeyboardEnhanceReassertTimer = nil;
+            return;
+        }
+        WCKeyboardEnhanceRefresh();
+    }];
+    WCKeyboardEnhanceReassertTimer.tolerance = 0.15;
 }
 
 #pragma mark - Voice repeat upload hooks
@@ -2114,6 +2216,7 @@ static BOOL WCViewLooksLikeGlobalSeparator(UIView *view) {
         // to fill m_nsFromUsr. Refresh again when opening settings.
         dispatch_async(dispatch_get_main_queue(), ^{ WCRefreshCachedCurrentUser(); });
         WCGestureRegisterEntry();
+        WCInstallKeyboardWindowCapture();
         %init;
 
         [[NSNotificationCenter defaultCenter] addObserverForName:UIKeyboardWillChangeFrameNotification

@@ -263,6 +263,7 @@ static NSDictionary<NSString *, NSString *> *WCConfigShareKeys(void) {
         @"D": WCKeyboardSwipeRightActionKey,
         @"E": WCKeyboardDoubleTapActionKey,
         @"F": WCKeyboardTripleTapActionKey,
+        @"G": WCKeyboardHapticKey,
     };
 }
 
@@ -897,7 +898,7 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
         NSMutableArray *keyboard = [NSMutableArray array];
         [keyboard addObject:WCSwitchRow(@"键盘增强", WCKeyboardEnhanceEnabledKey)];
         if ([d boolForKey:WCKeyboardEnhanceEnabledKey]) {
-            [keyboard addObject:WCSwitchRow(@"震动", WCInputGestureHapticKey)];
+            [keyboard addObject:WCSwitchRow(@"震动", WCKeyboardHapticKey)];
             [keyboard addObject:WCInputActionRow(@"左滑动作", WCKeyboardSwipeLeftActionKey)];
             [keyboard addObject:WCInputActionRow(@"右滑动作", WCKeyboardSwipeRightActionKey)];
             [keyboard addObject:WCInputActionRow(@"双击动作", WCKeyboardDoubleTapActionKey)];

@@ -61,6 +61,7 @@ FOUNDATION_EXPORT NSString *const WCMomentsLikeHapticKey;
 /// Per-gesture vibration switches. Intensity is shared via WCGestureHapticStyleKey.
 FOUNDATION_EXPORT NSString *const WCMessageGestureHapticKey;
 FOUNDATION_EXPORT NSString *const WCInputGestureHapticKey;
+FOUNDATION_EXPORT NSString *const WCKeyboardHapticKey;
 
 /// Global multi-finger long-press (any WeChat page).
 FOUNDATION_EXPORT NSString *const WCGlobalGestureEnabledKey;

@@ -35,6 +35,7 @@ NSString *const WCMomentsLikeHapticKey = @"com.qiu7c.wcgesture.moments.like-hapt
 
 NSString *const WCMessageGestureHapticKey = @"com.qiu7c.wcgesture.chat.message-gesture.haptic";
 NSString *const WCInputGestureHapticKey = @"com.qiu7c.wcgesture.chat.input-gesture.haptic";
+NSString *const WCKeyboardHapticKey = @"com.qiu7c.wcgesture.keyboard.haptic";
 
 NSString *const WCGlobalGestureEnabledKey = @"com.qiu7c.wcgesture.global.enabled";
 NSString *const WCGlobalTwoFingerActionKey = @"com.qiu7c.wcgesture.global.two-finger-action";
@@ -81,6 +82,7 @@ void WCGestureRegisterDefaults(void) {
             WCMomentsLikeHapticKey: @YES,
             WCMessageGestureHapticKey: @YES,
             WCInputGestureHapticKey: @YES,
+            WCKeyboardHapticKey: @YES,
             WCGlobalGestureEnabledKey: @NO,
             WCGlobalTwoFingerActionKey: @(WCGlobalActionNone),
             WCGlobalThreeFingerActionKey: @(WCGlobalActionNone),
