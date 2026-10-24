@@ -1,6 +1,7 @@
 #import "WCGestureSettingsVC.h"
 #import "WCGestureConfig.h"
 #import "WCGestureAccount.h"
+#import "WCPopup.h"
 #import <objc/message.h>
 #import <objc/runtime.h>
 
@@ -63,50 +64,43 @@ static void WCSetInteger(NSInteger value, NSString *key) {
     WCPostChange(key);
 }
 
-#pragma mark - Action picker sheet
+#pragma mark - Pickers (custom popup)
 
-static void WCPresentActionPicker(UIViewController *presenter, NSString *title,
+static void WCPresentActionPicker(__unused UIViewController *presenter, NSString *title,
                                   BOOL selfMessage, NSString *defaultsKey) {
-    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    NSInteger current = [defaults integerForKey:defaultsKey];
-    UIAlertController *sheet = [UIAlertController alertControllerWithTitle:title
-        message:selfMessage ? @"选择自己消息触发的动作" : @"选择对方消息触发的动作；不支持撤回"
-         preferredStyle:UIAlertControllerStyleActionSheet];
+    NSInteger current = [[NSUserDefaults standardUserDefaults] integerForKey:defaultsKey];
+    NSMutableArray<WCPopupOption *> *options = [NSMutableArray array];
     for (NSDictionary *option in WCActionOptions(selfMessage)) {
-        NSInteger value = [option[@"value"] integerValue];
-        NSString *label = value == current ? [@"✓  " stringByAppendingString:option[@"title"]] : option[@"title"];
-        [sheet addAction:[UIAlertAction actionWithTitle:label style:UIAlertActionStyleDefault
-            handler:^(__unused UIAlertAction *action) {
-                WCSetInteger(value, defaultsKey);
-            }]];
+        [options addObject:[WCPopupOption optionWithTitle:option[@"title"] value:option[@"value"]]];
     }
-    [sheet addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
-    [presenter presentViewController:sheet animated:YES completion:nil];
-}
-
-static void WCPresentTriggerDistanceEditor(UIViewController *presenter) {
-    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"触发距离"
-        message:@"输入 36 到 100 之间的数值；越小越容易触发"
-         preferredStyle:UIAlertControllerStyleAlert];
-    [alert addTextFieldWithConfigurationHandler:^(UITextField *field) {
-        field.text = [NSString stringWithFormat:@"%.0f", [defaults doubleForKey:WCReplySwipeTriggerDistanceKey]];
-        field.keyboardType = UIKeyboardTypeDecimalPad;
+    [WCPopup showOptionsWithTitle:title
+                          message:(selfMessage ? @"选择自己消息触发的动作" : @"选择对方消息触发的动作；不支持撤回")
+                          options:options
+                         selected:@(current)
+                       completion:^(id value) {
+        if (!value) return;
+        WCSetInteger([value integerValue], defaultsKey);
     }];
-    [alert addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
-    [alert addAction:[UIAlertAction actionWithTitle:@"保存" style:UIAlertActionStyleDefault
-        handler:^(__unused UIAlertAction *action) {
-            NSString *text = alert.textFields.firstObject.text;
-            double value = [text doubleValue];
-            if (value < 36.0) value = 36.0;
-            if (value > 100.0) value = 100.0;
-            [defaults setDouble:value forKey:WCReplySwipeTriggerDistanceKey];
-            WCPostChange(WCReplySwipeTriggerDistanceKey);
-        }]];
-    [presenter presentViewController:alert animated:YES completion:nil];
 }
 
-#pragma mark - Haptic style picker
+static void WCPresentTriggerDistanceEditor(__unused UIViewController *presenter) {
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSString *text = [NSString stringWithFormat:@"%.0f", [defaults doubleForKey:WCReplySwipeTriggerDistanceKey]];
+    [WCPopup showInputWithTitle:@"触发距离"
+                        message:@"输入 36 到 100 之间的数值；越小越容易触发"
+                           text:text
+                    placeholder:@"36 - 100"
+                       keyboard:UIKeyboardTypeDecimalPad
+                     completion:^(NSString *value) {
+        double d = [value doubleValue];
+        if (d < 36.0) d = 36.0;
+        if (d > 100.0) d = 100.0;
+        [defaults setDouble:d forKey:WCReplySwipeTriggerDistanceKey];
+        WCPostChange(WCReplySwipeTriggerDistanceKey);
+    }];
+}
+
+#pragma mark - Haptic style options
 
 static NSArray<NSDictionary *> *WCHapticStyleOptions(void) {
     return @[
@@ -125,41 +119,36 @@ static NSString *WCHapticStyleName(NSInteger style) {
     return @"中等";
 }
 
-static void WCPresentHapticStylePicker(UIViewController *presenter) {
-    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    NSInteger current = [defaults integerForKey:WCGestureHapticStyleKey];
-    UIAlertController *sheet = [UIAlertController alertControllerWithTitle:@"震感强度"
-        message:@"选择触感反馈强度" preferredStyle:UIAlertControllerStyleActionSheet];
+static void WCPresentHapticStylePicker(__unused UIViewController *presenter) {
+    NSInteger current = [[NSUserDefaults standardUserDefaults] integerForKey:WCGestureHapticStyleKey];
+    NSMutableArray<WCPopupOption *> *options = [NSMutableArray array];
     for (NSDictionary *option in WCHapticStyleOptions()) {
-        NSInteger value = [option[@"value"] integerValue];
-        NSString *label = value == current ? [@"✓  " stringByAppendingString:option[@"title"]] : option[@"title"];
-        [sheet addAction:[UIAlertAction actionWithTitle:label style:UIAlertActionStyleDefault
-            handler:^(__unused UIAlertAction *action) {
-                WCSetInteger(value, WCGestureHapticStyleKey);
-            }]];
+        [options addObject:[WCPopupOption optionWithTitle:option[@"title"] value:option[@"value"]]];
     }
-    [sheet addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
-    [presenter presentViewController:sheet animated:YES completion:nil];
+    [WCPopup showOptionsWithTitle:@"震感强度"
+                          message:@"选择触感反馈强度"
+                          options:options
+                         selected:@(current)
+                       completion:^(id value) {
+        if (!value) return;
+        WCSetInteger([value integerValue], WCGestureHapticStyleKey);
+    }];
 }
 
-static void WCPresentPluginNameEditor(UIViewController *presenter) {
+static void WCPresentPluginNameEditor(__unused UIViewController *presenter) {
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"插件名称"
-        message:@"设置在微信插件管理页显示的名字"
-         preferredStyle:UIAlertControllerStyleAlert];
-    [alert addTextFieldWithConfigurationHandler:^(UITextField *field) {
-        field.text = [defaults stringForKey:WCPluginNameKey] ?: @"微信手势";
-        field.autocapitalizationType = UITextAutocapitalizationTypeNone;
+    NSString *name = [defaults stringForKey:WCPluginNameKey] ?: @"微信手势";
+    [WCPopup showInputWithTitle:@"插件名称"
+                        message:@"设置在微信插件管理页显示的名字"
+                           text:name
+                    placeholder:@"微信手势"
+                       keyboard:UIKeyboardTypeDefault
+                     completion:^(NSString *value) {
+        NSString *text = [value stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+        if (text.length == 0) text = @"微信手势";
+        [defaults setObject:text forKey:WCPluginNameKey];
+        WCPostChange(WCPluginNameKey);
     }];
-    [alert addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
-    [alert addAction:[UIAlertAction actionWithTitle:@"保存" style:UIAlertActionStyleDefault
-        handler:^(__unused UIAlertAction *action) {
-            NSString *text = [alert.textFields.firstObject.text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
-            if (text.length == 0) text = @"微信手势";
-            [defaults setObject:text forKey:WCPluginNameKey];
-            WCPostChange(WCPluginNameKey);
-        }]];
-    [presenter presentViewController:alert animated:YES completion:nil];
 }
 
 #pragma mark - Config export/import (compact share code)
@@ -189,6 +178,11 @@ static NSDictionary<NSString *, NSString *> *WCConfigShareKeys(void) {
         @"s": WCGlobalTwoFingerActionKey,
         @"t": WCGlobalThreeFingerActionKey,
         @"u": WCPluginNameKey,
+        @"v": WCMessageGestureHapticKey,
+        @"w": WCInputGestureHapticKey,
+        @"x": WCGlobalGestureHapticKey,
+        @"y": WCGestureHapticStyleKey,
+        @"z": WCCustomPageURLKey,
     };
 }
 
@@ -225,46 +219,26 @@ static BOOL WCConfigImportCode(NSString *code) {
     return YES;
 }
 
-static void WCPresentExportConfig(UIViewController *presenter) {
-    NSString *code = WCConfigExportCode();
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"导出配置"
-        message:@"复制下方口令，在新设备/新账号导入即可恢复设置"
-         preferredStyle:UIAlertControllerStyleAlert];
-    [alert addTextFieldWithConfigurationHandler:^(UITextField *field) {
-        field.text = code;
-        field.userInteractionEnabled = NO;
-    }];
-    [alert addAction:[UIAlertAction actionWithTitle:@"复制" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *a) {
-        [UIPasteboard.generalPasteboard setString:code];
-    }]];
-    [alert addAction:[UIAlertAction actionWithTitle:@"关闭" style:UIAlertActionStyleCancel handler:nil]];
-    [presenter presentViewController:alert animated:YES completion:nil];
+static void WCPresentExportConfig(__unused UIViewController *presenter) {
+    [WCPopup showTextWithTitle:@"导出配置"
+                       message:@"复制下方口令，在新设备/新账号导入即可恢复设置"
+                          text:WCConfigExportCode()];
 }
 
-static void WCPresentImportConfig(UIViewController *presenter) {
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"导入配置"
-        message:@"粘贴配置口令"
-         preferredStyle:UIAlertControllerStyleAlert];
-    [alert addTextFieldWithConfigurationHandler:^(UITextField *field) {
-        field.placeholder = @"WCG1-...";
-        field.autocapitalizationType = UITextAutocapitalizationTypeNone;
-        field.text = UIPasteboard.generalPasteboard.string;
-    }];
-    [alert addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
-    [alert addAction:[UIAlertAction actionWithTitle:@"导入" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *a) {
-        NSString *text = alert.textFields.firstObject.text;
+static void WCPresentImportConfig(__unused UIViewController *presenter) {
+    [WCPopup showInputWithTitle:@"导入配置"
+                        message:@"粘贴配置口令"
+                           text:UIPasteboard.generalPasteboard.string
+                    placeholder:@"WCG1-..."
+                       keyboard:UIKeyboardTypeDefault
+                     completion:^(NSString *text) {
         if (WCConfigImportCode(text)) {
             WCPostChange(nil);
-            UIAlertController *ok = [UIAlertController alertControllerWithTitle:nil message:@"导入成功" preferredStyle:UIAlertControllerStyleAlert];
-            [ok addAction:[UIAlertAction actionWithTitle:@"好" style:UIAlertActionStyleDefault handler:nil]];
-            [presenter presentViewController:ok animated:YES completion:nil];
+            [WCPopup showMessage:@"导入成功" message:nil];
         } else {
-            UIAlertController *fail = [UIAlertController alertControllerWithTitle:nil message:@"口令格式错误" preferredStyle:UIAlertControllerStyleAlert];
-            [fail addAction:[UIAlertAction actionWithTitle:@"好" style:UIAlertActionStyleDefault handler:nil]];
-            [presenter presentViewController:fail animated:YES completion:nil];
+            [WCPopup showMessage:@"导入失败" message:@"口令格式错误"];
         }
-    }]];
-    [presenter presentViewController:alert animated:YES completion:nil];
+    }];
 }
 
 #pragma mark - Input action options
@@ -288,22 +262,20 @@ static NSString *WCInputActionName(NSInteger action) {
 
 #pragma mark - Input action picker
 
-static void WCPresentInputSwipeActionPicker(UIViewController *presenter, NSString *title, NSString *defaultsKey) {
-    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    NSInteger current = [defaults integerForKey:defaultsKey];
-    UIAlertController *sheet = [UIAlertController alertControllerWithTitle:title
-        message:@"选择触发动作"
-         preferredStyle:UIAlertControllerStyleActionSheet];
+static void WCPresentInputSwipeActionPicker(__unused UIViewController *presenter, NSString *title, NSString *defaultsKey) {
+    NSInteger current = [[NSUserDefaults standardUserDefaults] integerForKey:defaultsKey];
+    NSMutableArray<WCPopupOption *> *options = [NSMutableArray array];
     for (NSDictionary *option in WCInputActionOptions()) {
-        NSInteger value = [option[@"value"] integerValue];
-        NSString *label = value == current ? [@"✓  " stringByAppendingString:option[@"title"]] : option[@"title"];
-        [sheet addAction:[UIAlertAction actionWithTitle:label style:UIAlertActionStyleDefault
-            handler:^(__unused UIAlertAction *action) {
-                WCSetInteger(value, defaultsKey);
-            }]];
+        [options addObject:[WCPopupOption optionWithTitle:option[@"title"] value:option[@"value"]]];
     }
-    [sheet addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
-    [presenter presentViewController:sheet animated:YES completion:nil];
+    [WCPopup showOptionsWithTitle:title
+                          message:@"选择触发动作"
+                          options:options
+                         selected:@(current)
+                       completion:^(id value) {
+        if (!value) return;
+        WCSetInteger([value integerValue], defaultsKey);
+    }];
 }
 
 #pragma mark - Row model
@@ -316,6 +288,7 @@ typedef NS_ENUM(NSInteger, WCRowKind) {
     WCRowKindDistance,      // tap → number editor
     WCRowKindPluginName,    // tap → plugin name editor
     WCRowKindHapticStyle,   // tap → haptic style picker
+    WCRowKindCustomPageURL, // tap → custom page URL editor
     WCRowKindExport,         // tap → export config
     WCRowKindImport,        // tap → import config
 };
@@ -380,10 +353,13 @@ static WCRow *WCPlainRow(NSString *title, WCRowKind kind) {
 static NSArray<NSDictionary *> *WCGlobalActionOptions(void) {
     return @[
         @{ @"title": @"不设置", @"value": @(WCGlobalActionNone) },
+        @{ @"title": @"扫一扫", @"value": @(WCGlobalActionScanQR) },
+        @{ @"title": @"朋友圈", @"value": @(WCGlobalActionMoments) },
+        @{ @"title": @"添加朋友", @"value": @(WCGlobalActionAddFriend) },
+        @{ @"title": @"自定义页面", @"value": @(WCGlobalActionCustomPage) },
         @{ @"title": @"截图", @"value": @(WCGlobalActionScreenshot) },
         @{ @"title": @"返回上一页", @"value": @(WCGlobalActionBack) },
         @{ @"title": @"回到首页", @"value": @(WCGlobalActionLockScreen) },
-        @{ @"title": @"扫一扫", @"value": @(WCGlobalActionScanQR) },
         @{ @"title": @"快捷菜单", @"value": @(WCGlobalActionMenu) },
         @{ @"title": @"跳转设置页", @"value": @(WCGlobalActionJump) },
     ];
@@ -396,21 +372,20 @@ static NSString *WCGlobalActionName(NSInteger action) {
     return @"不设置";
 }
 
-static void WCPresentGlobalActionPicker(UIViewController *presenter, NSString *title, NSString *defaultsKey) {
-    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    NSInteger current = [defaults integerForKey:defaultsKey];
-    UIAlertController *sheet = [UIAlertController alertControllerWithTitle:title
-        message:@"选择触发动作" preferredStyle:UIAlertControllerStyleActionSheet];
+static void WCPresentGlobalActionPicker(__unused UIViewController *presenter, NSString *title, NSString *defaultsKey) {
+    NSInteger current = [[NSUserDefaults standardUserDefaults] integerForKey:defaultsKey];
+    NSMutableArray<WCPopupOption *> *options = [NSMutableArray array];
     for (NSDictionary *option in WCGlobalActionOptions()) {
-        NSInteger value = [option[@"value"] integerValue];
-        NSString *label = value == current ? [@"✓  " stringByAppendingString:option[@"title"]] : option[@"title"];
-        [sheet addAction:[UIAlertAction actionWithTitle:label style:UIAlertActionStyleDefault
-            handler:^(__unused UIAlertAction *action) {
-                WCSetInteger(value, defaultsKey);
-            }]];
+        [options addObject:[WCPopupOption optionWithTitle:option[@"title"] value:option[@"value"]]];
     }
-    [sheet addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
-    [presenter presentViewController:sheet animated:YES completion:nil];
+    [WCPopup showOptionsWithTitle:title
+                          message:@"选择触发动作"
+                          options:options
+                         selected:@(current)
+                       completion:^(id value) {
+        if (!value) return;
+        WCSetInteger([value integerValue], defaultsKey);
+    }];
 }
 
 static NSString *WCRowDetailText(WCRow *row) {
@@ -428,6 +403,10 @@ static NSString *WCRowDetailText(WCRow *row) {
             return [d stringForKey:WCPluginNameKey] ?: @"微信手势";
         case WCRowKindHapticStyle:
             return WCHapticStyleName([d integerForKey:WCGestureHapticStyleKey]);
+        case WCRowKindCustomPageURL: {
+            NSString *url = [d stringForKey:WCCustomPageURLKey];
+            return url.length > 0 ? url : @"未设置";
+        }
         case WCRowKindExport:
         case WCRowKindImport:
             return @"";
@@ -607,7 +586,7 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
 @interface WCGestureDetailController ()
 @property (nonatomic, assign) NSInteger category;
 @property (nonatomic, copy) NSArray<NSArray<WCRow *> *> *sections;
-@property (nonatomic, copy) NSArray<NSString *> *sectionTitles;
+@property (nonatomic, copy) NSArray<NSNumber *> *collapsible;
 @property (nonatomic, copy) NSArray<NSString *> *collapseKeys;
 @end
 
@@ -646,13 +625,14 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
 - (void)rebuildRows {
     NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
     NSMutableArray *sections = [NSMutableArray array];
-    NSMutableArray *titles = [NSMutableArray array];
+    NSMutableArray *collapsible = [NSMutableArray array];
     NSMutableArray *collapseKeys = [NSMutableArray array];
     NSString *prefix = @"com.qiu7c.wcgesture.collapse";
     if (self.category == WCGestureCategoryChat) {
         NSMutableArray *msg = [NSMutableArray array];
         [msg addObject:WCSwitchRow(@"消息手势", WCReplySwipeEnabledKey)];
         if ([d boolForKey:WCReplySwipeEnabledKey]) {
+            [msg addObject:WCSwitchRow(@"震动", WCMessageGestureHapticKey)];
             [msg addObject:WCActionRow(@"左滑 · 自己", WCReplySwipeSelfActionKey, YES)];
             [msg addObject:WCActionRow(@"左滑 · 对方", WCReplySwipeOtherActionKey, NO)];
             [msg addObject:WCActionRow(@"右滑 · 自己", WCReplySwipeRightSelfActionKey, YES)];
@@ -664,37 +644,40 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
             [msg addObject:WCDistanceRow(@"触发距离")];
         }
         [sections addObject:msg];
-        [titles addObject:@"消息手势"];
+        [collapsible addObject:@YES];
         [collapseKeys addObject:[prefix stringByAppendingString:@".chat.msg"]];
         NSMutableArray *input = [NSMutableArray array];
         [input addObject:WCSwitchRow(@"输入框手势", WCInputGestureEnabledKey)];
         if ([d boolForKey:WCInputGestureEnabledKey]) {
+            [input addObject:WCSwitchRow(@"震动", WCInputGestureHapticKey)];
             [input addObject:WCInputActionRow(@"左滑动作", WCInputSwipeLeftActionKey)];
             [input addObject:WCInputActionRow(@"右滑动作", WCInputSwipeRightActionKey)];
             [input addObject:WCInputActionRow(@"双击动作", WCInputDoubleTapActionKey)];
             [input addObject:WCInputActionRow(@"三击动作", WCInputTripleTapActionKey)];
         }
         [sections addObject:input];
-        [titles addObject:@"输入框手势"];
+        [collapsible addObject:@YES];
         [collapseKeys addObject:[prefix stringByAppendingString:@".chat.input"]];
     } else if (self.category == WCGestureCategoryOther) {
         NSMutableArray *moments = [NSMutableArray array];
         [moments addObject:WCSwitchRow(@"朋友圈双击点赞", WCMomentsDoubleTapLikeKey)];
         if ([d boolForKey:WCMomentsDoubleTapLikeKey]) {
-            [moments addObject:WCSwitchRow(@"点赞触感反馈", WCMomentsLikeHapticKey)];
+            [moments addObject:WCSwitchRow(@"震动", WCMomentsLikeHapticKey)];
         }
         [sections addObject:moments];
-        [titles addObject:@"朋友圈"];
+        [collapsible addObject:@YES];
         [collapseKeys addObject:[prefix stringByAppendingString:@".other.moments"]];
     } else if (self.category == WCGestureCategoryGlobal) {
         NSMutableArray *global = [NSMutableArray array];
         [global addObject:WCSwitchRow(@"全局手势", WCGlobalGestureEnabledKey)];
         if ([d boolForKey:WCGlobalGestureEnabledKey]) {
+            [global addObject:WCSwitchRow(@"震动", WCGlobalGestureHapticKey)];
             [global addObject:WCGlobalActionRow(@"双指长按", WCGlobalTwoFingerActionKey)];
             [global addObject:WCGlobalActionRow(@"三指长按", WCGlobalThreeFingerActionKey)];
+            [global addObject:WCPlainRow(@"自定义页面地址", WCRowKindCustomPageURL)];
         }
         [sections addObject:global];
-        [titles addObject:@"全局手势"];
+        [collapsible addObject:@YES];
         [collapseKeys addObject:[prefix stringByAppendingString:@".global"]];
     } else {
         // 插件设置
@@ -702,17 +685,17 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
         [plugin addObject:WCPlainRow(@"插件名称", WCRowKindPluginName)];
         [plugin addObject:WCPlainRow(@"震感强度", WCRowKindHapticStyle)];
         [sections addObject:plugin];
-        [titles addObject:@"插件"];
+        [collapsible addObject:@NO];
         [collapseKeys addObject:[prefix stringByAppendingString:@".plugin"]];
         NSMutableArray *config = [NSMutableArray array];
         [config addObject:WCPlainRow(@"导出配置", WCRowKindExport)];
         [config addObject:WCPlainRow(@"导入配置", WCRowKindImport)];
         [sections addObject:config];
-        [titles addObject:@"配置"];
+        [collapsible addObject:@NO];
         [collapseKeys addObject:[prefix stringByAppendingString:@".config"]];
     }
     self.sections = sections;
-    self.sectionTitles = titles;
+    self.collapsible = collapsible;
     self.collapseKeys = collapseKeys;
 }
 
@@ -727,34 +710,19 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
     return self.sections.count;
 }
 
+- (BOOL)sectionCollapsible:(NSInteger)section {
+    if (section < 0 || section >= (NSInteger)self.collapsible.count) return NO;
+    return [self.collapsible[section] boolValue];
+}
+
 - (NSInteger)tableView:(__unused UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
     NSUInteger total = self.sections[section].count;
     // 折叠时只保留第 0 行(大开关),子设置项收起
-    if ([self sectionCollapsed:section]) return MIN(1, total);
+    if ([self sectionCollapsible:section] && [self sectionCollapsed:section]) return MIN(1, total);
     return total;
 }
 
-- (UIView *)tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section {
-    NSString *title = (section < (NSInteger)self.sectionTitles.count) ? self.sectionTitles[section] : @"";
-    BOOL collapsed = [self sectionCollapsed:section];
-    UIButton *header = [UIButton buttonWithType:UIButtonTypeSystem];
-    header.frame = CGRectMake(0, 0, tableView.bounds.size.width, 40);
-    [header setTitle:[NSString stringWithFormat:@"  %@  %@", title, collapsed ? @"▸" : @"▾"]
-           forState:UIControlStateNormal];
-    header.contentHorizontalAlignment = UIControlContentHorizontalAlignmentLeft;
-    header.titleLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightSemibold];
-    [header setTitleColor:[UIColor secondaryLabelColor] forState:UIControlStateNormal];
-    header.tag = section;
-    [header addTarget:self action:@selector(toggleSection:) forControlEvents:UIControlEventTouchUpInside];
-    return header;
-}
-
-- (CGFloat)tableView:(__unused UITableView *)tableView heightForHeaderInSection:(__unused NSInteger)section {
-    return 40;
-}
-
-- (void)toggleSection:(UIButton *)header {
-    NSInteger section = header.tag;
+- (void)toggleCollapseForSection:(NSInteger)section {
     if (section < 0 || section >= (NSInteger)self.collapseKeys.count) return;
     NSString *key = self.collapseKeys[section];
     BOOL now = [[NSUserDefaults standardUserDefaults] boolForKey:key];
@@ -764,23 +732,64 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
-    WCRow *row = self.sections[indexPath.section][indexPath.row];
+    NSInteger section = indexPath.section;
+    NSInteger rowIdx = indexPath.row;
+    WCRow *row = self.sections[section][rowIdx];
     NSString *cellId = @"WCGestureCell";
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:cellId];
     if (!cell) {
         cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleValue1 reuseIdentifier:cellId];
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
+        UIView *bar = [[UIView alloc] init];
+        bar.tag = 9001;
+        bar.backgroundColor = UIColor.systemBlueColor;
+        bar.layer.cornerRadius = 1.25;
+        bar.hidden = YES;
+        bar.translatesAutoresizingMaskIntoConstraints = NO;
+        [cell.contentView addSubview:bar];
+        [NSLayoutConstraint activateConstraints:@[
+            [bar.leadingAnchor constraintEqualToAnchor:cell.contentView.leadingAnchor constant:20],
+            [bar.centerYAnchor constraintEqualToAnchor:cell.contentView.centerYAnchor],
+            [bar.widthAnchor constraintEqualToConstant:2.5],
+            [bar.heightAnchor constraintEqualToConstant:20],
+        ]];
     }
     cell.backgroundColor = UIColor.secondarySystemGroupedBackgroundColor;
     cell.textLabel.text = row.title;
-    cell.detailTextLabel.text = WCRowDetailText(row);
+    cell.detailTextLabel.text = (row.kind == WCRowKindSwitch) ? @"" : WCRowDetailText(row);
     cell.accessoryView = nil;
     cell.accessoryType = UITableViewCellAccessoryNone;
     cell.selectionStyle = UITableViewCellSelectionStyleNone;
+
+    BOOL collapsible = [self sectionCollapsible:section];
+    BOOL isHeaderRow = collapsible && rowIdx == 0;
+    BOOL isChild = collapsible && rowIdx > 0;
+
+    // Reset reuse state.
+    cell.indentationLevel = 0;
+    cell.indentationWidth = 0;
+    cell.imageView.image = nil;
+    [cell.contentView viewWithTag:9001].hidden = YES;
+
+    if (isHeaderRow) {
+        BOOL collapsed = [self sectionCollapsed:section];
+        UIImage *chevron = [UIImage systemImageNamed:(collapsed ? @"chevron.right" : @"chevron.down")
+            withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:13 weight:UIImageSymbolWeightSemibold]];
+        cell.imageView.image = [chevron imageWithTintColor:UIColor.secondaryLabelColor
+                                            renderingMode:UIImageRenderingModeAlwaysOriginal];
+        cell.imageView.contentMode = UIViewContentModeCenter;
+    }
+
+    if (isChild) {
+        cell.indentationLevel = 1;
+        cell.indentationWidth = 14;
+        [cell.contentView viewWithTag:9001].hidden = NO;
+    }
+
     if (row.kind == WCRowKindSwitch) {
         UISwitch *sw = [[UISwitch alloc] init];
         [sw addTarget:self action:@selector(handleSwitch:) forControlEvents:UIControlEventValueChanged];
-        sw.tag = (NSInteger)indexPath.section * 10000 + (NSInteger)indexPath.row;
+        sw.tag = section * 10000 + rowIdx;
         sw.on = [[NSUserDefaults standardUserDefaults] boolForKey:row.defaultsKey];
         cell.accessoryView = sw;
     } else {
@@ -800,8 +809,15 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
 }
 
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
-    WCRow *row = self.sections[indexPath.section][indexPath.row];
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
+    NSInteger section = indexPath.section;
+    // Tapping the first row (the big switch / section header) collapses or
+    // expands the child items.
+    if ([self sectionCollapsible:section] && indexPath.row == 0) {
+        [self toggleCollapseForSection:section];
+        return;
+    }
+    WCRow *row = self.sections[section][indexPath.row];
     switch (row.kind) {
         case WCRowKindSwitch: break;
         case WCRowKindActionDetail:
@@ -819,6 +835,17 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
         case WCRowKindHapticStyle:
             WCPresentHapticStylePicker(self);
             break;
+        case WCRowKindCustomPageURL:
+            [WCPopup showInputWithTitle:@"自定义页面地址"
+                                message:@"双指/三指长按选择「自定义页面」时打开此网址"
+                                   text:[[NSUserDefaults standardUserDefaults] stringForKey:WCCustomPageURLKey]
+                            placeholder:@"https://"
+                               keyboard:UIKeyboardTypeURL
+                             completion:^(NSString *value) {
+                [[NSUserDefaults standardUserDefaults] setObject:value forKey:WCCustomPageURLKey];
+                WCPostChange(WCCustomPageURLKey);
+            }];
+            break;
         case WCRowKindExport:
             WCPresentExportConfig(self);
             break;
@@ -833,35 +860,17 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
 
 @end
 
-#pragma mark - ActionSheet fallback entry (used by Me-page hook)
+#pragma mark - Settings entry
 
 void WCGesturePresentSettings(UIViewController *presenter) {
-    // Push the real controller when we have a navigation context; otherwise
-    // fall back to an ActionSheet-style quick toggle.
-    if (presenter.navigationController) {
-        WCGestureSettingsController *vc = [WCGestureSettingsController new];
-        [presenter.navigationController pushViewController:vc animated:YES];
-        return;
-    }
     if (!presenter) presenter = WCTopViewController();
-    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    BOOL msgGesture = [defaults boolForKey:WCReplySwipeEnabledKey];
-    BOOL inputGesture = [defaults boolForKey:WCInputGestureEnabledKey];
-
-    UIAlertController *sheet = [UIAlertController alertControllerWithTitle:@"微信手势"
-        message:@"WCGesture 设置"
-         preferredStyle:UIAlertControllerStyleActionSheet];
-
-    [sheet addAction:[UIAlertAction actionWithTitle:msgGesture ? @"消息手势：开" : @"消息手势：关"
-        style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
-            WCSetBool(!msgGesture, WCReplySwipeEnabledKey);
-        }]];
-    [sheet addAction:[UIAlertAction actionWithTitle:inputGesture ? @"输入框手势：开" : @"输入框手势：关"
-        style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
-            WCSetBool(!inputGesture, WCInputGestureEnabledKey);
-        }]];
-    [sheet addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
-    [presenter presentViewController:sheet animated:YES completion:nil];
+    WCGestureSettingsController *vc = [WCGestureSettingsController new];
+    if (presenter.navigationController) {
+        [presenter.navigationController pushViewController:vc animated:YES];
+    } else {
+        UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:vc];
+        [presenter presentViewController:nav animated:YES completion:nil];
+    }
 }
 
 #pragma mark - WCPluginsMgr registration

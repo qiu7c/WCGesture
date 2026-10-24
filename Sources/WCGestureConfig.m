@@ -23,10 +23,15 @@ NSString *const WCInputTripleTapActionKey = @"com.qiu7c.wcgesture.chat.input-ges
 NSString *const WCMomentsDoubleTapLikeKey = @"com.qiu7c.wcgesture.moments.double-tap-like";
 NSString *const WCMomentsLikeHapticKey = @"com.qiu7c.wcgesture.moments.like-haptic";
 
+NSString *const WCMessageGestureHapticKey = @"com.qiu7c.wcgesture.chat.message-gesture.haptic";
+NSString *const WCInputGestureHapticKey = @"com.qiu7c.wcgesture.chat.input-gesture.haptic";
+
 NSString *const WCGlobalGestureEnabledKey = @"com.qiu7c.wcgesture.global.enabled";
 NSString *const WCGlobalTwoFingerActionKey = @"com.qiu7c.wcgesture.global.two-finger-action";
 NSString *const WCGlobalThreeFingerActionKey = @"com.qiu7c.wcgesture.global.three-finger-action";
+NSString *const WCGlobalGestureHapticKey = @"com.qiu7c.wcgesture.global.haptic";
 NSString *const WCGestureHapticStyleKey = @"com.qiu7c.wcgesture.haptic-style";
+NSString *const WCCustomPageURLKey = @"com.qiu7c.wcgesture.custom-page-url";
 
 NSString *const WCGestureDidChangeNotification = @"WCGestureDidChangeNotification";
 
@@ -53,10 +58,14 @@ void WCGestureRegisterDefaults(void) {
             WCInputTripleTapActionKey: @(WCInputActionNone),
             WCMomentsDoubleTapLikeKey: @NO,
             WCMomentsLikeHapticKey: @YES,
+            WCMessageGestureHapticKey: @YES,
+            WCInputGestureHapticKey: @YES,
             WCGlobalGestureEnabledKey: @NO,
             WCGlobalTwoFingerActionKey: @(WCGlobalActionNone),
             WCGlobalThreeFingerActionKey: @(WCGlobalActionNone),
+            WCGlobalGestureHapticKey: @YES,
             WCGestureHapticStyleKey: @(WCHapticStyleMedium),
+            WCCustomPageURLKey: @"",
         };
         [[NSUserDefaults standardUserDefaults] registerDefaults:defaults];
     });

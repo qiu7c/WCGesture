@@ -12,6 +12,6 @@ TWEAK_NAME = WCGesture
 WCGesture_FILES = Tweak.x $(wildcard Sources/*.m)
 WCGesture_OBJCFLAGS = -fobjc-arc
 WCGesture_LDFLAGS = -Wl,-dead_strip
-WCGesture_FRAMEWORKS = UIKit Foundation QuartzCore Photos
+WCGesture_FRAMEWORKS = UIKit Foundation QuartzCore WebKit
 
 include $(THEOS_MAKE_PATH)/tweak.mk

@@ -32,11 +32,19 @@ FOUNDATION_EXPORT NSString *const WCInputTripleTapActionKey;
 FOUNDATION_EXPORT NSString *const WCMomentsDoubleTapLikeKey;
 FOUNDATION_EXPORT NSString *const WCMomentsLikeHapticKey;
 
+/// Per-gesture vibration switches. Intensity is shared via WCGestureHapticStyleKey.
+FOUNDATION_EXPORT NSString *const WCMessageGestureHapticKey;
+FOUNDATION_EXPORT NSString *const WCInputGestureHapticKey;
+
 /// Global multi-finger long-press (any WeChat page).
 FOUNDATION_EXPORT NSString *const WCGlobalGestureEnabledKey;
 FOUNDATION_EXPORT NSString *const WCGlobalTwoFingerActionKey;
 FOUNDATION_EXPORT NSString *const WCGlobalThreeFingerActionKey;
+FOUNDATION_EXPORT NSString *const WCGlobalGestureHapticKey;
 FOUNDATION_EXPORT NSString *const WCGestureHapticStyleKey;
+
+/// URL used by the "custom page" global action.
+FOUNDATION_EXPORT NSString *const WCCustomPageURLKey;
 
 /// Haptic intensity levels (maps to UIImpactFeedbackStyle).
 typedef NS_ENUM(NSInteger, WCHapticStyle) {
@@ -72,12 +80,15 @@ typedef NS_ENUM(NSInteger, WCReplySwipeAction) {
 /// Global multi-finger long-press action.
 typedef NS_ENUM(NSInteger, WCGlobalAction) {
     WCGlobalActionNone = 0,
-    WCGlobalActionScreenshot = 1,  // 截图当前页面
-    WCGlobalActionBack = 2,        // 返回上一页
-    WCGlobalActionLockScreen = 3,  // 锁屏
-    WCGlobalActionScanQR = 4,      // 扫描屏幕二维码
-    WCGlobalActionMenu = 5,        // 弹快捷菜单
-    WCGlobalActionJump = 6,        // 跳转指定 view 页面
+    WCGlobalActionScreenshot = 1,   // 截图当前页面
+    WCGlobalActionBack = 2,         // 返回上一页
+    WCGlobalActionLockScreen = 3,   // 回到首页
+    WCGlobalActionScanQR = 4,       // 扫一扫
+    WCGlobalActionMenu = 5,         // 弹快捷菜单
+    WCGlobalActionJump = 6,         // 跳转设置页
+    WCGlobalActionMoments = 7,      // 朋友圈
+    WCGlobalActionAddFriend = 8,    // 添加朋友
+    WCGlobalActionCustomPage = 9,   // 前往自定义页面
 };
 
 /// Registers the default values for all keys once per process.
