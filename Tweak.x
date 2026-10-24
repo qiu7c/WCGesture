@@ -182,7 +182,7 @@ static WCReplySwipeAction WCMessageGestureAction(CommonMessageCellView *cell,
                                                  NSString *otherKey) {
     BOOL selfMessage = WCMessageCellIsSender(cell);
     NSInteger action = [[NSUserDefaults standardUserDefaults] integerForKey:selfMessage ? selfKey : otherKey];
-    if (action < WCReplySwipeActionNone || action > WCReplySwipeActionRepeat) return WCReplySwipeActionNone;
+    if (action < WCReplySwipeActionNone || action > WCReplySwipeActionTranslate) return WCReplySwipeActionNone;
     if (!selfMessage && action == WCReplySwipeActionRevoke) return WCReplySwipeActionNone;
     return (WCReplySwipeAction)action;
 }
@@ -238,6 +238,38 @@ static UIViewController *WCViewControllerForResponder(id responderObject) {
         responder = responder.nextResponder;
     }
     return nil;
+}
+
+// Window-level presentation helpers. A UIWindow's responder chain does not lead
+// to a UIViewController, so WCViewControllerForResponder(window) returns nil.
+// Always start from rootViewController and walk presented controllers instead.
+static UIViewController *WCRootTopController(void) {
+    UIViewController *controller = WCActiveWindow().rootViewController;
+    while (controller.presentedViewController) controller = controller.presentedViewController;
+    return controller;
+}
+
+static UINavigationController *WCPushNavigation(void) {
+    UIViewController *top = WCRootTopController();
+    if ([top isKindOfClass:[UINavigationController class]]) return (UINavigationController *)top;
+    if (top.navigationController) return top.navigationController;
+    if ([top isKindOfClass:[UITabBarController class]]) {
+        UIViewController *selected = ((UITabBarController *)top).selectedViewController;
+        if ([selected isKindOfClass:[UINavigationController class]]) return (UINavigationController *)selected;
+        if (selected.navigationController) return selected.navigationController;
+    }
+    return nil;
+}
+
+static void WCPushGlobal(UIViewController *vc) {
+    if (!vc) return;
+    UINavigationController *nav = WCPushNavigation();
+    if (nav) {
+        [nav pushViewController:vc animated:YES];
+    } else {
+        UIViewController *top = WCRootTopController();
+        [top presentViewController:vc animated:YES completion:nil];
+    }
 }
 
 static NSArray<UIGestureRecognizer *> *WCNavigationReturnGesturesForView(UIView *view) {
@@ -748,8 +780,12 @@ static BOOL WCInvokeFirstMessageCellAction(CommonMessageCellView *cell, NSArray<
     for (NSString *selectorName in selectorNames) {
         SEL selector = NSSelectorFromString(selectorName);
         if (![cell respondsToSelector:selector]) continue;
-        ((void (*)(id, SEL, id))objc_msgSend)(cell, selector, nil);
-        return YES;
+        @try {
+            ((void (*)(id, SEL, id))objc_msgSend)(cell, selector, nil);
+            return YES;
+        } @catch (__unused NSException *exception) {
+            continue;
+        }
     }
     return NO;
 }
@@ -780,6 +816,18 @@ static BOOL WCPerformMessageGestureAction(CommonMessageCellView *cell, WCReplySw
             break;
         case WCReplySwipeActionRepeat:
             performed = WCRepeatMessage(cell);
+            break;
+        case WCReplySwipeActionForward:
+            performed = WCInvokeFirstMessageCellAction(cell, @[@"onForward:", @"doForward"]);
+            break;
+        case WCReplySwipeActionFavorite:
+            performed = WCInvokeFirstMessageCellAction(cell, @[@"onFavorite:", @"doFavorite"]);
+            break;
+        case WCReplySwipeActionTranslate:
+            performed = WCInvokeFirstMessageCellAction(cell, @[@"onTranslateMsg:", @"translateMsg"]);
+            break;
+        case WCReplySwipeActionSpeak:
+            performed = WCInvokeFirstMessageCellAction(cell, @[@"onSpeakMsg", @"onTextTranslateSpeak:"]);
             break;
         case WCReplySwipeActionNone:
             break;
@@ -1472,55 +1520,37 @@ static void WCPerformGlobalScreenshot(void) {
 
 // 返回上一页
 static void WCPerformGlobalBack(void) {
-    UIViewController *vc = WCViewControllerForResponder(WCActiveWindow());
-    UINavigationController *nav = vc.navigationController;
+    UIViewController *top = WCRootTopController();
+    UINavigationController *nav = [top isKindOfClass:[UINavigationController class]]
+        ? (UINavigationController *)top : top.navigationController;
     if (nav && nav.viewControllers.count > 1) {
         [nav popViewControllerAnimated:YES];
-    } else if (vc.presentingViewController) {
-        [vc dismissViewControllerAnimated:YES completion:nil];
-    } else {
-        // 首页:弹到根
-        if (nav) [nav popToRootViewControllerAnimated:YES];
+    } else if (top.presentingViewController) {
+        [top dismissViewControllerAnimated:YES completion:nil];
+    } else if (nav) {
+        [nav popToRootViewControllerAnimated:YES];
     }
 }
 
-// 锁屏:调微信内部的锁屏入口(通过私有 API 模拟电源键不可行,iOS 不允许)
-// 改为调出微信的设置页或关闭微信。这里用一个占位实现:回到首页。
+// 回到首页
 static void WCPerformGlobalLockScreen(void) {
-    Class mainFrameClass = NSClassFromString(@"NewMainFrameViewController");
-    UIWindow *window = WCActiveWindow();
-    if (!mainFrameClass || !window) return;
-    UIViewController *root = window.rootViewController;
-    if ([root isKindOfClass:mainFrameClass]) return;
-    UINavigationController *nav = root.navigationController ?: (root.presentedViewController.navigationController);
+    UIViewController *top = WCRootTopController();
+    UINavigationController *nav = [top isKindOfClass:[UINavigationController class]]
+        ? (UINavigationController *)top : top.navigationController;
     if (nav) [nav popToRootViewControllerAnimated:YES];
-    [root dismissViewControllerAnimated:YES completion:nil];
+    [top dismissViewControllerAnimated:YES completion:nil];
 }
 
 // 扫一扫:创建 CameraScanViewController 并 push
 static void WCPerformGlobalScanQR(void) {
     Class scanClass = NSClassFromString(@"CameraScanViewController");
-    if (!scanClass) return;
-    UIViewController *vc = WCViewControllerForResponder(WCActiveWindow());
-    UINavigationController *nav = vc.navigationController;
+    if (!scanClass) { WCShowToast(@"扫一扫：当前微信版本不支持"); return; }
     id scanVC = [[scanClass alloc] init];
-    if (!scanVC) return;
-    if (nav) {
-        [nav pushViewController:scanVC animated:YES];
-    } else {
-        [vc presentViewController:scanVC animated:YES completion:nil];
-    }
+    if (!scanVC) { WCShowToast(@"扫一扫：初始化失败"); return; }
+    WCPushGlobal(scanVC);
 }
 
 #pragma mark - Custom page
-
-static void WCPushGlobal(UIViewController *vc) {
-    if (!vc) return;
-    UIViewController *top = WCViewControllerForResponder(WCActiveWindow());
-    UINavigationController *nav = top.navigationController;
-    if (nav) [nav pushViewController:vc animated:YES];
-    else [top presentViewController:vc animated:YES completion:nil];
-}
 
 static void WCOpenMoments(void) {
     Class cls = NSClassFromString(@"WCTimeLineViewController");
@@ -1683,8 +1713,7 @@ static void WCSynchronizeGlobalGestures(void) {
 - (void)wc_handleGlobalLongPress:(UILongPressGestureRecognizer *)recognizer {
     if (recognizer.state != UIGestureRecognizerStateBegan ||
         !WCGestureEnabled(WCGlobalGestureEnabledKey)) return;
-    UIViewController *presenter = WCViewControllerForResponder(self);
-    if (!presenter) presenter = WCViewControllerForResponder(self.rootViewController);
+    UIViewController *presenter = WCRootTopController();
     NSInteger action;
     if (recognizer.numberOfTouchesRequired == 2) {
         action = [[NSUserDefaults standardUserDefaults] integerForKey:WCGlobalTwoFingerActionKey];

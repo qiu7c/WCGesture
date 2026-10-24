@@ -15,6 +15,10 @@ static NSArray<NSDictionary *> *WCActionOptions(BOOL selfMessage) {
     [options addObject:@{ @"title": @"复制", @"value": @(WCReplySwipeActionCopy) }];
     [options addObject:@{ @"title": @"删除", @"value": @(WCReplySwipeActionDelete) }];
     [options addObject:@{ @"title": @"复读", @"value": @(WCReplySwipeActionRepeat) }];
+    [options addObject:@{ @"title": @"转发", @"value": @(WCReplySwipeActionForward) }];
+    [options addObject:@{ @"title": @"收藏", @"value": @(WCReplySwipeActionFavorite) }];
+    [options addObject:@{ @"title": @"翻译", @"value": @(WCReplySwipeActionTranslate) }];
+    [options addObject:@{ @"title": @"朗读", @"value": @(WCReplySwipeActionSpeak) }];
     return options;
 }
 

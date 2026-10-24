@@ -79,6 +79,10 @@ typedef NS_ENUM(NSInteger, WCReplySwipeAction) {
     WCReplySwipeActionCopy = 3,
     WCReplySwipeActionDelete = 4,
     WCReplySwipeActionRepeat = 5,
+    WCReplySwipeActionForward = 6,
+    WCReplySwipeActionFavorite = 7,
+    WCReplySwipeActionSpeak = 8,
+    WCReplySwipeActionTranslate = 9,
 };
 
 /// Global multi-finger long-press action.
