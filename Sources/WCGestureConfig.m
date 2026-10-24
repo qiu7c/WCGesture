@@ -25,7 +25,10 @@ NSString *const WCKeyboardSwipeRightActionKey = @"com.qiu7c.wcgesture.input.keyb
 NSString *const WCKeyboardDoubleTapActionKey = @"com.qiu7c.wcgesture.input.keyboard.double-tap";
 NSString *const WCKeyboardTripleTapActionKey = @"com.qiu7c.wcgesture.input.keyboard.triple-tap";
 NSString *const WCKeyboardDebugFrameKey = @"com.qiu7c.wcgesture.input.keyboard.debug-frame";
-NSString *const WCKeyboardDebugTextKey = @"com.qiu7c.wcgesture.input.keyboard.debug-text";
+NSString *const WCKeyboardStripWidthKey = @"com.qiu7c.wcgesture.input.keyboard.strip-width";
+NSString *const WCKeyboardStripHeightKey = @"com.qiu7c.wcgesture.input.keyboard.strip-height";
+NSString *const WCKeyboardStripOffsetXKey = @"com.qiu7c.wcgesture.input.keyboard.strip-offset-x";
+NSString *const WCKeyboardStripOffsetYKey = @"com.qiu7c.wcgesture.input.keyboard.strip-offset-y";
 NSString *const WCTranslateEngineKey = @"com.qiu7c.wcgesture.translate.engine";
 NSString *const WCTranslateCustomURLKey = @"com.qiu7c.wcgesture.translate.custom-url";
 NSString *const WCTranslateCustomKeyKey = @"com.qiu7c.wcgesture.translate.custom-key";
@@ -75,7 +78,10 @@ void WCGestureRegisterDefaults(void) {
             WCKeyboardDoubleTapActionKey: @(WCInputActionNone),
             WCKeyboardTripleTapActionKey: @(WCInputActionNone),
             WCKeyboardDebugFrameKey: @YES,
-            WCKeyboardDebugTextKey: @NO,
+            WCKeyboardStripWidthKey: @0.0,
+            WCKeyboardStripHeightKey: @50.0,
+            WCKeyboardStripOffsetXKey: @0.0,
+            WCKeyboardStripOffsetYKey: @0.0,
             WCTranslateEngineKey: @(WCTranslateEngineEdge),
             WCTranslateCustomURLKey: @"",
             WCTranslateCustomKeyKey: @"",

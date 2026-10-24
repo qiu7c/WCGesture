@@ -38,10 +38,17 @@ FOUNDATION_EXPORT NSString *const WCKeyboardSwipeRightActionKey;
 FOUNDATION_EXPORT NSString *const WCKeyboardDoubleTapActionKey;
 FOUNDATION_EXPORT NSString *const WCKeyboardTripleTapActionKey;
 
-/// Debug aid: paints the keyboard gesture strip red and labels its size so the
-/// touchable band is visible while tuning gesture positions.
+/// Debug aid: paints the keyboard gesture strip red and shows its live size at
+/// the top of the screen so the touchable band is visible while tuning.
 FOUNDATION_EXPORT NSString *const WCKeyboardDebugFrameKey;
-FOUNDATION_EXPORT NSString *const WCKeyboardDebugTextKey;
+
+/// Geometry of the keyboard gesture strip, all in points. Width 0 means the
+/// full keyboard width; the offsets move the strip from its default spot
+/// (positive X = right, positive Y = up).
+FOUNDATION_EXPORT NSString *const WCKeyboardStripWidthKey;
+FOUNDATION_EXPORT NSString *const WCKeyboardStripHeightKey;
+FOUNDATION_EXPORT NSString *const WCKeyboardStripOffsetXKey;
+FOUNDATION_EXPORT NSString *const WCKeyboardStripOffsetYKey;
 
 /// Translation engine selection and optional custom (OpenAI-compatible) endpoint.
 typedef NS_ENUM(NSInteger, WCTranslateEngine) {

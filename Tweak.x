@@ -1316,7 +1316,10 @@ static void WCKeyboardEnhancePerform(NSString *actionKey) {
 static UIWindow *WCKeyboardEnhanceWindow = nil;
 static UIView *WCKeyboardEnhanceContainer = nil;
 static UIView *WCKeyboardEnhanceView = nil;
-static UILabel *WCKeyboardEnhanceDebugLabel = nil;
+// The debug caption lives at the top of the screen rather than inside the
+// strip, so it never hides the band the user is trying to position.
+static UIView *WCKeyboardEnhanceHintView = nil;
+static UILabel *WCKeyboardEnhanceHintLabel = nil;
 static CGRect WCKeyboardEnhanceLastFrame = {0};
 static BOOL WCKeyboardEnhanceLastFrameValid = NO;
 static NSTimer *WCKeyboardEnhanceReassertTimer = nil;
@@ -1328,8 +1331,37 @@ static BOOL WCKeyboardEnhanceDockRejected = NO;
 // instead of safe-area math so the strip sits at the same height whether the
 // dock or the keyboard window hosts it. 键盘小增强 uses bottom 20 / height 40
 // for the row it builds inside the dock.
-static const CGFloat WCKeyboardEnhanceBandBottomMargin = 16.0;
-static const CGFloat WCKeyboardEnhanceBandHeight = 32.0;
+static const CGFloat WCKeyboardEnhanceBandBottomMargin = 14.0;
+// Lift above the measured key-row bottom: key frames carry ~6-8pt of padding
+// below the visible key caps, so a small overlap is still blank.
+static const CGFloat WCKeyboardEnhanceBandRaise = 14.0;
+// Third-party keyboards draw their keys right to the frame edge, so the strip
+// may only overlap by a couple of points.
+static const CGFloat WCKeyboardEnhanceThirdPartyBandRaise = 2.0;
+
+// User-tunable geometry (settings → 键盘增强). Width 0 = full keyboard width;
+// the offsets move the strip from its default spot (positive X = right,
+// positive Y = up). Values are in points.
+static CGFloat WCKeyboardEnhanceConfiguredWidth(CGFloat hostWidth) {
+    CGFloat configured = [[NSUserDefaults standardUserDefaults] doubleForKey:WCKeyboardStripWidthKey];
+    if (configured <= 0.0) return hostWidth;
+    return MIN(configured, hostWidth);
+}
+
+static CGFloat WCKeyboardEnhanceConfiguredHeight(CGFloat hostHeight) {
+    CGFloat configured = [[NSUserDefaults standardUserDefaults] doubleForKey:WCKeyboardStripHeightKey];
+    if (configured < 20.0) configured = 20.0;
+    if (hostHeight > 0.0 && configured > hostHeight) configured = hostHeight;
+    return configured;
+}
+
+static CGFloat WCKeyboardEnhanceHorizontalOffset(void) {
+    return [[NSUserDefaults standardUserDefaults] doubleForKey:WCKeyboardStripOffsetXKey];
+}
+
+static CGFloat WCKeyboardEnhanceVerticalOffset(void) {
+    return [[NSUserDefaults standardUserDefaults] doubleForKey:WCKeyboardStripOffsetYKey];
+}
 
 static void WCKeyboardEnhanceStartReassertTimer(void);
 static void WCKeyboardEnhanceStopReassertTimer(void);
@@ -1455,11 +1487,18 @@ static UIWindow *WCSystemKeyboardWindow(void) {
     return best;
 }
 
+// The debug caption sits at the top of the app window (under the status bar),
+// so it never covers the strip while its geometry is being tuned.
+static void WCKeyboardEnhanceHideHint(void) {
+    WCKeyboardEnhanceHintView.hidden = YES;
+}
+
 static void WCKeyboardEnhanceHide(void) {
     WCKeyboardEnhanceLastFrameValid = NO;
     WCKeyboardEnhanceStopReassertTimer();
     WCKeyboardEnhanceView.hidden = YES;
     WCKeyboardEnhanceWindow.hidden = YES;
+    WCKeyboardEnhanceHideHint();
 }
 
 static void WCKeyboardEnhanceEnsureView(void) {
@@ -1491,16 +1530,6 @@ static void WCKeyboardEnhanceEnsureView(void) {
     [view addGestureRecognizer:tripleTap];
     [doubleTap requireGestureRecognizerToFail:tripleTap];
 
-    UILabel *label = [[UILabel alloc] initWithFrame:CGRectZero];
-    label.font = [UIFont boldSystemFontOfSize:10];
-    label.textColor = UIColor.whiteColor;
-    label.textAlignment = NSTextAlignmentCenter;
-    label.userInteractionEnabled = NO;
-    label.hidden = YES;
-    label.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    [view addSubview:label];
-    WCKeyboardEnhanceDebugLabel = label;
-
     WCKeyboardEnhanceView = view;
 }
 
@@ -1515,69 +1544,141 @@ static void WCKeyboardEnhanceUpdateDebugStyle(BOOL debug) {
         WCKeyboardEnhanceView.layer.borderColor = debug
             ? UIColor.systemRedColor.CGColor : UIColor.clearColor.CGColor;
     }
-    // The text label is a separate switch: the red range can be shown without
-    // the "触控区 …" caption.
-    BOOL showText = [[NSUserDefaults standardUserDefaults] boolForKey:WCKeyboardDebugTextKey];
-    WCKeyboardEnhanceDebugLabel.hidden = !(debug && showText);
+    // The caption is shown at the top of the screen, not inside the strip, and
+    // follows the "显示触发范围" switch.
+    if (!debug) WCKeyboardEnhanceHideHint();
 }
 
 static void WCKeyboardEnhanceSetDebugText(NSString *text) {
-    if (![WCKeyboardEnhanceDebugLabel.text isEqualToString:text]) {
-        WCKeyboardEnhanceDebugLabel.text = text;
+    BOOL debug = [[NSUserDefaults standardUserDefaults] boolForKey:WCKeyboardDebugFrameKey];
+    if (!debug) { WCKeyboardEnhanceHideHint(); return; }
+    UIWindow *window = WCActiveWindow();
+    if (!window) return;
+    if (!WCKeyboardEnhanceHintView) {
+        UIView *box = [[UIView alloc] initWithFrame:CGRectZero];
+        box.backgroundColor = [UIColor colorWithWhite:0.0 alpha:0.78];
+        box.layer.cornerRadius = 10.0;
+        box.layer.zPosition = 10000.0;
+        box.userInteractionEnabled = NO;
+        box.translatesAutoresizingMaskIntoConstraints = NO;
+        UILabel *label = [[UILabel alloc] initWithFrame:CGRectZero];
+        label.font = [UIFont monospacedDigitSystemFontOfSize:12.0 weight:UIFontWeightSemibold];
+        label.textColor = UIColor.whiteColor;
+        label.textAlignment = NSTextAlignmentCenter;
+        label.translatesAutoresizingMaskIntoConstraints = NO;
+        [box addSubview:label];
+        [NSLayoutConstraint activateConstraints:@[
+            [label.leadingAnchor constraintEqualToAnchor:box.leadingAnchor constant:10.0],
+            [label.trailingAnchor constraintEqualToAnchor:box.trailingAnchor constant:-10.0],
+            [label.topAnchor constraintEqualToAnchor:box.topAnchor constant:5.0],
+            [label.bottomAnchor constraintEqualToAnchor:box.bottomAnchor constant:-5.0],
+        ]];
+        WCKeyboardEnhanceHintView = box;
+        WCKeyboardEnhanceHintLabel = label;
     }
+    if (WCKeyboardEnhanceHintView.superview != window) {
+        [WCKeyboardEnhanceHintView removeFromSuperview];
+        [window addSubview:WCKeyboardEnhanceHintView];
+        [NSLayoutConstraint activateConstraints:@[
+            [WCKeyboardEnhanceHintView.centerXAnchor constraintEqualToAnchor:window.centerXAnchor],
+            [WCKeyboardEnhanceHintView.topAnchor
+                constraintEqualToAnchor:window.safeAreaLayoutGuide.topAnchor constant:6.0],
+        ]];
+    }
+    if (![WCKeyboardEnhanceHintLabel.text isEqualToString:text]) {
+        WCKeyboardEnhanceHintLabel.text = text;
+    }
+    WCKeyboardEnhanceHintView.hidden = NO;
 }
 
 // The strip should sit right under the keyboard's key rows: as high as it can
 // without covering a key, and as thick as fits in the blank band that is left.
 // Keys are individual UIKBKeyView instances; container views (key planes) span
 // the whole keyboard and would give a useless answer.
-static BOOL WCViewLooksLikeKeyboardKey(UIView *view) {
+static BOOL WCViewIsSystemKeyboardKey(UIView *view) {
+    Class keyView = NSClassFromString(@"UIKBKeyView");
+    if (keyView && [view isKindOfClass:keyView]) return YES;
+    Class keyButton = NSClassFromString(@"UIKBKeyButton");
+    if (keyButton && [view isKindOfClass:keyButton]) return YES;
+    // Name check restricted to UIKit's own keyboard classes: third-party
+    // keyboards often name their views "...KeyView" too.
     NSString *className = NSStringFromClass(view.class);
+    if (![className hasPrefix:@"UIKB"]) return NO;
     return [className containsString:@"KeyView"] || [className containsString:@"KeyButton"];
 }
 
-static CGFloat WCKeyboardEnhanceLowestKeyBottom(UIView *host, UIView *scanRoot) {
+// Third-party keyboards (搜狗/百度/讯飞…) do not use UIKBKeyView at all, so
+// matching class names alone found no key and the strip fell back to the window
+// bottom — which made it sit lower than with the system keyboard. Their keys
+// are ordinary controls, so fall back to those, but only when the system keys
+// are absent (so the system keyboard keeps its exact current placement) and
+// only for key-sized controls (a full-bleed background control would otherwise
+// drag the strip to the bottom edge).
+static CGFloat WCKeyboardEnhanceLowestKeyBottom(UIView *host, UIView *scanRoot, BOOL *systemKeyOut) {
     if (!host || !scanRoot) return 0.0;
-    CGFloat lowest = 0.0;
+    CGFloat systemLowest = 0.0;
+    CGFloat controlLowest = 0.0;
+    CGFloat hostWidth = CGRectGetWidth(host.bounds);
     NSMutableArray<UIView *> *stack = [NSMutableArray arrayWithObject:scanRoot];
     while (stack.count) {
         UIView *view = stack.lastObject;
         [stack removeLastObject];
         if (view.hidden || view.alpha <= 0.01) continue;
-        if (!CGRectIsEmpty(view.bounds) && WCViewLooksLikeKeyboardKey(view)) {
+        BOOL isSystemKey = WCViewIsSystemKeyboardKey(view);
+        if (!CGRectIsEmpty(view.bounds) && (isSystemKey || [view isKindOfClass:[UIControl class]])) {
             CGRect rect = [view convertRect:view.bounds toView:host];
-            if (CGRectGetWidth(rect) > 12.0 && CGRectGetHeight(rect) > 12.0) {
-                lowest = MAX(lowest, CGRectGetMaxY(rect));
+            CGFloat w = CGRectGetWidth(rect);
+            CGFloat h = CGRectGetHeight(rect);
+            if (w > 12.0 && h > 12.0) {
+                if (isSystemKey) {
+                    systemLowest = MAX(systemLowest, CGRectGetMaxY(rect));
+                } else if (h <= 90.0 && w <= hostWidth * 0.95) {
+                    controlLowest = MAX(controlLowest, CGRectGetMaxY(rect));
+                }
             }
         }
         [stack addObjectsFromArray:view.subviews];
     }
-    return lowest;
+    if (systemLowest > 0.0) {
+        if (systemKeyOut) *systemKeyOut = YES;
+        return systemLowest;
+    }
+    if (systemKeyOut) *systemKeyOut = NO;
+    return controlLowest;
 }
 
 // Geometry of the strip inside `host` (dock or keyboard window). Placed right
 // below the lowest visible key when that can be measured; otherwise anchored to
 // the bottom edge using the shared constants. `scanRoot` is the keyboard window
 // to look for keys in (the dock may only cover part of it).
-static CGRect WCKeyboardEnhanceStripFrame(UIView *host, UIView *scanRoot, CGFloat *keyBottomOut) {
+static CGRect WCKeyboardEnhanceStripFrame(UIView *host, UIView *scanRoot,
+                                          CGFloat *keyBottomOut, BOOL *thirdPartyOut) {
     CGFloat height = CGRectGetHeight(host.bounds);
     CGFloat width = CGRectGetWidth(host.bounds);
-    CGFloat band = WCKeyboardEnhanceBandHeight;
-    CGFloat keyBottom = WCKeyboardEnhanceLowestKeyBottom(host, scanRoot);
+    CGFloat band = WCKeyboardEnhanceConfiguredHeight(height);
+    BOOL systemKey = NO;
+    CGFloat keyBottom = WCKeyboardEnhanceLowestKeyBottom(host, scanRoot, &systemKey);
     if (keyBottomOut) *keyBottomOut = keyBottom;
+    if (thirdPartyOut) *thirdPartyOut = (keyBottom > 0.0 && !systemKey);
 
     CGFloat top = MAX(0.0, height - WCKeyboardEnhanceBandBottomMargin - band);
-    if (keyBottom > 0.0 && keyBottom < height) {
-        // 4pt clear of the key row and 4pt clear of the bottom edge.
-        CGFloat gap = 4.0;
-        CGFloat available = height - keyBottom - gap - 4.0;
-        if (available >= 12.0) {
-            band = MIN(band, available);
-            top = keyBottom + gap;
-        }
+    if (keyBottom > 0.0 && keyBottom <= height + 1.0) {
+        // Start at the measured key-row bottom, lifted by the padding overlap.
+        // Third-party key views have no padding below their caps, so only a
+        // hair of overlap is safe there.
+        CGFloat raise = systemKey ? WCKeyboardEnhanceBandRaise : WCKeyboardEnhanceThirdPartyBandRaise;
+        CGFloat raisedTop = keyBottom - raise;
+        if (raisedTop >= 0.0) top = raisedTop;
     }
-    if (top + band > height) band = MAX(18.0, height - top);
-    return CGRectMake(0, top, width, band);
+    top -= WCKeyboardEnhanceVerticalOffset();
+    if (top < 0.0) top = 0.0;
+    if (top + band > height - 4.0) top = MAX(0.0, height - 4.0 - band);
+
+    CGFloat stripWidth = WCKeyboardEnhanceConfiguredWidth(width);
+    CGFloat x = (width - stripWidth) / 2.0 + WCKeyboardEnhanceHorizontalOffset();
+    if (x < 0.0) x = 0.0;
+    if (x + stripWidth > width) x = MAX(0.0, width - stripWidth);
+    return CGRectMake(x, top, stripWidth, band);
 }
 
 // Dock-hosted variant (0x4da4 in 键盘小增强): the strip lives in the keyboard's
@@ -1612,7 +1713,6 @@ static BOOL WCKeyboardEnhanceApplyInDock(UIView *dock) {
     // (e.g. an inactive or lower-level one), or the strip renders off-screen.
     UIWindow *topKeyboardWindow = WCSystemKeyboardWindow();
     if (topKeyboardWindow && dock.window != topKeyboardWindow) return NO;
-    if (dockHeight < 18.0 + WCKeyboardEnhanceBandBottomMargin) return NO;
 
     WCKeyboardEnhanceEnsureView();
     BOOL debug = [[NSUserDefaults standardUserDefaults] boolForKey:WCKeyboardDebugFrameKey];
@@ -1625,7 +1725,8 @@ static BOOL WCKeyboardEnhanceApplyInDock(UIView *dock) {
     WCCapturedKeyboardDockView = dock;
 
     CGFloat keyBottom = 0.0;
-    CGRect target = WCKeyboardEnhanceStripFrame(dock, dock.window, &keyBottom);
+    BOOL thirdParty = NO;
+    CGRect target = WCKeyboardEnhanceStripFrame(dock, dock.window, &keyBottom, &thirdParty);
     if (!CGRectEqualToRect(WCKeyboardEnhanceView.frame, target)) {
         WCKeyboardEnhanceView.frame = target;
     }
@@ -1639,9 +1740,9 @@ static BOOL WCKeyboardEnhanceApplyInDock(UIView *dock) {
         [WCKeyboardEnhanceView removeFromSuperview];
         return NO;
     }
-    WCKeyboardEnhanceSetDebugText([NSString stringWithFormat:@"触控区 %.0f×%.0f D %.0f 键%.0f",
+    WCKeyboardEnhanceSetDebugText([NSString stringWithFormat:@"触控区 %.0f×%.0f D %.0f 键%.0f%@",
                                    CGRectGetWidth(target), CGRectGetHeight(target), dockHeight,
-                                   keyBottom]);
+                                   keyBottom, thirdParty ? @" 三" : @""]);
     WCKeyboardEnhanceStartReassertTimer();
     return YES;
 }
@@ -1674,10 +1775,9 @@ static void WCKeyboardEnhanceApply(CGRect keyboardFrame) {
     BOOL debug = [[NSUserDefaults standardUserDefaults] boolForKey:WCKeyboardDebugFrameKey];
     WCKeyboardEnhanceUpdateDebugStyle(debug);
 
-    // The band sits in the blank strip under the keyboard's key rows. Same
-    // constants as the dock host, so the strip does not jump when the host
-    // changes.
-    CGFloat band = WCKeyboardEnhanceBandHeight;
+    // The band sits in the blank strip under the keyboard's key rows. Both
+    // hosts share WCKeyboardEnhanceStripFrame, so the strip does not jump when
+    // the host changes.
 
     // Prefer the keyboard's own dock view; fall back to the keyboard window
     // only when this iOS build has no reachable dock (e.g. hardware keyboard).
@@ -1710,23 +1810,31 @@ static void WCKeyboardEnhanceApply(CGRect keyboardFrame) {
         }
         CGRect kb = keyboardWindow.bounds;
         CGFloat keyBottom = 0.0;
-        CGRect target = WCKeyboardEnhanceStripFrame(keyboardWindow, keyboardWindow, &keyBottom);
+        BOOL thirdParty = NO;
+        CGRect target = WCKeyboardEnhanceStripFrame(keyboardWindow, keyboardWindow, &keyBottom, &thirdParty);
         if (!CGRectEqualToRect(WCKeyboardEnhanceView.frame, target)) {
             WCKeyboardEnhanceView.frame = target;
         }
         WCKeyboardEnhanceWindow.hidden = YES;
-        NSString *labelText = [NSString stringWithFormat:@"触控区 %.0f×%.0f K %.0f 键%.0f%@",
+        NSString *labelText = [NSString stringWithFormat:@"触控区 %.0f×%.0f K %.0f 键%.0f%@%@",
                                CGRectGetWidth(kb), CGRectGetHeight(target),
                                keyboardWindow.windowLevel, keyBottom,
-                               WCKeyboardEnhanceDockRejected ? @" dock×" : @""];
-        if (![WCKeyboardEnhanceDebugLabel.text isEqualToString:labelText]) {
-            WCKeyboardEnhanceDebugLabel.text = labelText;
-        }
+                               WCKeyboardEnhanceDockRejected ? @" dock×" : @"",
+                               thirdParty ? @" 三" : @""];
+        WCKeyboardEnhanceSetDebugText(labelText);
     } else {
         // Fallback: our own window above the keyboard window level.
-        CGRect strip = CGRectMake(0,
-                                  CGRectGetMaxY(keyboardFrame) - WCKeyboardEnhanceBandBottomMargin - band,
-                                  appWindow.bounds.size.width, band);
+        CGFloat appWidth = appWindow.bounds.size.width;
+        CGFloat keyboardHeight = CGRectGetHeight(keyboardFrame);
+        CGFloat band = WCKeyboardEnhanceConfiguredHeight(keyboardHeight > 0.0 ? keyboardHeight : 400.0);
+        CGFloat stripWidth = WCKeyboardEnhanceConfiguredWidth(appWidth);
+        CGFloat stripX = (appWidth - stripWidth) / 2.0 + WCKeyboardEnhanceHorizontalOffset();
+        if (stripX < 0.0) stripX = 0.0;
+        if (stripX + stripWidth > appWidth) stripX = MAX(0.0, appWidth - stripWidth);
+        CGRect strip = CGRectMake(stripX,
+                                  CGRectGetMaxY(keyboardFrame) - WCKeyboardEnhanceBandBottomMargin
+                                      - band - WCKeyboardEnhanceVerticalOffset(),
+                                  stripWidth, band);
         CGFloat desiredLevel = 10000001.0;
         if (!WCKeyboardEnhanceWindow) {
             WCKeyboardOverlayWindow *window = nil;
@@ -1756,9 +1864,7 @@ static void WCKeyboardEnhanceApply(CGRect keyboardFrame) {
         WCKeyboardEnhanceWindow.hidden = NO;
         NSString *labelText = [NSString stringWithFormat:@"触控区 %.0f×%.0f W",
                                strip.size.width, strip.size.height];
-        if (![WCKeyboardEnhanceDebugLabel.text isEqualToString:labelText]) {
-            WCKeyboardEnhanceDebugLabel.text = labelText;
-        }
+        WCKeyboardEnhanceSetDebugText(labelText);
     }
     WCKeyboardEnhanceView.hidden = NO;
     WCKeyboardEnhanceStartReassertTimer();

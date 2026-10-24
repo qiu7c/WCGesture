@@ -110,6 +110,44 @@ static void WCPresentTriggerDistanceEditor(__unused UIViewController *presenter)
     }];
 }
 
+// Quick editor for the keyboard strip geometry, so the band can be tuned by
+// typing numbers instead of rebuilding: width 0 = full keyboard width, X
+// offset positive = right, Y offset positive = up.
+static void WCPresentKeyboardNumberEditor(__unused UIViewController *presenter,
+                                         NSString *title, NSString *defaultsKey) {
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    BOOL isWidth = [defaultsKey isEqualToString:WCKeyboardStripWidthKey];
+    BOOL isOffset = [defaultsKey isEqualToString:WCKeyboardStripOffsetXKey]
+        || [defaultsKey isEqualToString:WCKeyboardStripOffsetYKey];
+    double minValue = isWidth ? 0.0 : (isOffset ? -400.0 : 20.0);
+    double maxValue = isWidth ? 1000.0 : (isOffset ? 400.0 : 200.0);
+    NSString *message;
+    NSString *placeholder;
+    if (isWidth) {
+        message = @"输入 0 到 1000；0 表示与键盘同宽";
+        placeholder = @"0 = 满宽";
+    } else if (isOffset) {
+        message = @"输入 -400 到 400；正数向右、向上";
+        placeholder = @"-400 - 400";
+    } else {
+        message = @"输入 20 到 200 之间的数值";
+        placeholder = @"20 - 200";
+    }
+    NSString *text = [NSString stringWithFormat:@"%.0f", [defaults doubleForKey:defaultsKey]];
+    [WCPopup showInputWithTitle:title
+                        message:message
+                           text:text
+                    placeholder:placeholder
+                       keyboard:(isOffset ? UIKeyboardTypeNumbersAndPunctuation : UIKeyboardTypeDecimalPad)
+                     completion:^(NSString *value) {
+        double d = [value doubleValue];
+        if (d < minValue) d = minValue;
+        if (d > maxValue) d = maxValue;
+        [defaults setDouble:d forKey:defaultsKey];
+        WCPostChange(defaultsKey);
+    }];
+}
+
 #pragma mark - Haptic style options
 
 static NSArray<NSDictionary *> *WCHapticStyleOptions(void) {
@@ -372,6 +410,7 @@ typedef NS_ENUM(NSInteger, WCRowKind) {
     WCRowKindInputAction,   // tap → input swipe action picker
     WCRowKindGlobalAction,  // tap → global action picker
     WCRowKindDistance,      // tap → number editor
+    WCRowKindKeyboardNumber,// tap → number editor for the keyboard strip geometry
     WCRowKindPluginName,    // tap → plugin name editor
     WCRowKindHapticStyle,   // tap → haptic style picker
     WCRowKindCustomPages, // tap → custom page class name editor
@@ -415,6 +454,14 @@ static WCRow *WCDistanceRow(NSString *title) {
     WCRow *row = [WCRow new];
     row.title = title;
     row.kind = WCRowKindDistance;
+    return row;
+}
+
+static WCRow *WCNumberRow(NSString *title, NSString *key) {
+    WCRow *row = [WCRow new];
+    row.title = title;
+    row.defaultsKey = key;
+    row.kind = WCRowKindKeyboardNumber;
     return row;
 }
 
@@ -524,6 +571,13 @@ static NSString *WCRowDetailText(WCRow *row) {
         case WCRowKindDistance: {
             double v = [d doubleForKey:WCReplySwipeTriggerDistanceKey];
             return [NSString stringWithFormat:@"%.0f", v <= 0 ? 56.0 : v];
+        }
+        case WCRowKindKeyboardNumber: {
+            if ([row.defaultsKey isEqualToString:WCKeyboardStripWidthKey]) {
+                double w = [d doubleForKey:WCKeyboardStripWidthKey];
+                return w > 0 ? [NSString stringWithFormat:@"%.0f", w] : @"满宽";
+            }
+            return [NSString stringWithFormat:@"%.0f", [d doubleForKey:row.defaultsKey]];
         }
     }
     return @"";
@@ -904,9 +958,11 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
             [keyboard addObject:WCInputActionRow(@"双击动作", WCKeyboardDoubleTapActionKey)];
             [keyboard addObject:WCInputActionRow(@"三击动作", WCKeyboardTripleTapActionKey)];
             [keyboard addObject:WCSwitchRow(@"显示触发范围", WCKeyboardDebugFrameKey)];
-            if ([d boolForKey:WCKeyboardDebugFrameKey]) {
-                [keyboard addObject:WCSwitchRow(@"显示触控区提示", WCKeyboardDebugTextKey)];
-            }
+            // Tap to type a value and see the strip move without rebuilding.
+            [keyboard addObject:WCNumberRow(@"触控区宽度", WCKeyboardStripWidthKey)];
+            [keyboard addObject:WCNumberRow(@"触控区高度", WCKeyboardStripHeightKey)];
+            [keyboard addObject:WCNumberRow(@"触控区左右偏移", WCKeyboardStripOffsetXKey)];
+            [keyboard addObject:WCNumberRow(@"触控区上下偏移", WCKeyboardStripOffsetYKey)];
         }
         [sections addObject:keyboard];
         [collapsible addObject:@YES];
@@ -1138,6 +1194,9 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
             break;
         case WCRowKindDistance:
             WCPresentTriggerDistanceEditor(self);
+            break;
+        case WCRowKindKeyboardNumber:
+            WCPresentKeyboardNumberEditor(self, row.title, row.defaultsKey);
             break;
     }
 }
