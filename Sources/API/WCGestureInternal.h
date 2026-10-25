@@ -4,6 +4,7 @@
 #import "Sources/WeChat/WCGesturePrivateAPI.h"
 
 #import "Sources/API/WCGestureSupportAPI.h"
+#import "Sources/API/WCGestureAppearanceAPI.h"
 #import "Sources/API/WCGestureAIAPI.h"
 #import "Sources/API/WCGestureTranslateAPI.h"
 #import "Sources/API/WCGestureChatLayoutAPI.h"

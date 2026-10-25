@@ -1,0 +1,199 @@
+#import <math.h>
+#import "Sources/API/WCGestureInternal.h"
+
+// Parameters describe the controls rather than the feature. More layout
+// editors can reuse this page by supplying a preview and parameter list.
+@interface WCAdjustmentController : UIViewController <UITableViewDataSource, UITableViewDelegate>
+@property (nonatomic, assign) WCGesturePreviewKind kind;
+@property (nonatomic, strong) UIView *preview;
+@property (nonatomic, strong) UITableView *table;
+@property (nonatomic, copy) NSArray<NSDictionary *> *parameters;
+@property (nonatomic, copy) NSArray<NSDictionary *> *customParameters;
+@property (nonatomic, copy) NSString *customTitle;
+@property (nonatomic, strong) UIView *customPreview;
+@property (nonatomic, assign) NSInteger previewTheme;
+@end
+
+static NSDictionary *WCParameter(NSString *title, NSString *key, double minimum, double maximum, double reset) {
+    return @{ @"title": title, @"key": key, @"minimum": @(minimum), @"maximum": @(maximum), @"reset": @(reset) };
+}
+
+@implementation WCAdjustmentController
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    self.title = self.customTitle ?: (self.kind == WCGesturePreviewAntiRevoke ? @"提示外观预览" : @"消息时间位置预览");
+    self.view.backgroundColor = UIColor.systemGroupedBackgroundColor;
+    self.preview = self.customPreview ?: WCGestureCreateChatPreview(self.kind);
+    WCGestureSetPreviewEditing(self.preview, YES);
+    self.table = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStyleInsetGrouped];
+    self.table.dataSource = self; self.table.delegate = self;
+    self.table.backgroundColor = UIColor.systemGroupedBackgroundColor;
+    for (UIView *view in @[self.preview, self.table]) { view.translatesAutoresizingMaskIntoConstraints = NO; [self.view addSubview:view]; }
+    [NSLayoutConstraint activateConstraints:@[
+        [self.preview.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:16],
+        [self.preview.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-16],
+        [self.preview.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor constant:12],
+        [self.preview.heightAnchor constraintEqualToConstant:230],
+        [self.table.topAnchor constraintEqualToAnchor:self.preview.bottomAnchor constant:8],
+        [self.table.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
+        [self.table.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
+        [self.table.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
+    ]];
+    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"重置位置" style:UIBarButtonItemStylePlain target:self action:@selector(reset)];
+    [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(changed:) name:WCGestureDidChangeNotification object:nil];
+    [self rebuildParameters];
+}
+- (void)dealloc { [NSNotificationCenter.defaultCenter removeObserver:self]; }
+- (void)rebuildParameters {
+    if (self.customParameters) {
+        self.parameters = self.customParameters;
+        [self.table reloadData]; [self.preview setNeedsLayout];
+        return;
+    }
+    BOOL revoke = self.kind == WCGesturePreviewAntiRevoke;
+    BOOL side = [NSUserDefaults.standardUserDefaults boolForKey:WCGestureMessageTimeBubbleSideKey];
+    NSMutableArray *parameters = [NSMutableArray arrayWithObject:@{ @"title": @"预览外观", @"themes": @[@"系统", @"浅色", @"深色"] }];
+    NSArray *options = WCGestureChatOptions(revoke, NO);
+    if (!revoke) {
+        [parameters addObject:@{ @"option": options.firstObject }];
+        if (side) [parameters addObject:@{ @"title": @"垂直基准", @"segments": @[@"顶部", @"中间", @"底部"], @"key": WCGestureMessageTimePositionKey, @"reset": @2 }];
+    } else {
+        [parameters addObject:@{ @"title": @"提示文字", @"textKey": WCGestureAntiRevokeSideTextKey }];
+    }
+    if (revoke || side) {
+        [parameters addObject:WCParameter(@"水平位置 X", revoke ? WCGestureAntiRevokeSideOffsetXKey : WCGestureMessageTimeOffsetXKey, -80, 80, 0)];
+        [parameters addObject:WCParameter(@"垂直位置 Y", revoke ? WCGestureAntiRevokeSideOffsetYKey : WCGestureMessageTimeOffsetYKey, -80, 80, revoke ? 10 : 0)];
+    } else [parameters addObject:WCParameter(@"头像时间间距", WCGestureMessageTimeAvatarSpacingKey, -6, 8, -2)];
+    if (!revoke) [parameters addObject:WCParameter(@"时间字号", WCGestureMessageTimeFontSizeKey, 8, 18, 10)];
+    for (NSDictionary *option in options) {
+        NSString *type = option[@"type"];
+        if ([type isEqualToString:@"color"] || [type isEqualToString:@"format"] || ([type isEqualToString:@"bool"] && !revoke)) [parameters addObject:@{ @"option": option }];
+    }
+    self.parameters = parameters;
+    [self.table reloadData];
+    [self.preview setNeedsLayout];
+}
+- (void)changed:(NSNotification *)note {
+    [self.preview setNeedsLayout];
+    // Keep an actively dragged slider alive; rebuilding it loses its touch.
+    for (UITableViewCell *cell in self.table.visibleCells) {
+        UISlider *slider = [cell.contentView viewWithTag:9200];
+        if (slider.isTracking) return;
+    }
+    [self rebuildParameters];
+}
+- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section { return self.parameters.count; }
+- (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)path {
+    return self.parameters[path.row][@"minimum"] ? 86 * WCGestureSettingsScaleFactor() : 52 * WCGestureSettingsScaleFactor();
+}
+- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)path {
+    NSDictionary *parameter = self.parameters[path.row];
+    UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleValue1 reuseIdentifier:nil];
+    cell.backgroundColor = UIColor.secondarySystemGroupedBackgroundColor;
+    cell.textLabel.font = [UIFont systemFontOfSize:15 * WCGestureSettingsScaleFactor()];
+    NSDictionary *option = parameter[@"option"];
+    if (parameter[@"themes"]) {
+        cell.textLabel.text = parameter[@"title"];
+        UISegmentedControl *segments = [[UISegmentedControl alloc] initWithItems:parameter[@"themes"]];
+        segments.selectedSegmentIndex = self.previewTheme;
+        [segments addTarget:self action:@selector(themeChanged:) forControlEvents:UIControlEventValueChanged];
+        cell.accessoryView = segments;
+    } else if (option) {
+        cell.textLabel.text = option[@"title"];
+        if ([option[@"type"] isEqualToString:@"bool"]) {
+            UISwitch *toggle = [UISwitch new]; toggle.on = [NSUserDefaults.standardUserDefaults boolForKey:option[@"key"]];
+            toggle.tag = path.row; [toggle addTarget:self action:@selector(toggled:) forControlEvents:UIControlEventValueChanged]; cell.accessoryView = toggle;
+        } else { cell.detailTextLabel.text = WCGestureChatOptionDetail(option); cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator; }
+    } else if (parameter[@"segments"]) {
+        cell.textLabel.text = parameter[@"title"];
+        UISegmentedControl *segments = [[UISegmentedControl alloc] initWithItems:parameter[@"segments"]];
+        segments.selectedSegmentIndex = MIN(2, MAX(0, [NSUserDefaults.standardUserDefaults integerForKey:parameter[@"key"]]));
+        segments.tag = path.row; [segments addTarget:self action:@selector(segmented:) forControlEvents:UIControlEventValueChanged]; cell.accessoryView = segments;
+    } else if (parameter[@"textKey"]) {
+        cell.textLabel.text = parameter[@"title"];
+        cell.detailTextLabel.text = [NSUserDefaults.standardUserDefaults stringForKey:parameter[@"textKey"]];
+        cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+    } else {
+        // Auto Layout keeps the sliders usable when the plugin UI is scaled.
+        cell.textLabel.text = nil;
+        UILabel *label = [UILabel new]; label.tag = 9201;
+        label.textColor = UIColor.labelColor;
+        label.font = [UIFont monospacedDigitSystemFontOfSize:14 * WCGestureSettingsScaleFactor() weight:UIFontWeightRegular];
+        double value = [NSUserDefaults.standardUserDefaults doubleForKey:parameter[@"key"]];
+        label.text = [NSString stringWithFormat:@"%@   %.0f", parameter[@"title"], value];
+        UISlider *slider = [UISlider new]; slider.tag = 9200;
+        slider.minimumValue = [parameter[@"minimum"] floatValue]; slider.maximumValue = [parameter[@"maximum"] floatValue]; slider.value = value;
+        slider.accessibilityIdentifier = parameter[@"key"];
+        [slider addTarget:self action:@selector(slid:) forControlEvents:UIControlEventValueChanged];
+        for (UIView *view in @[label, slider]) { view.translatesAutoresizingMaskIntoConstraints = NO; [cell.contentView addSubview:view]; }
+        [NSLayoutConstraint activateConstraints:@[
+            [label.leadingAnchor constraintEqualToAnchor:cell.contentView.leadingAnchor constant:16],
+            [label.trailingAnchor constraintEqualToAnchor:cell.contentView.trailingAnchor constant:-16],
+            [label.topAnchor constraintEqualToAnchor:cell.contentView.topAnchor constant:10],
+            [slider.leadingAnchor constraintEqualToAnchor:label.leadingAnchor],
+            [slider.trailingAnchor constraintEqualToAnchor:label.trailingAnchor],
+            [slider.topAnchor constraintEqualToAnchor:label.bottomAnchor constant:4],
+            [slider.bottomAnchor constraintEqualToAnchor:cell.contentView.bottomAnchor constant:-8],
+        ]];
+    }
+    return cell;
+}
+- (void)slid:(UISlider *)slider {
+    double value = round(slider.value); NSString *key = slider.accessibilityIdentifier;
+    [NSUserDefaults.standardUserDefaults setDouble:value forKey:key];
+    UIView *parent = slider.superview;
+    UILabel *label = [parent viewWithTag:9201];
+    for (NSDictionary *parameter in self.parameters) if ([parameter[@"key"] isEqualToString:key]) label.text = [NSString stringWithFormat:@"%@   %.0f", parameter[@"title"], value];
+    WCGestureSettingsPostChange(key);
+}
+- (void)toggled:(UISwitch *)toggle {
+    NSDictionary *option = self.parameters[toggle.tag][@"option"];
+    [NSUserDefaults.standardUserDefaults setBool:toggle.on forKey:option[@"key"]]; WCGestureSettingsPostChange(option[@"key"]);
+}
+- (void)segmented:(UISegmentedControl *)segments {
+    NSString *key = self.parameters[segments.tag][@"key"];
+    [NSUserDefaults.standardUserDefaults setInteger:segments.selectedSegmentIndex forKey:key]; WCGestureSettingsPostChange(key);
+}
+- (void)themeChanged:(UISegmentedControl *)segments {
+    self.previewTheme = segments.selectedSegmentIndex;
+    self.preview.overrideUserInterfaceStyle = (UIUserInterfaceStyle)self.previewTheme;
+    [self.preview setNeedsLayout];
+}
+- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)path {
+    [tableView deselectRowAtIndexPath:path animated:YES];
+    NSDictionary *parameter = self.parameters[path.row];
+    if (parameter[@"option"]) { WCGestureEditChatOption(self, parameter[@"option"]); return; }
+    if (parameter[@"textKey"]) {
+        NSString *key = parameter[@"textKey"];
+        [WCPopup showInputWithTitle:parameter[@"title"] message:@"实时预览气泡旁提示文字" text:[NSUserDefaults.standardUserDefaults stringForKey:key] placeholder:@"已拦截撤回"
+            keyboard:UIKeyboardTypeDefault completion:^(NSString *text) {
+                [NSUserDefaults.standardUserDefaults setObject:text forKey:key]; WCGestureSettingsPostChange(key);
+            }];
+    } else if (parameter[@"minimum"]) {
+        NSString *key = parameter[@"key"];
+        [WCPopup showInputWithTitle:parameter[@"title"] message:[NSString stringWithFormat:@"范围 %@ 到 %@", parameter[@"minimum"], parameter[@"maximum"]]
+            text:[NSString stringWithFormat:@"%.0f", [NSUserDefaults.standardUserDefaults doubleForKey:key]] placeholder:nil keyboard:UIKeyboardTypeNumbersAndPunctuation completion:^(NSString *text) {
+                NSScanner *scanner = [NSScanner scannerWithString:text]; double value;
+                if (![scanner scanDouble:&value] || !scanner.isAtEnd || !isfinite(value)) return;
+                [NSUserDefaults.standardUserDefaults setDouble:MIN([parameter[@"maximum"] doubleValue], MAX([parameter[@"minimum"] doubleValue], value)) forKey:key];
+                WCGestureSettingsPostChange(key);
+            }];
+    }
+}
+- (void)reset {
+    for (NSDictionary *parameter in self.parameters) {
+        if (parameter[@"reset"] && ![parameter[@"key"] isEqualToString:WCGestureMessageTimeFontSizeKey]) [NSUserDefaults.standardUserDefaults setObject:parameter[@"reset"] forKey:parameter[@"key"]];
+    }
+    WCGestureSettingsPostChange(nil);
+}
+@end
+
+UIViewController *WCGestureCreatePositionEditor(WCGesturePreviewKind kind) {
+    WCAdjustmentController *controller = [WCAdjustmentController new]; controller.kind = kind; return controller;
+}
+
+UIViewController *WCGestureCreateAdjustmentEditor(NSString *title, UIView *preview, NSArray<NSDictionary *> *parameters) {
+    WCAdjustmentController *controller = [WCAdjustmentController new];
+    controller.customPreview = preview; controller.customTitle = title; controller.customParameters = parameters;
+    return controller;
+}

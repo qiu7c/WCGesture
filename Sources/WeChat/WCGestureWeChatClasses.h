@@ -34,6 +34,9 @@ NS_ASSUME_NONNULL_BEGIN
 @interface BaseMsgContentViewController : UIViewController
 @end
 
+@interface SystemMessageCellView : UIView
+@end
+
 @interface MMGrowTextView : UIView
 - (void)didMoveToWindow;
 - (void)textViewDidChange:(id)textView;

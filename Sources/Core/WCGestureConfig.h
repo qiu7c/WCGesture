@@ -161,6 +161,32 @@ FOUNDATION_EXPORT NSString *const WCGestureMessageTimeFontSizeKey;
 FOUNDATION_EXPORT NSString *const WCGestureMessageTimeBoldKey;
 FOUNDATION_EXPORT NSString *const WCGestureMessageTimePositionKey;
 
+FOUNDATION_EXPORT NSString *const WCGestureMessageTimeBelowAvatarKey;
+FOUNDATION_EXPORT NSString *const WCGestureMessageTimeBubbleSideKey;
+FOUNDATION_EXPORT NSString *const WCGestureMessageTimeColorKey;
+FOUNDATION_EXPORT NSString *const WCGestureMessageTimeLightColorKey;
+FOUNDATION_EXPORT NSString *const WCGestureMessageTimeDarkColorKey;
+FOUNDATION_EXPORT NSString *const WCGestureMessageTimeAvatarSpacingKey;
+FOUNDATION_EXPORT NSString *const WCGestureAntiRevokeNotifySenderKey;
+FOUNDATION_EXPORT NSString *const WCGestureAntiRevokeLocalTemplateKey;
+FOUNDATION_EXPORT NSString *const WCGestureAntiRevokeReplyTemplateKey;
+FOUNDATION_EXPORT NSString *const WCGestureAntiRevokeTimeFilterKey;
+FOUNDATION_EXPORT NSString *const WCGestureAntiRevokePromptStyleKey;
+FOUNDATION_EXPORT NSString *const WCGestureAntiRevokeSideTextKey;
+FOUNDATION_EXPORT NSString *const WCGestureAntiRevokeSideOffsetXKey;
+FOUNDATION_EXPORT NSString *const WCGestureAntiRevokeSideOffsetYKey;
+FOUNDATION_EXPORT NSString *const WCGestureAntiRevokeLocalTextColorKey;
+FOUNDATION_EXPORT NSString *const WCGestureAntiRevokeSideTextColorKey;
+FOUNDATION_EXPORT NSString *const WCGestureAntiRevokeLocalLightTextColorKey;
+FOUNDATION_EXPORT NSString *const WCGestureAntiRevokeLocalDarkTextColorKey;
+FOUNDATION_EXPORT NSString *const WCGestureAntiRevokeSideLightTextColorKey;
+FOUNDATION_EXPORT NSString *const WCGestureAntiRevokeSideDarkTextColorKey;
+FOUNDATION_EXPORT NSString *const WCGestureAntiRevokePersistRecordsKey;
+FOUNDATION_EXPORT NSString *const WCGesturePageScalePluginUIKey;
+FOUNDATION_EXPORT NSString *const WCGestureMessageTimeOffsetXKey;
+FOUNDATION_EXPORT NSString *const WCGestureMessageTimeOffsetYKey;
+
+
 /// Interface size, based on WCAtlas theme scaling (70–100%, default 90%).
 FOUNDATION_EXPORT NSString *const WCGesturePageScaleEnabledKey;
 FOUNDATION_EXPORT NSString *const WCGesturePageScalePercentKey;

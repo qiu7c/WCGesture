@@ -8,9 +8,10 @@ The home page has six categories: 聊天类功能 / 手势类功能 / 朋友圈�
 The search bar finds settings even when their feature is disabled and opens the relevant group without enabling it.
 
 **聊天工具 (Chat tools)**:
-- Anti-revoke retains already-received messages recalled by the other party; your own recalls keep native behavior. Disabled by default.
-- Message times beside bubbles, with format, 8–16pt font, bold and top/center/bottom placement. Disabled by default.
-- Chat-time, anti-revoke and layout settings include illustrative previews; message-time previews share the live label styling and positioning code.
+- Anti-revoke ports WCAtlas's original message lookup/interception, local system-message or side-prompt display, templates, light/dark colors, optional sender reply and age filter, searchable records and optional local persistence. Disabled by default; automatic replies are also off by default.
+- Message times port WCAtlas's below-avatar / bubble-side modes, avatar spacing, custom date format, 8–18pt font, bold, light/dark colors, split-message handling and reuse-safe refresh. Disabled by default.
+- A dedicated position preview page provides dragging, sliders, exact numeric entry, reset and light/dark preview; the same editor infrastructure accepts other preview views and parameter descriptors.
+- Existing inline chat-time, anti-revoke and layout previews remain available. Real labels and previews share formatting/style and coordinate helpers.
 - Time labels hide when there is insufficient side space. Actual message rendering and recall behavior still require device validation.
 
 **消息手势 (Message gestures)** — on chat message bubbles:
@@ -20,7 +21,8 @@ The search bar finds settings even when their feature is disabled and opens the 
 - Adjustable trigger distance (36–100 points)
 
 **界面大小 (Layout)** — smaller, denser native layouts based on WCAtlas:
-- Enable “界面大小（缩小布局）” under “界面与布局”, then choose 70–100% (default 90%)
+- Enable “界面大小” under “界面类功能”, then choose 70–100% (default 90%)
+- “包含插件界面” also scales One Wx's own settings and popup metrics; off by default
 - Scales WeChat's `#font_set` theme values (`alllevel` / `chatLevel`) from font level 1, plus WebView text
 - 100% means the unscaled level-1 baseline; switch the feature off to restore WeChat's original font level
 - Native content reflows through WeChat; fixed-size images and controls are not universally scaled
@@ -49,7 +51,9 @@ hooks; shared code sits outside `Features/`:
 | `Sources/UI/WCGestureSettingsHome.m` | Six-category home and settings search |
 | `Sources/UI/WCGestureChatPreview.m` | Illustrative chat/settings previews |
 | `Sources/Features/AntiRevoke/` | Verified other-party revoke interception |
-| `Sources/Features/MessageTime/` | Bubble-side message-time labels and reuse cleanup |
+| `Sources/Features/MessageTime/` | WCAtlas message-time modes, split-part selection and reuse cleanup |
+| `Sources/UI/WCGestureChatOptions.m` | Shared full WCAtlas chat-settings catalog and editors |
+| `Sources/UI/WCGestureAdjustmentController.m` | Reusable independent position/appearance preview editor |
 | `Sources/Features/MessageGestures/` | Bubble swipes/taps, repeat path, voice-upload hooks |
 | `Sources/Features/InputGestures/` | Input-box swipes/taps and their actions |
 | `Sources/Features/KeyboardStrip/` | Keyboard bottom gesture strip |
@@ -106,17 +110,25 @@ All keys live under the `com.qiu7c.onewx.*` namespace. Settings saved by the old
 | `com.qiu7c.onewx.chat.input-swipe-actions` | NO |
 | `com.qiu7c.onewx.chat.anti-revoke.enabled` | NO |
 | `com.qiu7c.onewx.chat.message-time.enabled` | NO |
-| `com.qiu7c.onewx.chat.message-time.format` | HH:mm:ss |
-| `com.qiu7c.onewx.chat.message-time.font-size` | 10.0 (8–16) |
+| `com.qiu7c.onewx.chat.message-time.format` | MM-dd HH:mm:ss |
+| `com.qiu7c.onewx.chat.message-time.font-size` | 10.0 (8–18) |
 | `com.qiu7c.onewx.chat.message-time.bold` | NO |
 | `com.qiu7c.onewx.chat.message-time.position` | 2 (bottom; 0 top, 1 center) |
+| `com.qiu7c.onewx.chat.message-time.below-avatar` | YES (new installations) |
+| `com.qiu7c.onewx.chat.message-time.bubble-side` | NO (existing bubble-only settings are preserved) |
+| `com.qiu7c.onewx.chat.message-time.avatar-spacing` | -2.0 (-6–8) |
+| `com.qiu7c.onewx.chat.message-time.offset-x/y` | 0.0 (-80–80) |
 | `com.qiu7c.onewx.interface.page-scale.enabled` | NO |
 | `com.qiu7c.onewx.interface.page-scale.percent` | 90.0 (70–100) |
+| `com.qiu7c.onewx.interface.page-scale.plugin-ui` | NO |
 | `com.qiu7c.onewx.chat.layout.enabled` | NO |
 | `com.qiu7c.onewx.chat.layout.font-level` | 2 |
 | `com.qiu7c.onewx.chat.layout.moments-enabled` | NO |
 | `com.qiu7c.onewx.chat.layout.moments-scale` | 115.0 |
 
 ## License
+
+WCAtlas setting-by-setting coverage, runtime behavior and device-validation checklist:
+[`docs/WCATLAS_PARITY.md`](docs/WCATLAS_PARITY.md).
 
 See WCAtlas for upstream attribution. This extraction is derivative of WCAtlas by qiu7c.

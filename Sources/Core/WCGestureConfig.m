@@ -59,6 +59,31 @@ NSString *const WCGestureAIReplyPresetKey = @"com.qiu7c.onewx.ai.reply-preset";
 NSString *const WCGestureAIAnswerPresetKey = @"com.qiu7c.onewx.ai.answer-preset";
 NSString *const WCGestureAIPolishPresetKey = @"com.qiu7c.onewx.ai.polish-preset";
 
+NSString *const WCGestureMessageTimeBelowAvatarKey = @"com.qiu7c.onewx.chat.message-time.below-avatar";
+NSString *const WCGestureMessageTimeBubbleSideKey = @"com.qiu7c.onewx.chat.message-time.bubble-side";
+NSString *const WCGestureMessageTimeColorKey = @"com.qiu7c.onewx.chat.message-time.color";
+NSString *const WCGestureMessageTimeLightColorKey = @"com.qiu7c.onewx.chat.message-time.color.light";
+NSString *const WCGestureMessageTimeDarkColorKey = @"com.qiu7c.onewx.chat.message-time.color.dark";
+NSString *const WCGestureMessageTimeAvatarSpacingKey = @"com.qiu7c.onewx.chat.message-time.avatar-spacing";
+NSString *const WCGestureAntiRevokeNotifySenderKey = @"com.qiu7c.onewx.chat.anti-revoke.notify-sender";
+NSString *const WCGestureAntiRevokeLocalTemplateKey = @"com.qiu7c.onewx.chat.anti-revoke.local-template";
+NSString *const WCGestureAntiRevokeReplyTemplateKey = @"com.qiu7c.onewx.chat.anti-revoke.reply-template";
+NSString *const WCGestureAntiRevokeTimeFilterKey = @"com.qiu7c.onewx.chat.anti-revoke.time-filter";
+NSString *const WCGestureAntiRevokePromptStyleKey = @"com.qiu7c.onewx.chat.anti-revoke.prompt-style";
+NSString *const WCGestureAntiRevokeSideTextKey = @"com.qiu7c.onewx.chat.anti-revoke.side-text";
+NSString *const WCGestureAntiRevokeSideOffsetXKey = @"com.qiu7c.onewx.chat.anti-revoke.side-offset-x";
+NSString *const WCGestureAntiRevokeSideOffsetYKey = @"com.qiu7c.onewx.chat.anti-revoke.side-offset-y";
+NSString *const WCGestureAntiRevokeLocalTextColorKey = @"com.qiu7c.onewx.chat.anti-revoke.local-text-color";
+NSString *const WCGestureAntiRevokeSideTextColorKey = @"com.qiu7c.onewx.chat.anti-revoke.side-text-color";
+NSString *const WCGestureAntiRevokeLocalLightTextColorKey = @"com.qiu7c.onewx.chat.anti-revoke.local-text-color.light";
+NSString *const WCGestureAntiRevokeLocalDarkTextColorKey = @"com.qiu7c.onewx.chat.anti-revoke.local-text-color.dark";
+NSString *const WCGestureAntiRevokeSideLightTextColorKey = @"com.qiu7c.onewx.chat.anti-revoke.side-text-color.light";
+NSString *const WCGestureAntiRevokeSideDarkTextColorKey = @"com.qiu7c.onewx.chat.anti-revoke.side-text-color.dark";
+NSString *const WCGestureAntiRevokePersistRecordsKey = @"com.qiu7c.onewx.chat.anti-revoke.persist-records";
+NSString *const WCGesturePageScalePluginUIKey = @"com.qiu7c.onewx.interface.page-scale.plugin-ui";
+NSString *const WCGestureMessageTimeOffsetXKey = @"com.qiu7c.onewx.chat.message-time.offset-x";
+NSString *const WCGestureMessageTimeOffsetYKey = @"com.qiu7c.onewx.chat.message-time.offset-y";
+
 NSString *const WCGesturePageScaleEnabledKey = @"com.qiu7c.onewx.interface.page-scale.enabled";
 NSString *const WCGestureAntiRevokeEnabledKey = @"com.qiu7c.onewx.chat.anti-revoke.enabled";
 NSString *const WCGestureMessageTimeEnabledKey = @"com.qiu7c.onewx.chat.message-time.enabled";
@@ -191,6 +216,13 @@ void WCGestureMigrateLegacyDefaults(void) {
 void WCGestureRegisterDefaults(void) {
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
+        // Preserve the bubble-only mode published before the WCAtlas port.
+        // New installations use WCAtlas's below-avatar default.
+        NSUserDefaults *stored = NSUserDefaults.standardUserDefaults;
+        if ([stored objectForKey:WCGestureMessageTimeEnabledKey] && ![stored objectForKey:WCGestureMessageTimeBubbleSideKey]) {
+            [stored setBool:YES forKey:WCGestureMessageTimeBubbleSideKey];
+            [stored setBool:NO forKey:WCGestureMessageTimeBelowAvatarKey];
+        }
         NSDictionary *defaults = @{
             WCGestureEnabledKey: @YES,
             WCPluginNameKey: @"One Wx",
@@ -252,10 +284,34 @@ void WCGestureRegisterDefaults(void) {
             WCGestureAIReplyPresetKey: @0,
             WCGestureAIAnswerPresetKey: @0,
             WCGestureAIPolishPresetKey: @0,
+            WCGestureAntiRevokeNotifySenderKey: @NO,
+            WCGestureAntiRevokeTimeFilterKey: @300.0,
+            WCGestureAntiRevokePromptStyleKey: @0,
+            WCGestureAntiRevokeSideTextKey: @"已拦截撤回",
+            WCGestureAntiRevokeSideOffsetXKey: @0.0,
+            WCGestureAntiRevokeSideOffsetYKey: @10.0,
+            WCGestureAntiRevokePersistRecordsKey: @NO,
+            WCGestureMessageTimeBelowAvatarKey: @YES,
+            WCGestureMessageTimeBubbleSideKey: @NO,
+            WCGestureMessageTimeColorKey: @"#8E8E93FF",
+            WCGestureMessageTimeAvatarSpacingKey: @-2.0,
+            WCGestureMessageTimeLightColorKey: @"",
+            WCGestureMessageTimeDarkColorKey: @"",
+            WCGestureAntiRevokeLocalTemplateKey: @"拦截到一条{用户名}撤回的消息\n发送时间：{yyyy}-{MM}-{dd} {HH}:{mm}:{ss}\n内容：{内容}",
+            WCGestureAntiRevokeReplyTemplateKey: @"【捕捉到一条撤回消息】\n操作用户：{用户名}\n发送时间：{yyyy}-{MM}-{dd} {HH}:{mm}:{ss}\n撤回内容：{内容}\n\n撤回无效，消息已保存",
+            WCGestureAntiRevokeLocalTextColorKey: @"",
+            WCGestureAntiRevokeSideTextColorKey: @"",
+            WCGestureAntiRevokeLocalLightTextColorKey: @"",
+            WCGestureAntiRevokeLocalDarkTextColorKey: @"",
+            WCGestureAntiRevokeSideLightTextColorKey: @"",
+            WCGestureAntiRevokeSideDarkTextColorKey: @"",
+            WCGesturePageScalePluginUIKey: @NO,
+            WCGestureMessageTimeOffsetXKey: @0.0,
+            WCGestureMessageTimeOffsetYKey: @0.0,
             WCGesturePageScaleEnabledKey: @NO,
             WCGestureAntiRevokeEnabledKey: @NO,
             WCGestureMessageTimeEnabledKey: @NO,
-            WCGestureMessageTimeFormatKey: @"HH:mm:ss",
+            WCGestureMessageTimeFormatKey: @"MM-dd HH:mm:ss",
             WCGestureMessageTimeFontSizeKey: @10.0,
             WCGestureMessageTimeBoldKey: @NO,
             WCGestureMessageTimePositionKey: @2,

@@ -146,13 +146,13 @@ typedef NS_ENUM(NSInteger, WCPopupMode) {
 - (UIView *)makeTitleArea {
     UIView *area = [[UIView alloc] init];
     area.translatesAutoresizingMaskIntoConstraints = NO;
-    UILabel *label = [self makeLabel:self.popupTitle font:[UIFont systemFontOfSize:17 weight:UIFontWeightSemibold]
+    UILabel *label = [self makeLabel:self.popupTitle font:[UIFont systemFontOfSize:17 * WCGestureSettingsScaleFactor() weight:UIFontWeightSemibold]
                                color:UIColor.labelColor align:NSTextAlignmentCenter];
     [area addSubview:label];
     [label.leadingAnchor constraintEqualToAnchor:area.leadingAnchor constant:20].active = YES;
     [label.trailingAnchor constraintEqualToAnchor:area.trailingAnchor constant:-20].active = YES;
     [label.centerYAnchor constraintEqualToAnchor:area.centerYAnchor].active = YES;
-    [area.heightAnchor constraintEqualToConstant:60].active = YES;
+    [area.heightAnchor constraintEqualToConstant:60 * WCGestureSettingsScaleFactor()].active = YES;
     return area;
 }
 
@@ -170,7 +170,7 @@ typedef NS_ENUM(NSInteger, WCPopupMode) {
 - (UIButton *)makeActionButton:(NSString *)title color:(UIColor *)color primary:(BOOL)primary {
     UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem];
     [button setTitle:title forState:UIControlStateNormal];
-    button.titleLabel.font = [UIFont systemFontOfSize:(primary ? 16.5 : 16.0) weight:(primary ? UIFontWeightSemibold : UIFontWeightRegular)];
+    button.titleLabel.font = [UIFont systemFontOfSize:(primary ? 16.5 : 16.0) * WCGestureSettingsScaleFactor() weight:(primary ? UIFontWeightSemibold : UIFontWeightRegular)];
     [button setTitleColor:color forState:UIControlStateNormal];
     button.translatesAutoresizingMaskIntoConstraints = NO;
     return button;
@@ -182,7 +182,7 @@ typedef NS_ENUM(NSInteger, WCPopupMode) {
                       cancelTitle:(nullable NSString *)cancelTitle {
     UIView *row = [[UIView alloc] init];
     row.translatesAutoresizingMaskIntoConstraints = NO;
-    [row.heightAnchor constraintEqualToConstant:54].active = YES;
+    [row.heightAnchor constraintEqualToConstant:54 * WCGestureSettingsScaleFactor()].active = YES;
 
     UIButton *cancel = [self makeActionButton:(cancelTitle ?: @"取消") color:UIColor.secondaryLabelColor primary:NO];
     __weak typeof(self) weakSelf = self;
@@ -216,7 +216,7 @@ typedef NS_ENUM(NSInteger, WCPopupMode) {
     if (message.length == 0) return;
     UIView *wrap = [[UIView alloc] init];
     wrap.translatesAutoresizingMaskIntoConstraints = NO;
-    UILabel *label = [self makeLabel:message font:[UIFont systemFontOfSize:13] color:UIColor.secondaryLabelColor align:NSTextAlignmentCenter];
+    UILabel *label = [self makeLabel:message font:[UIFont systemFontOfSize:13 * WCGestureSettingsScaleFactor()] color:UIColor.secondaryLabelColor align:NSTextAlignmentCenter];
     [wrap addSubview:label];
     [label.leadingAnchor constraintEqualToAnchor:wrap.leadingAnchor constant:20].active = YES;
     [label.trailingAnchor constraintEqualToAnchor:wrap.trailingAnchor constant:-20].active = YES;
@@ -268,7 +268,7 @@ typedef NS_ENUM(NSInteger, WCPopupMode) {
         row.contentEdgeInsets = UIEdgeInsetsMake(0, 20, 0, 20);
         [row setTitle:option.title forState:UIControlStateNormal];
         [row setTitleColor:UIColor.labelColor forState:UIControlStateNormal];
-        row.titleLabel.font = [UIFont systemFontOfSize:16];
+        row.titleLabel.font = [UIFont systemFontOfSize:16 * WCGestureSettingsScaleFactor()];
         row.translatesAutoresizingMaskIntoConstraints = NO;
         [row.heightAnchor constraintEqualToConstant:52].active = YES;
         if (selected) {
@@ -320,7 +320,7 @@ typedef NS_ENUM(NSInteger, WCPopupMode) {
     field.placeholder = self.placeholder;
     field.keyboardType = self.keyboard;
     field.secureTextEntry = self.secureInput;
-    field.font = [UIFont systemFontOfSize:16];
+    field.font = [UIFont systemFontOfSize:16 * WCGestureSettingsScaleFactor()];
     field.textColor = UIColor.labelColor;
     field.backgroundColor = UIColor.tertiarySystemGroupedBackgroundColor;
     field.layer.cornerRadius = 10.0;
@@ -336,7 +336,7 @@ typedef NS_ENUM(NSInteger, WCPopupMode) {
     [field.bottomAnchor constraintEqualToAnchor:fieldWrap.bottomAnchor constant:-4].active = YES;
     [field.leadingAnchor constraintEqualToAnchor:fieldWrap.leadingAnchor constant:20].active = YES;
     [field.trailingAnchor constraintEqualToAnchor:fieldWrap.trailingAnchor constant:-20].active = YES;
-    [field.heightAnchor constraintEqualToConstant:44].active = YES;
+    [field.heightAnchor constraintEqualToConstant:44 * WCGestureSettingsScaleFactor()].active = YES;
 
     __weak typeof(self) weakSelf = self;
     [stack addArrangedSubview:[self makeButtonRowPrimary:@"确定" primaryBlock:^{

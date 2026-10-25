@@ -8,15 +8,19 @@
 
 - (void)setViewModel:(id)viewModel {
     WCGestureMessageTimeHide(self);
+    WCGestureAntiRevokeHide(self);
     %orig;
     WCSynchronizeReplyGesture(self);
     [self setNeedsLayout];
+    WCGestureMessageTimeSchedule(self);
 }
 
 - (void)didMoveToWindow {
     %orig;
     WCSynchronizeReplyGesture(self);
     WCGestureMessageTimeLayout(self);
+    WCGestureMessageTimeSchedule(self);
+    WCGestureAntiRevokeLayout(self);
 }
 
 %new

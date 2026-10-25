@@ -65,6 +65,7 @@
             dispatch_async(dispatch_get_main_queue(), ^{
                 WCGestureLayoutSettingsChanged(note.object);
                 WCGestureMessageTimeSettingsChanged(note.object);
+                WCGestureAntiRevokeSettingsChanged(note.object);
                 WCKeyboardEnhanceRefresh();
                 WCSynchronizeVisibleReplyGestures();
                 WCSynchronizeGlobalGestures();

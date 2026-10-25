@@ -7,6 +7,13 @@
 }
 %end
 
+%hook SystemMessageCellView
+- (void)layoutSubviews {
+    %orig;
+    WCGestureAntiRevokeSystemCellLayout(self);
+}
+%end
+
 %ctor {
     %init;
 }

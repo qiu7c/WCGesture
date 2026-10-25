@@ -39,7 +39,7 @@ static UIViewController *WCTopViewController(void) {
 }
 
 static void WCPostChange(NSString *key) {
-    [[NSNotificationCenter defaultCenter] postNotificationName:WCGestureDidChangeNotification object:key];
+    WCGestureSettingsPostChange(key);
 }
 
 static void WCSetBool(BOOL value, NSString *key) {
@@ -912,8 +912,7 @@ typedef NS_ENUM(NSInteger, WCRowKind) {
     WCRowKindTranslateTest,       // tap → test translation engine
     WCRowKindExport,         // tap → export config
     WCRowKindImport,        // tap → import config
-    WCRowKindMessageTimeFormat,
-    WCRowKindMessageTimePosition,
+    WCRowKindChatOption,
     WCRowKindMessageTimePreview,
     WCRowKindAntiRevokePreview,
     WCRowKindLayoutPreview,
@@ -921,23 +920,6 @@ typedef NS_ENUM(NSInteger, WCRowKind) {
 
 static BOOL WCRowIsPreview(WCRowKind kind) {
     return kind == WCRowKindMessageTimePreview || kind == WCRowKindAntiRevokePreview || kind == WCRowKindLayoutPreview;
-}
-
-static void WCPresentMessageTimeChoice(BOOL position) {
-    NSString *key = position ? WCGestureMessageTimePositionKey : WCGestureMessageTimeFormatKey;
-    NSArray *titles = position ? @[@"顶部", @"居中", @"底部"] : @[@"HH:mm", @"HH:mm:ss", @"MM-dd HH:mm:ss"];
-    NSMutableArray *options = [NSMutableArray array];
-    for (NSUInteger i = 0; i < titles.count; i++) {
-        [options addObject:[WCPopupOption optionWithTitle:titles[i] value:position ? @(i) : titles[i]]];
-    }
-    [WCPopup showOptionsWithTitle:position ? @"时间位置" : @"时间格式"
-        message:@"修改后立即更新下方预览和当前聊天"
-        options:options selected:[NSUserDefaults.standardUserDefaults objectForKey:key]
-        completion:^(id value) {
-            if (!value) return;
-            [NSUserDefaults.standardUserDefaults setObject:value forKey:key];
-            WCPostChange(key);
-        }];
 }
 
 @interface WCRow : NSObject
@@ -948,6 +930,7 @@ static void WCPresentMessageTimeChoice(BOOL position) {
 @property (nonatomic, assign) BOOL selfMessage;      // action picker variant
 @property (nonatomic, assign) NSInteger presetIndex;// AI preset this row manages
 @property (nonatomic, assign) NSUInteger indentationDepth;
+@property (nonatomic, copy) NSDictionary *chatOption;
 @end
 @implementation WCRow
 @end
@@ -1069,12 +1052,7 @@ static void WCPresentGlobalActionPicker(__unused UIViewController *presenter, NS
 static NSString *WCRowDetailText(WCRow *row) {
     NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
     switch (row.kind) {
-        case WCRowKindMessageTimeFormat:
-            return [d stringForKey:WCGestureMessageTimeFormatKey] ?: @"HH:mm:ss";
-        case WCRowKindMessageTimePosition: {
-            NSInteger position = [d integerForKey:WCGestureMessageTimePositionKey];
-            return @[@"顶部", @"居中", @"底部"][MIN(2, MAX(0, position))];
-        }
+        case WCRowKindChatOption: return WCGestureChatOptionDetail(row.chatOption);
         case WCRowKindMessageTimePreview:
         case WCRowKindAntiRevokePreview:
         case WCRowKindLayoutPreview:
@@ -1407,6 +1385,7 @@ static NSString *WCRowDetailText(WCRow *row) {
 
 - (void)settingsDidChange:(__unused NSNotification *)note {
     [self rebuildRows];
+    self.tableView.estimatedRowHeight = 48 * WCGestureSettingsScaleFactor();
     [self.tableView reloadData];
 }
 
@@ -1417,22 +1396,25 @@ static NSString *WCRowDetailText(WCRow *row) {
     NSMutableArray *collapseKeys = [NSMutableArray array];
     NSString *prefix = @"com.qiu7c.onewx.collapse";
     if (self.category == WCGestureCategoryChat) {
-        [sections addObject:@[
-            WCSwitchRow(@"防撤回", WCGestureAntiRevokeEnabledKey),
-            WCHintRow(@"保留已接收的对方撤回消息；自己撤回仍正常。未收到的消息无法恢复。"),
-            WCPlainRow(@"防撤回预览", WCRowKindAntiRevokePreview)]];
-        [collapsible addObject:@YES];
-        [collapseKeys addObject:[prefix stringByAppendingString:@".chat.anti-revoke"]];
-        NSMutableArray *time = [NSMutableArray arrayWithObject:WCSwitchRow(@"消息时间", WCGestureMessageTimeEnabledKey)];
-        [time addObject:WCPlainRow(@"时间格式", WCRowKindMessageTimeFormat)];
-        [time addObject:WCNumberRow(@"时间字号", WCGestureMessageTimeFontSizeKey)];
-        [time addObject:WCSwitchRow(@"时间加粗", WCGestureMessageTimeBoldKey)];
-        [time addObject:WCPlainRow(@"时间位置", WCRowKindMessageTimePosition)];
-        [time addObject:WCPlainRow(@"消息时间预览", WCRowKindMessageTimePreview)];
-        [time addObject:WCHintRow(@"可先调整并预览，开启开关后应用到聊天。实际气泡旁空间不足时隐藏，避免遮挡内容。")];
-        [sections addObject:time];
-        [collapsible addObject:@YES];
-        [collapseKeys addObject:[prefix stringByAppendingString:@".chat.message-time"]];
+        NSArray *masters = @[WCGestureAntiRevokeEnabledKey, WCGestureMessageTimeEnabledKey];
+        NSArray *names = @[@"防撤回", @"消息时间"];
+        NSArray *suffixes = @[@".chat.anti-revoke", @".chat.message-time"];
+        for (NSUInteger i = 0; i < masters.count; i++) {
+            NSMutableArray *rows = [NSMutableArray arrayWithObject:WCSwitchRow(names[i], masters[i])];
+            for (NSDictionary *option in WCGestureChatOptions(i == 0, self.searchIndexMode)) {
+                WCRow *row = [option[@"type"] isEqualToString:@"bool"]
+                    ? WCSwitchRow(option[@"title"], option[@"key"]) : WCPlainRow(option[@"title"], WCRowKindChatOption);
+                row.chatOption = option;
+                [rows addObject:row];
+            }
+            [rows addObject:WCPlainRow(i == 0 ? @"防撤回预览" : @"消息时间预览",
+                i == 0 ? WCRowKindAntiRevokePreview : WCRowKindMessageTimePreview)];
+            [rows addObject:WCHintRow(i == 0 ? @"回复撤回者默认关闭；开启后会自动向该会话发送回复模板。"
+                : @"可先调节并预览；开启开关后应用到实际聊天。")];
+            [sections addObject:rows];
+            [collapsible addObject:@YES];
+            [collapseKeys addObject:[prefix stringByAppendingString:suffixes[i]]];
+        }
     } else if (self.category == WCGestureCategoryGestures) {
         NSMutableArray *msg = [NSMutableArray array];
         [msg addObject:WCSwitchRow(@"消息手势", WCReplySwipeEnabledKey)];
@@ -1545,10 +1527,10 @@ static NSString *WCRowDetailText(WCRow *row) {
         [collapseKeys addObject:[prefix stringByAppendingString:@".other.moments"]];
     } else if (self.category == WCGestureCategoryInterface) {
         NSMutableArray *enhance = [NSMutableArray array];
-        [enhance addObject:WCSwitchRow(@"界面大小（缩小布局）", WCGesturePageScaleEnabledKey)];
-        if ((self.searchIndexMode || [d boolForKey:WCGesturePageScaleEnabledKey])) {
-            [enhance addObject:WCNumberRow(@"界面比例 (%)", WCGesturePageScalePercentKey)];
-        } else {
+        [enhance addObject:WCSwitchRow(@"界面大小", WCGesturePageScaleEnabledKey)];
+        [enhance addObject:WCNumberRow(@"界面比例 (%)", WCGesturePageScalePercentKey)];
+        [enhance addObject:WCSwitchRow(@"包含插件界面", WCGesturePageScalePluginUIKey)];
+        if (![d boolForKey:WCGesturePageScaleEnabledKey]) {
             // Only expose already-enabled legacy settings for adjustment or
             // disabling; new users get one interface-size entry.
             if ((self.searchIndexMode || [d boolForKey:WCChatLayoutEnabledKey])) {
@@ -1634,6 +1616,9 @@ static NSString *WCRowDetailText(WCRow *row) {
                 insideGroup = YES;
             } else {
                 row.indentationDepth = baseDepth + (insideGroup ? 1 : 0);
+                NSString *key = row.chatOption[@"key"];
+                if ([key isEqualToString:WCGestureAntiRevokeTimeFilterKey] ||
+                    [key isEqualToString:WCGestureAntiRevokeReplyTemplateKey]) row.indentationDepth++;
             }
         }
     }
@@ -1691,7 +1676,7 @@ static NSString *WCRowDetailText(WCRow *row) {
             [preview.trailingAnchor constraintEqualToAnchor:previewCell.contentView.trailingAnchor constant:-12],
             [preview.topAnchor constraintEqualToAnchor:previewCell.contentView.topAnchor constant:8],
             [preview.bottomAnchor constraintEqualToAnchor:previewCell.contentView.bottomAnchor constant:-8],
-            [preview.heightAnchor constraintEqualToConstant:190],
+            [preview.heightAnchor constraintEqualToConstant:230],
         ]];
         return previewCell;
     }
@@ -1700,19 +1685,7 @@ static NSString *WCRowDetailText(WCRow *row) {
     if (!cell) {
         cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleValue1 reuseIdentifier:cellId];
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
-        UIView *bar = [[UIView alloc] init];
-        bar.tag = 9001;
-        bar.backgroundColor = UIColor.systemBlueColor;
-        bar.layer.cornerRadius = 1.25;
-        bar.hidden = YES;
-        bar.translatesAutoresizingMaskIntoConstraints = NO;
-        [cell.contentView addSubview:bar];
-        [NSLayoutConstraint activateConstraints:@[
-            [bar.leadingAnchor constraintEqualToAnchor:cell.contentView.leadingAnchor constant:20],
-            [bar.centerYAnchor constraintEqualToAnchor:cell.contentView.centerYAnchor],
-            [bar.widthAnchor constraintEqualToConstant:2.5],
-            [bar.heightAnchor constraintEqualToConstant:20],
-        ]];
+
     }
     cell.backgroundColor = UIColor.secondarySystemGroupedBackgroundColor;
     BOOL isHint = row.kind == WCRowKindHint;
@@ -1735,37 +1708,40 @@ static NSString *WCRowDetailText(WCRow *row) {
     cell.indentationLevel = 0;
     cell.indentationWidth = 0;
     cell.imageView.image = nil;
-    [cell.contentView viewWithTag:9001].hidden = YES;
 
-    if (isHeaderRow || isGroupRow) {
-        BOOL collapsed = isHeaderRow ? [self sectionCollapsed:section]
-            : ![[NSUserDefaults standardUserDefaults] boolForKey:row.defaultsKey];
-        UIImage *chevron = [UIImage systemImageNamed:(collapsed ? @"chevron.right" : @"chevron.down")
-            withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:13 weight:UIImageSymbolWeightSemibold]];
-        cell.imageView.image = [chevron imageWithTintColor:UIColor.secondaryLabelColor
-                                            renderingMode:UIImageRenderingModeAlwaysOriginal];
-        cell.imageView.contentMode = UIViewContentModeCenter;
-    }
-
+    CGFloat scale = WCGestureSettingsScaleFactor();
+    cell.textLabel.font = [UIFont systemFontOfSize:(isHint ? 13 : (isChild ? 15 : 17)) * scale
+        weight:(isHeaderRow || isGroupRow) ? UIFontWeightSemibold : UIFontWeightRegular];
+    cell.detailTextLabel.font = [UIFont systemFontOfSize:13 * scale];
     if (isChild) {
         cell.indentationLevel = row.indentationDepth;
-        cell.indentationWidth = 22;
-        UIView *bar = [cell.contentView viewWithTag:9001];
-        bar.hidden = NO;
-        for (NSLayoutConstraint *constraint in cell.contentView.constraints) {
-            if (constraint.firstItem == bar && constraint.firstAttribute == NSLayoutAttributeLeading) {
-                constraint.constant = 20.0 + (row.indentationDepth - 1) * 22.0;
-            }
-        }
+        cell.indentationWidth = 18 * scale;
     }
-
+    UIImageView *foldArrow = nil;
+    if (isHeaderRow || isGroupRow) {
+        BOOL collapsed = isHeaderRow ? [self sectionCollapsed:section]
+            : ![NSUserDefaults.standardUserDefaults boolForKey:row.defaultsKey];
+        foldArrow = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:collapsed ? @"chevron.right" : @"chevron.down"]];
+        foldArrow.tintColor = UIColor.tertiaryLabelColor;
+        foldArrow.contentMode = UIViewContentModeScaleAspectFit;
+        foldArrow.frame = CGRectMake(0, 0, 12 * scale, 16 * scale);
+    }
     if (row.kind == WCRowKindSwitch) {
         UISwitch *sw = [[UISwitch alloc] init];
         [sw addTarget:self action:@selector(handleSwitch:) forControlEvents:UIControlEventValueChanged];
         sw.tag = section * 10000 + rowIdx;
         sw.on = [[NSUserDefaults standardUserDefaults] boolForKey:row.defaultsKey];
-        cell.accessoryView = sw;
+        sw.transform = CGAffineTransformMakeScale(scale, scale);
+        if (foldArrow) {
+            UIView *accessory = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 82 * scale, 32 * scale)];
+            foldArrow.center = CGPointMake(6 * scale, 16 * scale);
+            sw.center = CGPointMake(56 * scale, 16 * scale);
+            [accessory addSubview:foldArrow]; [accessory addSubview:sw];
+            cell.accessoryView = accessory;
+        } else cell.accessoryView = sw;
     } else if (isGroupRow) {
+        cell.accessoryView = foldArrow;
+        cell.detailTextLabel.text = @"";
         cell.selectionStyle = UITableViewCellSelectionStyleDefault;
     } else if (row.kind != WCRowKindHint) {
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
@@ -1794,11 +1770,8 @@ static NSString *WCRowDetailText(WCRow *row) {
     }
     WCRow *row = self.sections[section][indexPath.row];
     switch (row.kind) {
-        case WCRowKindMessageTimeFormat:
-            WCPresentMessageTimeChoice(NO);
-            break;
-        case WCRowKindMessageTimePosition:
-            WCPresentMessageTimeChoice(YES);
+        case WCRowKindChatOption:
+            WCGestureEditChatOption(self, row.chatOption);
             break;
         case WCRowKindMessageTimePreview:
         case WCRowKindAntiRevokePreview:
