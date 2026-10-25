@@ -32,29 +32,6 @@ static NSString *WCActionName(NSInteger action, BOOL selfMessage) {
     return @"不设置";
 }
 
-static UIWindow *WCActiveWindow(void) {
-    NSArray<UIWindow *> *windows = nil;
-    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
-        if (scene.activationState != UISceneActivationStateForegroundActive ||
-            ![scene isKindOfClass:[UIWindowScene class]]) continue;
-        windows = ((UIWindowScene *)scene).windows;
-        if (windows.count) break;
-    }
-    if (windows.count == 0) {
-        id all = nil;
-        @try { all = [UIApplication.sharedApplication valueForKey:@"windows"]; }
-        @catch (__unused NSException *exception) {}
-        if ([all isKindOfClass:[NSArray class]]) windows = all;
-    }
-    for (UIWindow *window in windows) {
-        if (window.isKeyWindow && !window.hidden && window.alpha > 0.0) return window;
-    }
-    for (UIWindow *window in windows) {
-        if (!window.hidden && window.alpha > 0.0 && window.rootViewController) return window;
-    }
-    return windows.firstObject;
-}
-
 static UIViewController *WCTopViewController(void) {
     UIViewController *root = WCActiveWindow().rootViewController;
     while (root.presentedViewController) root = root.presentedViewController;
