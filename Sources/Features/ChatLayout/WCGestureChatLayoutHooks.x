@@ -11,7 +11,9 @@
 - (id)getValueOfProperty:(id)property inRuleSet:(id)ruleSet {
     id value = nil;
     WCGestureLayoutBeginThemeLookup();
-    @try { value = %orig; }
+    @try {
+        value = %orig;
+    }
     @finally { value = WCGestureLayoutEndThemeLookup(value, property, ruleSet); }
     return value;
 }
@@ -19,7 +21,9 @@
 - (id)getValueOfProperty:(id)property inRuleSet:(id)ruleSet isAdapt:(BOOL)isAdapt {
     id value = nil;
     WCGestureLayoutBeginThemeLookup();
-    @try { value = %orig; }
+    @try {
+        value = %orig;
+    }
     @finally { value = WCGestureLayoutEndThemeLookup(value, property, ruleSet); }
     return value;
 }
@@ -31,7 +35,9 @@
 + (id)getValueOfProperty:(id)property inRuleSet:(id)ruleSet {
     id value = nil;
     WCGestureLayoutBeginThemeLookup();
-    @try { value = %orig; }
+    @try {
+        value = %orig;
+    }
     @finally { value = WCGestureLayoutEndThemeLookup(value, property, ruleSet); }
     return value;
 }

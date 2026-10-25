@@ -284,6 +284,11 @@ CI：`.github/workflows/build.yml`，推送 `main` 时自动构建 rootful + roo
 
 ### 已踩过的坑
 
+布局主题 Hook 的 `%orig` 必须单独占行：`@try { value = %orig; }` 的单行写法
+会使当前 CI 的 Logos 展开吞掉后面的右花括号，产生 `unexpected '@'` / 缺失
+`@finally` / 括号不匹配等连锁错误。改为多行 `@try`，把 `value = %orig;`
+独立放一行。普通源码括号检查不能发现这类预处理问题，还需检查 `%orig` 行尾。
+
 | 报错 | 原因 | 修法 |
 |---|---|---|
 | `static declaration of 'WCActiveWindow' follows non-static declaration` | 设置页保留了旧的本地实现，和公共 API 冲突 | 删除本地 `static`，用 `WCGestureSupport.m` 的实现 |
