@@ -13,7 +13,8 @@ static BOOL WCAutoDeviceLoginCanConfirm(MultiDeviceCardLoginContentView *view) {
 }
 
 void WCGestureAutoDeviceLoginApply(UIView *view) {
-    if (![view isKindOfClass:MultiDeviceCardLoginContentView.class]) return;
+    Class loginClass = NSClassFromString(@"MultiDeviceCardLoginContentView");
+    if (!loginClass || ![view isKindOfClass:loginClass]) return;
     MultiDeviceCardLoginContentView *card = (MultiDeviceCardLoginContentView *)view;
     if (![card respondsToSelector:@selector(onTapConfirmButton)] || !WCAutoDeviceLoginCanConfirm(card)) return;
     id info = card.deviceLoginInfo;
