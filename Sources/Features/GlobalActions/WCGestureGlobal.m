@@ -1,3 +1,4 @@
+#import <objc/message.h>
 #import <objc/runtime.h>
 
 #import "Sources/API/WCGestureInternal.h"
@@ -239,6 +240,9 @@ static void WCPerformGlobalJump(UIViewController *presenter) {
 }
 
 void WCPerformGlobalAction(UIViewController *presenter, WCGlobalAction action) {
+    // The popup completion has no presenter of its own; fall back to the
+    // topmost controller so "jump" and other page-based actions still work.
+    if (!presenter) presenter = WCRootTopController();
     switch (action) {
         case WCGlobalActionScreenshot: WCPerformGlobalScreenshot(); break;
         case WCGlobalActionBack: WCPerformGlobalBack(); break;

@@ -11,6 +11,6 @@ void WCSynchronizeGlobalGesturesOnWindow(UIWindow *window);
 void WCSynchronizeGlobalGestures(void);
 
 /// Runs a configured multi-finger action from `presenter`.
-void WCPerformGlobalAction(UIViewController *presenter, WCGlobalAction action);
+void WCPerformGlobalAction(UIViewController * _Nullable presenter, WCGlobalAction action);
 
 NS_ASSUME_NONNULL_END
