@@ -33,10 +33,6 @@
     self.records = filtered; [self.tableView reloadData];
 }
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section { return self.records.count; }
-- (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
-    return [NSUserDefaults.standardUserDefaults boolForKey:WCGestureAntiRevokePersistRecordsKey]
-        ? @"本地保存仅包含消息摘要和类型，不复制媒体文件。" : @"记录仅保存在本次微信运行的内存中。";
-}
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)path {
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"RevokeRecord"];
     if (!cell) cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:@"RevokeRecord"];

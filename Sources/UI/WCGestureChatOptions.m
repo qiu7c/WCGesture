@@ -96,14 +96,6 @@ NSString *WCGestureChatOptionDetail(NSDictionary *option) {
     self.title = self.option[@"title"];
     self.view.backgroundColor = UIColor.systemGroupedBackgroundColor;
     self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"保存" style:UIBarButtonItemStyleDone target:self action:@selector(save)];
-    UILabel *help = [UILabel new];
-    help.text = [self.option[@"type"] isEqualToString:@"format"] ? @"支持 yyyy、MM、dd、E、HH、mm、ss，可组合分隔文字。留空恢复默认。"
-        : @"支持 {用户名}、{内容}、{yyyy}、{MM}、{dd}、{HH}、{mm}、{ss} 和换行。";
-    if ([self.option[@"key"] isEqualToString:WCGestureMomentsTimeFormatKey])
-        help.text = @"支持 yyyy、MM、dd、E、HH、mm、ss；留空恢复默认。朋友圈时间保持单行，换行按空格显示。";
-    help.numberOfLines = 0;
-    help.font = [UIFont systemFontOfSize:13 * WCGestureSettingsScaleFactor()];
-    help.textColor = UIColor.secondaryLabelColor;
     self.textView = [UITextView new];
     self.textView.backgroundColor = UIColor.secondarySystemGroupedBackgroundColor;
     self.textView.layer.cornerRadius = 16;
@@ -116,18 +108,15 @@ NSString *WCGestureChatOptionDetail(NSDictionary *option) {
     UIButton *reset = [UIButton buttonWithType:UIButtonTypeSystem];
     [reset setTitle:@"恢复默认" forState:UIControlStateNormal];
     [reset addTarget:self action:@selector(reset) forControlEvents:UIControlEventTouchUpInside];
-    for (UIView *view in @[help, self.textView, reset]) { view.translatesAutoresizingMaskIntoConstraints = NO; [self.view addSubview:view]; }
+    for (UIView *view in @[self.textView, reset]) { view.translatesAutoresizingMaskIntoConstraints = NO; [self.view addSubview:view]; }
     self.editorBottom = [self.textView.bottomAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.bottomAnchor constant:-16];
     [NSLayoutConstraint activateConstraints:@[
-        [help.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:20],
-        [help.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-20],
-        [help.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor constant:16],
-        [reset.topAnchor constraintEqualToAnchor:help.bottomAnchor constant:8],
-        [reset.trailingAnchor constraintEqualToAnchor:help.trailingAnchor],
+        [reset.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor constant:8],
+        [reset.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-20],
         [reset.heightAnchor constraintEqualToConstant:40],
         [self.textView.topAnchor constraintEqualToAnchor:reset.bottomAnchor constant:8],
-        [self.textView.leadingAnchor constraintEqualToAnchor:help.leadingAnchor],
-        [self.textView.trailingAnchor constraintEqualToAnchor:help.trailingAnchor], self.editorBottom,
+        [self.textView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:20],
+        [self.textView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-20], self.editorBottom,
     ]];
     UIToolbar *toolbar = [[UIToolbar alloc] initWithFrame:CGRectMake(0, 0, 0, 44)];
     toolbar.items = @[[[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil],
@@ -178,7 +167,7 @@ void WCGestureEditChatOption(UIViewController *presenter, NSDictionary *option) 
         WCChatTextEditor *editor = [WCChatTextEditor new]; editor.option = option;
         [presenter.navigationController pushViewController:editor animated:YES];
     } else if ([type isEqualToString:@"font-size"]) {
-        [WCPopup showInputWithTitle:title message:@"8–18 点，修改后立即更新预览" text:[NSString stringWithFormat:@"%.0f", [NSUserDefaults.standardUserDefaults doubleForKey:key]]
+        [WCPopup showInputWithTitle:title message:nil text:[NSString stringWithFormat:@"%.0f", [NSUserDefaults.standardUserDefaults doubleForKey:key]]
             placeholder:@"8 - 18" keyboard:UIKeyboardTypeDecimalPad completion:^(NSString *text) {
                 double value = text.doubleValue; if (!isfinite(value)) return;
                 [NSUserDefaults.standardUserDefaults setDouble:MIN(18, MAX(8, value)) forKey:key]; WCGestureSettingsPostChange(key);
@@ -195,7 +184,7 @@ void WCGestureEditChatOption(UIViewController *presenter, NSDictionary *option) 
         } else return;
         NSMutableArray *options = [NSMutableArray array];
         for (NSUInteger i = 0; i < titles.count; i++) [options addObject:[WCPopupOption optionWithTitle:titles[i] value:values[i]]];
-        [WCPopup showOptionsWithTitle:title message:[type isEqualToString:@"filter"] ? @"仅限制自动回复，不影响本地拦截" : nil options:options
+        [WCPopup showOptionsWithTitle:title message:nil options:options
             selected:[NSUserDefaults.standardUserDefaults objectForKey:key] completion:^(id value) {
                 if (!value) return;
                 [NSUserDefaults.standardUserDefaults setObject:value forKey:key];

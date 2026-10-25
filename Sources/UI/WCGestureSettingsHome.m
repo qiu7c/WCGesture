@@ -46,7 +46,7 @@
     CGFloat x = CGRectGetMaxX(self.iconBackground.frame) + 12 * scale;
     CGFloat width = MAX(0, self.card.bounds.size.width - x - 38 * scale);
     BOOL subtitle = self.subtitle.text.length > 0;
-    self.heading.font = [UIFont systemFontOfSize:17 * scale weight:UIFontWeightSemibold];
+    self.heading.font = [UIFont systemFontOfSize:17 * scale weight:UIFontWeightRegular];
     self.subtitle.font = [UIFont systemFontOfSize:12 * scale];
     self.heading.frame = CGRectMake(x, self.card.bounds.size.height / 2 - (subtitle ? 21 : 12) * scale, width, 24 * scale);
     self.subtitle.frame = CGRectMake(x, CGRectGetMaxY(self.heading.frame), width, 18 * scale);
@@ -74,6 +74,10 @@
     self.title = @"One Wx";
     WCRefreshCachedCurrentUser();
     self.tableView.backgroundColor = UIColor.systemGroupedBackgroundColor;
+    // Let the page background continue behind the transparent navigation item,
+    // including when WeChat's shared navigation bar uses an opaque layout.
+    self.edgesForExtendedLayout |= UIRectEdgeTop;
+    self.extendedLayoutIncludesOpaqueBars = YES;
     self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
     self.tableView.keyboardDismissMode = UIScrollViewKeyboardDismissModeOnDrag;
     self.searchField = [UITextField new];
@@ -91,6 +95,7 @@
 }
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
+    WCGestureSettingsConfigureNavigation(self);
     self.searchIndex = [WCGestureDetailController searchEntries];
     self.tableView.rowHeight = 88 * WCGestureSettingsScaleFactor();
     self.tableView.tableHeaderView = WCGestureSettingsSearchHeader(self.searchField, self.view.bounds.size.width);

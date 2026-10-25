@@ -330,9 +330,25 @@ FOUNDATION_EXPORT NSString *const WCGestureMessageRepeatMenuEnabledKey;
 FOUNDATION_EXPORT NSString *const WCGestureMomentsTimeEnabledKey;
 FOUNDATION_EXPORT NSString *const WCGestureMomentsTimeFormatKey;
 FOUNDATION_EXPORT NSString *const WCGestureAutoOriginalEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureAutoDeviceLoginEnabledKey;
 FOUNDATION_EXPORT NSString *const WCGestureVoiceTranscriptionEnabledKey;
 FOUNDATION_EXPORT NSString *const WCGestureVoiceTranscriptionIgnoreGroupKey;
 FOUNDATION_EXPORT NSString *const WCGestureVoiceTranscriptionIgnorePrivateKey;
 FOUNDATION_EXPORT NSString *const WCGestureVoiceTranscriptionIgnoreSelfKey;
 
 NS_ASSUME_NONNULL_END
+
+// Moments monitoring settings and account-scoped runtime state.
+FOUNDATION_EXPORT NSString *const WCGestureBackgroundKeepAliveEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureAdBlockerEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureMomentsInteractionReminderEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureMomentsInteractionReminderDetailsEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureMomentsReminderEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureMomentsReminderUsersKey;
+FOUNDATION_EXPORT NSString *const WCGestureMomentsReminderIntervalKey;
+FOUNDATION_EXPORT NSString *const WCGestureMomentsReminderForwardEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureMomentsReminderForwardTargetKey;
+FOUNDATION_EXPORT NSString *const WCGestureMomentsReminderForwardImagesKey;
+FOUNDATION_EXPORT NSString *const WCGestureMomentsReminderForwardVideosKey;
+FOUNDATION_EXPORT NSString *const WCGestureMomentsReminderSeenItemsKey;
+FOUNDATION_EXPORT NSString *const WCGestureMomentsInteractionStateKey;

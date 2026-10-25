@@ -62,7 +62,7 @@ static void WCPresentActionPicker(__unused UIViewController *presenter, NSString
         [options addObject:[WCPopupOption optionWithTitle:option[@"title"] value:option[@"value"]]];
     }
     [WCPopup showOptionsWithTitle:title
-                          message:(selfMessage ? @"选择自己消息触发的动作" : @"选择对方消息触发的动作；不支持撤回")
+                          message:nil
                           options:options
                          selected:@(current)
                        completion:^(id value) {
@@ -75,7 +75,7 @@ static void WCPresentTriggerDistanceEditor(__unused UIViewController *presenter)
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     NSString *text = [NSString stringWithFormat:@"%.0f", [defaults doubleForKey:WCReplySwipeTriggerDistanceKey]];
     [WCPopup showInputWithTitle:@"触发距离"
-                        message:@"输入 36 到 100 之间的数值；越小越容易触发"
+                        message:nil
                            text:text
                     placeholder:@"36 - 100"
                        keyboard:UIKeyboardTypeDecimalPad
@@ -108,47 +108,40 @@ static void WCPresentKeyboardNumberEditor(__unused UIViewController *presenter,
     BOOL isRounding = [defaultsKey isEqualToString:WCGestureChatInputInnerRadiusKey]
         || [defaultsKey isEqualToString:WCGestureChatInputOuterRadiusKey];
     BOOL isScale = [defaultsKey isEqualToString:WCMomentsHeightScaleKey];
+    BOOL isReminderInterval = [defaultsKey isEqualToString:WCGestureMomentsReminderIntervalKey];
     double minValue = isPageScale ? 70.0 : (isFontLevel ? 1.0 : (isScale ? 100.0 : (isWidth ? 0.0 : (isOffset ? -400.0 : 20.0))));
     double maxValue = isPageScale ? 100.0 : (isFontLevel ? 8.0 : (isScale ? 160.0 : (isWidth ? 1000.0 : (isOffset ? 400.0 : 200.0))));
+    if (isReminderInterval) { minValue = 30; maxValue = 3600; }
     if (isAvatarCorner) { minValue = 0; maxValue = 100; }
     if (isTimeSize) { minValue = 8.0; maxValue = 18.0; }
     if (isRounding || isMomentsCorner) { minValue = 0.0; maxValue = 40.0; }
-    NSString *message;
     NSString *placeholder;
-    if (isMomentsCorner) {
-        message = @"输入 0 到 40；0 为直角，圆角不超过图片短边的一半。仅处理朋友圈图片，关闭后恢复原样。";
+    if (isReminderInterval) {
+        placeholder = @"30 - 3600 秒";
+    } else if (isMomentsCorner) {
         placeholder = @"0 - 40（默认 8）";
     } else if (isAvatarCorner) {
-        message = @"输入 0 到 100；0 为直角，100 为圆形，关闭后恢复微信原样。";
         placeholder = @"0 - 100（默认 100）";
     } else if (isRounding) {
-        message = @"输入 0 到 40；0 为直角，实际圆角不超过控件高度的一半。可进入整页预览观察单行和多行效果。";
         placeholder = @"0 - 40";
     } else if (isTimeSize) {
-        message = @"输入 8 到 18 之间的字号，修改后立即更新预览与当前聊天";
         placeholder = @"8 - 18（默认 10）";
     } else if (isPageScale) {
-        message = @"输入 70 到 100 之间的百分比，越小越紧凑。基于微信最小字号档位缩放；关闭后恢复原设置。修改或关闭后建议重启微信，使缓存布局完整刷新。";
         placeholder = @"70 - 100（默认 90）";
     } else if (isWidth) {
-        message = @"输入 0 到 1000；0 表示与键盘同宽";
         placeholder = @"0 = 满宽";
     } else if (isFontLevel) {
-        message = @"输入 1 到 8 之间的字号级别";
         placeholder = @"1 - 8";
     } else if (isScale) {
-        message = @"输入 100 到 160 之间的百分比";
         placeholder = @"100 - 160";
     } else if (isOffset) {
-        message = @"输入 -400 到 400；正数向右、向上";
         placeholder = @"-400 - 400";
     } else {
-        message = @"输入 20 到 200 之间的数值";
         placeholder = @"20 - 200";
     }
     NSString *text = [NSString stringWithFormat:@"%.0f", [defaults doubleForKey:defaultsKey]];
     [WCPopup showInputWithTitle:title
-                        message:message
+                        message:nil
                            text:text
                     placeholder:placeholder
                        keyboard:(isOffset ? UIKeyboardTypeNumbersAndPunctuation : UIKeyboardTypeDecimalPad)
@@ -191,7 +184,7 @@ static void WCPresentSignatureFontPicker(__unused UIViewController *presenter) {
         [options addObject:[WCPopupOption optionWithTitle:option[@"title"] value:option[@"value"]]];
     }
     [WCPopup showOptionsWithTitle:@"签名字体"
-                          message:@"使用系统自带中文字体；设备缺少该字体时回退为系统字"
+                          message:nil
                           options:options
                          selected:@(current)
                        completion:^(id value) {
@@ -228,7 +221,7 @@ static void WCPresentSignatureDecorationPicker(__unused UIViewController *presen
         [options addObject:[WCPopupOption optionWithTitle:option[@"title"] value:option[@"value"]]];
     }
     [WCPopup showOptionsWithTitle:@"签名装饰"
-                          message:@"装饰符会加在签名两侧，文字本身保持不变"
+                          message:nil
                           options:options
                          selected:@(current)
                        completion:^(id value) {
@@ -278,7 +271,7 @@ static void WCPresentSignatureHexEditor(void) {
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     NSString *current = [defaults stringForKey:WCKeyboardSignatureColorKey] ?: @"";
     [WCPopup showInputWithTitle:@"自定义颜色"
-                        message:@"输入 6 位十六进制颜色，例如 #FF8800"
+                        message:nil
                            text:current
                     placeholder:@"#FF8800"
                        keyboard:UIKeyboardTypeASCIICapable
@@ -302,7 +295,7 @@ static void WCPresentSignatureColorPicker(__unused UIViewController *presenter) 
         [options addObject:[WCPopupOption optionWithTitle:option[@"title"] value:option[@"value"]]];
     }
     [WCPopup showOptionsWithTitle:@"签名颜色"
-                          message:@"「跟随系统」会在浅色/深色键盘上自动换成合适的颜色"
+                          message:nil
                           options:options
                          selected:current
                        completion:^(id value) {
@@ -320,7 +313,7 @@ static void WCPresentSignatureEditor(__unused UIViewController *presenter) {
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     NSString *text = [defaults stringForKey:WCKeyboardSignatureTextKey] ?: @"";
     [WCPopup showInputWithTitle:@"触控区签名"
-                        message:@"显示在触发范围中间；要关闭请用「清除签名」"
+                        message:nil
                            text:text
                     placeholder:@"例如：秋 🌾"
                        keyboard:UIKeyboardTypeDefault
@@ -341,12 +334,9 @@ static NSString *WCSignatureOffsetDescription(double value) {
 static void WCPresentSignatureOffsetEditor(__unused UIViewController *presenter,
                                            NSString *title, NSString *defaultsKey) {
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    BOOL horizontal = [defaultsKey isEqualToString:WCKeyboardSignatureOffsetXKey];
     double value = [defaults doubleForKey:defaultsKey];
     [WCPopup showInputWithTitle:title
-                        message:(horizontal
-                            ? @"输入 -60 到 60；正数向右，0 复位，建议每次调 1~10"
-                            : @"输入 -60 到 60；正数向上，0 复位，建议每次调 1~10")
+                        message:nil
                            text:[NSString stringWithFormat:@"%.0f", value]
                     placeholder:@"-60 - 60"
                        keyboard:UIKeyboardTypeNumbersAndPunctuation
@@ -363,7 +353,7 @@ static void WCPresentSignatureSizeEditor(__unused UIViewController *presenter) {
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     NSString *text = [NSString stringWithFormat:@"%.0f", [defaults doubleForKey:WCKeyboardSignatureSizeKey]];
     [WCPopup showInputWithTitle:@"签名字号"
-                        message:@"输入 6 到 24 之间的数值；会随键盘宽度等比缩放"
+                        message:nil
                            text:text
                     placeholder:@"6 - 24"
                        keyboard:UIKeyboardTypeDecimalPad
@@ -404,7 +394,7 @@ static void WCPresentHapticStylePicker(__unused UIViewController *presenter) {
         [options addObject:[WCPopupOption optionWithTitle:option[@"title"] value:option[@"value"]]];
     }
     [WCPopup showOptionsWithTitle:@"震感强度"
-                          message:@"选择触感反馈强度"
+                          message:nil
                           options:options
                          selected:@(current)
                        completion:^(id value) {
@@ -417,7 +407,7 @@ static void WCPresentPluginNameEditor(__unused UIViewController *presenter) {
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     NSString *name = [defaults stringForKey:WCPluginNameKey] ?: @"One Wx";
     [WCPopup showInputWithTitle:@"插件名称"
-                        message:@"设置在微信插件管理页显示的名字"
+                        message:nil
                            text:name
                     placeholder:@"One Wx"
                        keyboard:UIKeyboardTypeDefault
@@ -453,7 +443,7 @@ static void WCPresentTranslateEnginePicker(__unused UIViewController *presenter)
         [options addObject:[WCPopupOption optionWithTitle:option[@"title"] value:option[@"value"]]];
     }
     [WCPopup showOptionsWithTitle:@"翻译引擎"
-                          message:@"微软翻译与 MyMemory 免费且无需 key；「已配置的 AI」使用上方 AI 服务商，按预设提示词翻译"
+                          message:nil
                           options:options
                          selected:@(current)
                        completion:^(id value) {
@@ -473,7 +463,7 @@ static void WCPresentTranslatePairPicker(__unused UIViewController *presenter) {
                                                     value:language[@"code"]]];
     }
     [WCPopup showOptionsWithTitle:@"互译语言"
-                          message:@"互译动作会自动判断方向：中文换成所选语言，其它语言换成中文"
+                          message:nil
                           options:options
                          selected:current
                        completion:^(id value) {
@@ -519,7 +509,7 @@ static void WCPresentAIProviderPicker(__unused UIViewController *presenter) {
         [options addObject:[WCPopupOption optionWithTitle:option[@"title"] value:option[@"value"]]];
     }
     [WCPopup showOptionsWithTitle:@"AI 服务商"
-                          message:@"选择模板会自动填好接口地址和模型；切换后需重新填写对应的 API Key"
+                          message:nil
                           options:options
                          selected:@(current)
                        completion:^(id value) {
@@ -535,12 +525,12 @@ static void WCPresentAIProviderPicker(__unused UIViewController *presenter) {
 }
 
 static void WCPresentAITextEditor(__unused UIViewController *presenter,
-                                  NSString *title, NSString *message,
+                                  NSString *title,
                                   NSString *defaultsKey, NSString *placeholder) {
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     NSString *text = [defaults stringForKey:defaultsKey] ?: @"";
     [WCPopup showInputWithTitle:title
-                        message:message
+                        message:nil
                            text:text
                     placeholder:placeholder
                        keyboard:UIKeyboardTypeDefault
@@ -554,7 +544,7 @@ static void WCPresentAITextEditor(__unused UIViewController *presenter,
 static void WCPresentAIAPIKeyEditor(__unused UIViewController *presenter) {
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     [WCPopup showSecureInputWithTitle:@"AI API Key"
-                              message:@"输入新的 Key 会覆盖旧值；取消则保持不变"
+                              message:nil
                                  text:@""
                           placeholder:@"sk-..."
                              keyboard:UIKeyboardTypeDefault
@@ -586,7 +576,7 @@ static void WCPresentAIPresetPicker(__unused UIViewController *presenter,
     }
     if (current < 0 || current >= (NSInteger)options.count) current = 0;
     [WCPopup showOptionsWithTitle:title
-                          message:@"方案填了完整提示词就整段替换内置提示词；留空则用内置默认"
+                          message:nil
                           options:options
                          selected:@(current)
                        completion:^(id value) {
@@ -613,7 +603,7 @@ static void WCPresentAIPresetPromptEditor(NSInteger index) {
     if (index < 0 || index >= (NSInteger)presets.count) return;
     NSDictionary<NSString *, NSString *> *preset = presets[(NSUInteger)index];
     [WCPopup showInputWithTitle:[NSString stringWithFormat:@"%@ · 完整提示词", preset[@"name"]]
-                        message:@"这里填整段系统提示词；留空请用「清空提示词」"
+                        message:nil
                            text:preset[@"prompt"]
                     placeholder:@"例如：你是……，只输出……"
                        keyboard:UIKeyboardTypeDefault
@@ -627,7 +617,7 @@ static void WCPresentAIPresetRename(NSInteger index) {
     if (index < 0 || index >= (NSInteger)presets.count) return;
     NSDictionary<NSString *, NSString *> *preset = presets[(NSUInteger)index];
     [WCPopup showInputWithTitle:@"重命名方案"
-                        message:@"输入新的方案名称"
+                        message:nil
                            text:preset[@"name"]
                     placeholder:@"方案名称"
                        keyboard:UIKeyboardTypeDefault
@@ -648,7 +638,7 @@ static void WCPresentAIPresetActions(NSInteger index) {
         [options addObject:[WCPopupOption optionWithTitle:@"删除这个方案" value:@"delete"]];
     }
     [WCPopup showOptionsWithTitle:presets[(NSUInteger)index][@"name"]
-                          message:@"提示词留空时使用内置默认提示词"
+                          message:nil
                           options:options
                          selected:nil
                        completion:^(id value) {
@@ -681,7 +671,7 @@ static void WCPresentAIPresetAdd(void) {
     NSArray<NSDictionary<NSString *, NSString *> *> *presets = WCGestureAIPresets();
     NSString *suggested = [NSString stringWithFormat:@"方案 %lu", (unsigned long)presets.count + 1];
     [WCPopup showInputWithTitle:@"新增方案"
-                        message:@"输入方案名称；创建后点它编辑完整提示词"
+                        message:nil
                            text:suggested
                     placeholder:@"方案名称"
                        keyboard:UIKeyboardTypeDefault
@@ -720,7 +710,7 @@ static void WCPresentAIDefaultPrompts(void) {
         WCGestureAIDefaultPrompt(WCGestureAITaskAnswer),
         WCGestureAIDefaultPrompt(WCGestureAITaskPolish)];
     [WCPopup showTextWithTitle:@"内置提示词"
-                       message:@"方案提示词留空时使用；可复制后改成自己的方案"
+                       message:nil
                           text:text];
 }
 
@@ -844,6 +834,18 @@ static NSDictionary<NSString *, NSString *> *WCConfigShareKeys(void) {
         WCGestureMessageTimeBoldKey,
         WCGestureMessageTimePositionKey,
         WCGesturePageScalePercentKey,
+        WCGestureAutoDeviceLoginEnabledKey,
+        WCGestureBackgroundKeepAliveEnabledKey,
+        WCGestureAdBlockerEnabledKey,
+        WCGestureMomentsInteractionReminderEnabledKey,
+        WCGestureMomentsInteractionReminderDetailsEnabledKey,
+        WCGestureMomentsReminderEnabledKey,
+        WCGestureMomentsReminderUsersKey,
+        WCGestureMomentsReminderIntervalKey,
+        WCGestureMomentsReminderForwardEnabledKey,
+        WCGestureMomentsReminderForwardTargetKey,
+        WCGestureMomentsReminderForwardImagesKey,
+        WCGestureMomentsReminderForwardVideosKey,
     ];
     for (NSString *key in additional) keys[[@"setting:" stringByAppendingString:key]] = key;
     return keys;
@@ -884,13 +886,13 @@ static BOOL WCConfigImportCode(NSString *code) {
 
 static void WCPresentExportConfig(__unused UIViewController *presenter) {
     [WCPopup showTextWithTitle:@"导出配置"
-                       message:@"复制下方口令，在新设备/新账号导入即可恢复设置"
+                       message:nil
                           text:WCConfigExportCode()];
 }
 
 static void WCPresentImportConfig(__unused UIViewController *presenter) {
     [WCPopup showInputWithTitle:@"导入配置"
-                        message:@"粘贴配置口令"
+                        message:nil
                            text:UIPasteboard.generalPasteboard.string
                     placeholder:@"WCG1-..."
                        keyboard:UIKeyboardTypeDefault
@@ -946,7 +948,7 @@ static void WCPresentInputSwipeActionPicker(__unused UIViewController *presenter
         [options addObject:[WCPopupOption optionWithTitle:option[@"title"] value:option[@"value"]]];
     }
     [WCPopup showOptionsWithTitle:title
-                          message:@"选择触发动作"
+                          message:nil
                           options:options
                          selected:@(current)
                        completion:^(id value) {
@@ -959,9 +961,10 @@ static void WCPresentInputSwipeActionPicker(__unused UIViewController *presenter
 
 typedef NS_ENUM(NSInteger, WCRowKind) {
     WCRowKindSwitch,        // toggle
+    WCRowKindMomentsReminderUsers,
+    WCRowKindMomentsReminderForwardTarget,
     WCRowKindSectionTitle,  // section header with no setting value
     WCRowKindGroupToggle,   // tap → fold/unfold the rows below it
-    WCRowKindHint,          // small gray explanatory text, not tappable
     WCRowKindActionDetail,  // tap → message action picker
     WCRowKindInputAction,   // tap → input swipe action picker
     WCRowKindGlobalAction,  // tap → global action picker
@@ -1081,11 +1084,6 @@ static WCRow *WCGroupRow(NSString *title, NSString *key) {
     return row;
 }
 
-static WCRow *WCHintRow(NSString *text) {
-    WCRow *row = WCPlainRow(text, WCRowKindHint);
-    return row;
-}
-
 static NSArray<NSDictionary *> *WCGlobalActionOptions(void) {
     return @[
         @{ @"title": @"不设置", @"value": @(WCGlobalActionNone) },
@@ -1117,7 +1115,7 @@ static void WCPresentGlobalActionPicker(__unused UIViewController *presenter, NS
         [options addObject:[WCPopupOption optionWithTitle:option[@"title"] value:option[@"value"]]];
     }
     [WCPopup showOptionsWithTitle:title
-                          message:@"选择触发动作"
+                          message:nil
                           options:options
                          selected:@(current)
                        completion:^(id value) {
@@ -1194,8 +1192,11 @@ static NSString *WCRowDetailText(WCRow *row) {
             return @"";
         case WCRowKindGroupToggle:
             return [d boolForKey:row.defaultsKey] ? @"收起" : @"展开";
+        case WCRowKindMomentsReminderUsers:
+            return [NSString stringWithFormat:@"%lu 位", (unsigned long)WCGestureMomentsReminderUsers().count];
+        case WCRowKindMomentsReminderForwardTarget:
+            return [d integerForKey:WCGestureMomentsReminderForwardTargetKey] == 1 ? @"文件传输助手" : @"自己的聊天框";
         case WCRowKindSectionTitle:
-        case WCRowKindHint:
             return @"";
         case WCRowKindAIProvider:
             return WCGestureAIProviderName([d integerForKey:WCGestureAIProviderKey]);
@@ -1281,14 +1282,14 @@ static NSString *WCRowDetailText(WCRow *row) {
     NSString *existingClass = [existing[@"class"] isKindOfClass:[NSString class]] ? existing[@"class"] : nil;
     NSString *existingMode = [existing[@"mode"] isKindOfClass:[NSString class]] ? existing[@"mode"] : @"full";
     [WCPopup showInputWithTitle:@"页面备注"
-                        message:@"给这个页面起个名字，显示在列表里"
+                        message:nil
                            text:existingName
                     placeholder:@"例如：扫一扫"
                        keyboard:UIKeyboardTypeDefault
                      completion:^(NSString *name) {
         NSString *remark = name.length > 0 ? name : @"自定义页面";
         [WCPopup showInputWithTitle:@"页面类名"
-                            message:@"可直接 init 的 UIViewController 类名"
+                            message:nil
                                text:existingClass
                         placeholder:@"ViewControllerClassName"
                            keyboard:UIKeyboardTypeASCIICapable
@@ -1299,7 +1300,7 @@ static NSString *WCRowDetailText(WCRow *row) {
                 [WCPopupOption optionWithTitle:@"模态（卡片弹出，可下滑关闭）" value:@"modal"],
             ];
             [WCPopup showOptionsWithTitle:@"打开方式"
-                                  message:@"有些页面只能模态打开，有些更适合全屏"
+                                  message:nil
                                   options:modes
                                  selected:existingMode
                                completion:^(id value) {
@@ -1423,7 +1424,6 @@ static NSString *WCRowDetailText(WCRow *row) {
             NSString *groupKey = @"";
             for (WCRow *row in rows) {
                 if (row.kind == WCRowKindGroupToggle) groupKey = row.defaultsKey;
-                if (row.kind == WCRowKindHint) continue;
                 [entries addObject:@{ @"title": row.title, @"category": @(category),
                     @"categoryTitle": detail.title, @"sectionTitle": rows.firstObject.title,
                     @"sectionKey": detail.collapseKeys[section], @"groupKey": groupKey }];
@@ -1484,33 +1484,26 @@ static NSString *WCRowDetailText(WCRow *row) {
                 row.chatOption = option;
                 [rows addObject:row];
             }
-            [rows addObject:WCHintRow(i == 0 ? @"回复撤回者默认关闭；开启后会自动向该会话发送回复模板。"
-                : @"可先调节并预览；开启开关后应用到实际聊天。")];
             [sections addObject:rows];
             [collapsible addObject:@YES];
             [collapseKeys addObject:[prefix stringByAppendingString:suffixes[i]]];
         }
-        [sections addObject:@[WCSwitchRow(@"语音转发", WCGestureVoiceForwardEnabledKey),
-            WCHintRow(@"长按语音选择转发，使用微信原生选择联系人与语音发送流程。")]];
-        [collapsible addObject:@YES];
+        [sections addObject:@[WCSwitchRow(@"语音转发", WCGestureVoiceForwardEnabledKey)]];
+        [collapsible addObject:@NO];
         [collapseKeys addObject:[prefix stringByAppendingString:@".chat.voice-forward"]];
-        [sections addObject:@[WCSwitchRow(@"聊天记录搜索", WCGestureChatSearchEnabledKey),
-            WCHintRow(@"在聊天顶栏增加搜索按钮，打开微信原生聊天记录搜索。")]];
-        [collapsible addObject:@YES]; [collapseKeys addObject:[prefix stringByAppendingString:@".chat.search"]];
+        [sections addObject:@[WCSwitchRow(@"聊天记录搜索", WCGestureChatSearchEnabledKey)]];
+        [collapsible addObject:@NO]; [collapseKeys addObject:[prefix stringByAppendingString:@".chat.search"]];
         [sections addObject:@[WCSwitchRow(@"引用消息定位", WCGestureQuoteJumpEnabledKey),
             WCSwitchRow(@"定位图片引用", WCGestureQuoteJumpImageKey), WCSwitchRow(@"定位视频引用", WCGestureQuoteJumpVideoKey)]];
         [collapsible addObject:@YES]; [collapseKeys addObject:[prefix stringByAppendingString:@".chat.quote-jump"]];
-        [sections addObject:@[WCSwitchRow(@"长按菜单消息 +1", WCGestureMessageRepeatMenuEnabledKey),
-            WCHintRow(@"为可复读消息增加 +1，可在长按菜单管理中隐藏、排序或改名。点击后立即发送。")]];
-        [collapsible addObject:@YES]; [collapseKeys addObject:[prefix stringByAppendingString:@".chat.repeat-menu"]];
-        [sections addObject:@[WCSwitchRow(@"自动勾选原图", WCGestureAutoOriginalEnabledKey),
-            WCHintRow(@"进入相册选择和图片预览时自动勾选原图；关闭后不再自动修改选择。")]];
-        [collapsible addObject:@YES]; [collapseKeys addObject:[prefix stringByAppendingString:@".chat.auto-original"]];
+        [sections addObject:@[WCSwitchRow(@"长按菜单消息 +1", WCGestureMessageRepeatMenuEnabledKey)]];
+        [collapsible addObject:@NO]; [collapseKeys addObject:[prefix stringByAppendingString:@".chat.repeat-menu"]];
+        [sections addObject:@[WCSwitchRow(@"自动勾选原图", WCGestureAutoOriginalEnabledKey)]];
+        [collapsible addObject:@NO]; [collapseKeys addObject:[prefix stringByAppendingString:@".chat.auto-original"]];
         [sections addObject:@[WCSwitchRow(@"语音自动转文字", WCGestureVoiceTranscriptionEnabledKey),
             WCSwitchRow(@"忽略群聊语音", WCGestureVoiceTranscriptionIgnoreGroupKey),
             WCSwitchRow(@"忽略私聊语音", WCGestureVoiceTranscriptionIgnorePrivateKey),
-            WCSwitchRow(@"忽略自己发送", WCGestureVoiceTranscriptionIgnoreSelfKey),
-            WCHintRow(@"可见语音通过微信原生转文字处理；不重复请求已有结果或本次已尝试的消息。")]];
+            WCSwitchRow(@"忽略自己发送", WCGestureVoiceTranscriptionIgnoreSelfKey)]];
         [collapsible addObject:@YES]; [collapseKeys addObject:[prefix stringByAppendingString:@".chat.voice-transcription"]];
     } else if (self.category == WCGestureCategoryGestures) {
         NSMutableArray *msg = [NSMutableArray array];
@@ -1581,7 +1574,6 @@ static NSString *WCRowDetailText(WCRow *row) {
                 // One shared set by default; turn this on to tune the
                 // third-party keyboard separately.
                 [keyboard addObject:WCSwitchRow(@"第三方单独调节", WCKeyboardStripSeparateAdjustKey)];
-                [keyboard addObject:WCHintRow(@"第三方键盘可能存在偏移，支持独立调节")];
                 if ((self.searchIndexMode || [d boolForKey:WCKeyboardStripSeparateAdjustKey])) {
                     [keyboard addObject:WCNumberRow(@"触控区宽度（官方）", WCKeyboardStripWidthKey)];
                     [keyboard addObject:WCNumberRow(@"触控区高度（官方）", WCKeyboardStripHeightKey)];
@@ -1622,14 +1614,33 @@ static NSString *WCRowDetailText(WCRow *row) {
         [sections addObject:moments];
         [collapsible addObject:@YES];
         [collapseKeys addObject:[prefix stringByAppendingString:@".other.moments"]];
-        [sections addObject:@[WCSwitchRow(@"朋友圈图片圆角", WCGestureMomentsImageCornerEnabledKey),
-            WCNumberRow(@"图片圆角程度", WCGestureMomentsImageCornerRadiusKey),
-            WCHintRow(@"仅处理朋友圈图片，拼图整体裁切；不处理头像、文字块或播放器。0 为直角，关闭恢复原样。")]];
+        [sections addObject:@[WCSwitchRow(@"朋友圈圆角", WCGestureMomentsImageCornerEnabledKey),
+            WCNumberRow(@"圆角程度", WCGestureMomentsImageCornerRadiusKey)]];
         [collapsible addObject:@YES]; [collapseKeys addObject:[prefix stringByAppendingString:@".moments.image-corner"]];
         WCRow *timeFormat = WCPlainRow(@"朋友圈日期格式", WCRowKindChatOption);
         timeFormat.chatOption = @{ @"title": timeFormat.title, @"type": @"format", @"key": WCGestureMomentsTimeFormatKey };
         [sections addObject:@[WCSwitchRow(@"朋友圈精确发布时间", WCGestureMomentsTimeEnabledKey), timeFormat]];
         [collapsible addObject:@YES]; [collapseKeys addObject:[prefix stringByAppendingString:@".moments.precise-time"]];
+        NSMutableArray *reminders = [NSMutableArray arrayWithObjects:
+            WCSwitchRow(@"朋友圈特别关心", WCGestureMomentsReminderEnabledKey),
+            WCPlainRow(@"特别关心好友", WCRowKindMomentsReminderUsers),
+            WCNumberRow(@"检测间隔（秒）", WCGestureMomentsReminderIntervalKey),
+            WCSwitchRow(@"转发到聊天", WCGestureMomentsReminderForwardEnabledKey), nil];
+        if (self.searchIndexMode || [d boolForKey:WCGestureMomentsReminderForwardEnabledKey]) {
+            NSString *forwardGroup = [prefix stringByAppendingString:@".moments.reminder.forward.expanded"];
+            [reminders addObject:WCGroupRow(@"转发选项", forwardGroup)];
+            if (self.searchIndexMode || [d boolForKey:forwardGroup]) {
+                [reminders addObject:WCPlainRow(@"转发目标", WCRowKindMomentsReminderForwardTarget)];
+                [reminders addObject:WCSwitchRow(@"同时转发图片", WCGestureMomentsReminderForwardImagesKey)];
+                [reminders addObject:WCSwitchRow(@"同时转发视频", WCGestureMomentsReminderForwardVideosKey)];
+            }
+        }
+        [sections addObject:reminders];
+        [collapsible addObject:@YES]; [collapseKeys addObject:[prefix stringByAppendingString:@".moments.reminder"]];
+        [sections addObject:@[WCSwitchRow(@"朋友圈互动通知", WCGestureMomentsInteractionReminderEnabledKey),
+            WCSwitchRow(@"显示详细信息", WCGestureMomentsInteractionReminderDetailsEnabledKey)]];
+        [collapsible addObject:@YES]; [collapseKeys addObject:[prefix stringByAppendingString:@".moments.interaction-reminder"]];
+
     } else if (self.category == WCGestureCategoryInterface) {
         NSMutableArray *enhance = [NSMutableArray array];
         [enhance addObject:WCSwitchRow(@"界面大小", WCGesturePageScaleEnabledKey)];
@@ -1659,31 +1670,28 @@ static NSString *WCRowDetailText(WCRow *row) {
         WCRow *roundingPreview = WCPlainRow(@"整页圆角预览与调节", WCRowKindChatOption);
         roundingPreview.chatOption = @{ @"title": roundingPreview.title, @"type": @"input-rounding-position", @"key": @"" };
         [rounding addObject:roundingPreview];
-        [rounding addObject:WCHintRow(@"可先预览再开启。半径 0–40，实际不超过控件高度的一半；关闭后恢复微信原样。")];
         [sections addObject:rounding];
         [collapsible addObject:@YES];
         [collapseKeys addObject:[prefix stringByAppendingString:@".interface.chat-input-rounding"]];
         [sections addObject:@[WCSwitchRow(@"全局头像圆角", WCGestureGlobalAvatarRoundingEnabledKey),
-            WCNumberRow(@"头像圆角程度 (%)", WCGestureGlobalAvatarCornerPercentKey),
-            WCHintRow(@"0 为直角，100 为圆形；聊天预览中的头像也应用当前设置。关闭后恢复原样。")]];
+            WCNumberRow(@"头像圆角程度 (%)", WCGestureGlobalAvatarCornerPercentKey)]];
         [collapsible addObject:@YES];
         [collapseKeys addObject:[prefix stringByAppendingString:@".interface.avatar-rounding"]];
     } else if (self.category == WCGestureCategoryDisabled) {
-        [sections addObject:@[WCSwitchRow(@"隐藏群标题尾部", WCGestureHideGroupTitleTailKey),
-            WCHintRow(@"隐藏群人数与免打扰尾标；更改后重新进入群聊。")]];
-        [collapsible addObject:@YES]; [collapseKeys addObject:[prefix stringByAppendingString:@".interface.group-title"]];
+        [sections addObject:@[WCSwitchRow(@"广告精简", WCGestureAdBlockerEnabledKey)]];
+        [collapsible addObject:@NO]; [collapseKeys addObject:[prefix stringByAppendingString:@".interface.ad-blocker"]];
+        [sections addObject:@[WCSwitchRow(@"隐藏群标题尾部", WCGestureHideGroupTitleTailKey)]];
+        [collapsible addObject:@NO]; [collapseKeys addObject:[prefix stringByAppendingString:@".interface.group-title"]];
         [sections addObject:@[WCSwitchRow(@"隐藏截屏分享浮层", WCGestureHideScreenshotForwardKey)]];
         [collapsible addObject:@NO]; [collapseKeys addObject:[prefix stringByAppendingString:@".interface.screenshot"]];
         [sections addObject:@[WCPlainRow(@"我的页面入口管理", WCRowKindSectionTitle),
             WCSwitchRow(@"隐藏作品入口", WCGestureHideMeFinderKey),
             WCSwitchRow(@"隐藏小店与卡包", WCGestureHideMeCardsKey),
-            WCSwitchRow(@"隐藏表情入口", WCGestureHideMeEmoticonsKey),
-            WCHintRow(@"重新进入“我”页面生效，One Wx 插件入口保留。")]];
+            WCSwitchRow(@"隐藏表情入口", WCGestureHideMeEmoticonsKey)]];
         [collapsible addObject:@YES]; [collapseKeys addObject:[prefix stringByAppendingString:@".interface.me-menu"]];
         WCRow *menu = WCPlainRow(@"隐藏、排序与重命名", WCRowKindChatOption);
         menu.chatOption = @{ @"title": menu.title, @"type": @"long-press-menu", @"key": @"" };
-        [sections addObject:@[WCSwitchRow(@"长按菜单管理", WCGestureLongPressMenuEnabledKey), menu,
-            WCHintRow(@"先长按消息收集菜单，再设置隐藏、顺序和名称；下次长按生效。")]];
+        [sections addObject:@[WCSwitchRow(@"长按菜单管理", WCGestureLongPressMenuEnabledKey), menu]];
         [collapsible addObject:@YES];
         [collapseKeys addObject:[prefix stringByAppendingString:@".chat.long-press-menu"]];
         [sections addObject:@[WCSwitchRow(@"去除所有分割线", WCHideSeparatorLinesKey)]];
@@ -1697,6 +1705,12 @@ static NSString *WCRowDetailText(WCRow *row) {
         [sections addObject:plugin];
         [collapsible addObject:@NO];
         [collapseKeys addObject:[prefix stringByAppendingString:@".plugin"]];
+        [sections addObject:@[WCSwitchRow(@"自动确认登录", WCGestureAutoDeviceLoginEnabledKey)]];
+        [collapsible addObject:@NO];
+        [collapseKeys addObject:[prefix stringByAppendingString:@".automation.device-login"]];
+        [sections addObject:@[WCSwitchRow(@"后台保活", WCGestureBackgroundKeepAliveEnabledKey)]];
+        [collapsible addObject:@NO];
+        [collapseKeys addObject:[prefix stringByAppendingString:@".background.keep-alive"]];
         NSMutableArray *ai = [NSMutableArray array];
         [ai addObject:WCSwitchRow(@"AI 配置", WCGestureAIEnabledKey)];
         if ((self.searchIndexMode || [d boolForKey:WCGestureAIEnabledKey])) {
@@ -1745,7 +1759,9 @@ static NSString *WCRowDetailText(WCRow *row) {
     // sit another level in. Every rebuild also resets depth after folding.
     for (NSUInteger sectionIndex = 0; sectionIndex < sections.count; sectionIndex++) {
         NSArray<WCRow *> *rows = sections[sectionIndex];
-        BOOL hasHeader = [collapsible[sectionIndex] boolValue];
+        // A single setting has no children to expand, even if its saved fold state exists.
+        BOOL hasHeader = [collapsible[sectionIndex] boolValue] && rows.count > 1;
+        collapsible[sectionIndex] = @(hasHeader);
         BOOL insideGroup = NO;
         for (NSUInteger rowIndex = 0; rowIndex < rows.count; rowIndex++) {
             WCRow *row = rows[rowIndex];
@@ -1810,13 +1826,10 @@ static NSString *WCRowDetailText(WCRow *row) {
 
     }
     cell.backgroundColor = UIColor.secondarySystemGroupedBackgroundColor;
-    BOOL isHint = row.kind == WCRowKindHint;
     cell.textLabel.text = row.title;
-    // Hint rows read as a footnote, not as a tappable setting.
-    cell.textLabel.font = [UIFont systemFontOfSize:(isHint ? 13.0 : 17.0)];
-    cell.textLabel.textColor = isHint ? UIColor.secondaryLabelColor : UIColor.labelColor;
-    cell.textLabel.numberOfLines = isHint ? 0 : 1;
-    cell.detailTextLabel.text = (row.kind == WCRowKindSwitch || isHint) ? @"" : WCRowDetailText(row);
+    cell.textLabel.textColor = UIColor.labelColor;
+    cell.textLabel.numberOfLines = 1;
+    cell.detailTextLabel.text = row.kind == WCRowKindSwitch ? @"" : WCRowDetailText(row);
     cell.accessoryView = nil;
     cell.accessoryType = UITableViewCellAccessoryNone;
     cell.selectionStyle = UITableViewCellSelectionStyleNone;
@@ -1832,8 +1845,7 @@ static NSString *WCRowDetailText(WCRow *row) {
     cell.imageView.image = nil;
 
     CGFloat scale = WCGestureSettingsScaleFactor();
-    cell.textLabel.font = [UIFont systemFontOfSize:(isHint ? 13 : (isChild ? 15 : 17)) * scale
-        weight:(isHeaderRow || isGroupRow) ? UIFontWeightSemibold : UIFontWeightRegular];
+    cell.textLabel.font = [UIFont systemFontOfSize:(isChild ? 15 : 17) * scale weight:UIFontWeightRegular];
     cell.detailTextLabel.font = [UIFont systemFontOfSize:13 * scale];
     if (isChild) {
         cell.indentationLevel = row.indentationDepth;
@@ -1866,7 +1878,7 @@ static NSString *WCRowDetailText(WCRow *row) {
         cell.accessoryView = foldArrow;
         cell.detailTextLabel.text = @"";
         cell.selectionStyle = UITableViewCellSelectionStyleDefault;
-    } else if (row.kind != WCRowKindHint) {
+    } else if (row.kind != WCRowKindSectionTitle) {
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
         cell.selectionStyle = UITableViewCellSelectionStyleDefault;
     }
@@ -1893,12 +1905,21 @@ static NSString *WCRowDetailText(WCRow *row) {
     }
     WCRow *row = self.sections[section][indexPath.row];
     switch (row.kind) {
+        case WCRowKindMomentsReminderUsers:
+            [self.navigationController pushViewController:WCGestureCreateMomentsFriendPicker() animated:YES];
+            break;
+        case WCRowKindMomentsReminderForwardTarget:
+            [WCPopup showOptionsWithTitle:@"转发目标" message:nil
+                options:@[[WCPopupOption optionWithTitle:@"自己的聊天框" value:@0],
+                          [WCPopupOption optionWithTitle:@"文件传输助手" value:@1]]
+                selected:@([NSUserDefaults.standardUserDefaults integerForKey:WCGestureMomentsReminderForwardTargetKey])
+                completion:^(id value) { if (value) WCSetInteger([value integerValue], WCGestureMomentsReminderForwardTargetKey); }];
+            break;
         case WCRowKindChatOption:
             WCGestureEditChatOption(self, row.chatOption);
             break;
         case WCRowKindSwitch:
         case WCRowKindSectionTitle:
-        case WCRowKindHint:
             break;
         case WCRowKindGroupToggle: {
             BOOL expanded = [[NSUserDefaults standardUserDefaults] boolForKey:row.defaultsKey];
@@ -1977,7 +1998,6 @@ static NSString *WCRowDetailText(WCRow *row) {
             NSInteger provider = [[NSUserDefaults standardUserDefaults] integerForKey:WCGestureAIProviderKey];
             NSString *fallback = WCGestureAIProviderDefaultBaseURL(provider);
             WCPresentAITextEditor(self, @"AI 接口地址",
-                @"OpenAI 兼容地址；取消则保持当前值，切换服务商可恢复模板默认",
                 WCGestureAIBaseURLKey,
                 fallback.length > 0 ? fallback : @"https://api.example.com/v1");
             break;
@@ -1986,7 +2006,6 @@ static NSString *WCRowDetailText(WCRow *row) {
             NSInteger provider = [[NSUserDefaults standardUserDefaults] integerForKey:WCGestureAIProviderKey];
             NSString *fallback = WCGestureAIProviderDefaultModel(provider);
             WCPresentAITextEditor(self, @"AI 模型",
-                @"填写服务商提供的模型名称；取消则保持当前值",
                 WCGestureAIModelKey,
                 fallback.length > 0 ? fallback : @"模型名称");
             break;

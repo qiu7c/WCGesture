@@ -14,7 +14,7 @@
 %hook BaseMsgContentViewController
 - (void)viewWillAppear:(BOOL)animated {
     %orig;
-    WCGestureChatSearchUpdate(self);
+    WCGestureChatSearchWillAppear(self);
 }
 - (void)viewDidLayoutSubviews {
     %orig;
@@ -23,6 +23,17 @@
 %new
 - (void)wc_openChatSearch:(id)sender {
     WCGestureChatSearchOpen(self, sender);
+}
+%new
+- (void)wc_handleChatSearchEdgePan:(UIScreenEdgePanGestureRecognizer *)recognizer {
+    WCGestureChatSearchHandleEdgePan(self, recognizer);
+}
+%end
+
+%hook MsgSearchHelper
+- (void)wcsDidDismissSearch:(id)searcher {
+    %orig;
+    WCGestureChatSearchDidDismiss(self);
 }
 %end
 

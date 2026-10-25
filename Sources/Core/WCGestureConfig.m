@@ -15,6 +15,20 @@ NSString *const WCGestureMessageRepeatMenuEnabledKey = @"com.qiu7c.onewx.chat.re
 NSString *const WCGestureMomentsTimeEnabledKey = @"com.qiu7c.onewx.moments.precise-time.enabled";
 NSString *const WCGestureMomentsTimeFormatKey = @"com.qiu7c.onewx.moments.precise-time.format";
 NSString *const WCGestureAutoOriginalEnabledKey = @"com.qiu7c.onewx.chat.auto-original.enabled";
+NSString *const WCGestureBackgroundKeepAliveEnabledKey = @"com.qiu7c.onewx.background.keep-alive";
+NSString *const WCGestureAdBlockerEnabledKey = @"com.qiu7c.onewx.interface.ad-blocker.enabled";
+NSString *const WCGestureMomentsInteractionReminderEnabledKey = @"com.qiu7c.onewx.moments.interaction-reminder";
+NSString *const WCGestureMomentsInteractionReminderDetailsEnabledKey = @"com.qiu7c.onewx.moments.interaction-reminder.details";
+NSString *const WCGestureMomentsReminderEnabledKey = @"com.qiu7c.onewx.moments.reminder";
+NSString *const WCGestureMomentsReminderUsersKey = @"com.qiu7c.onewx.moments.reminder.users";
+NSString *const WCGestureMomentsReminderIntervalKey = @"com.qiu7c.onewx.moments.reminder.interval";
+NSString *const WCGestureMomentsReminderForwardEnabledKey = @"com.qiu7c.onewx.moments.reminder.forward";
+NSString *const WCGestureMomentsReminderForwardTargetKey = @"com.qiu7c.onewx.moments.reminder.forward-target";
+NSString *const WCGestureMomentsReminderForwardImagesKey = @"com.qiu7c.onewx.moments.reminder.forward-images";
+NSString *const WCGestureMomentsReminderForwardVideosKey = @"com.qiu7c.onewx.moments.reminder.forward-videos";
+NSString *const WCGestureMomentsReminderSeenItemsKey = @"com.qiu7c.onewx.moments.reminder.seen-items";
+NSString *const WCGestureMomentsInteractionStateKey = @"com.qiu7c.onewx.moments.interaction-reminder.state";
+NSString *const WCGestureAutoDeviceLoginEnabledKey = @"com.qiu7c.onewx.automation.device-login.enabled";
 NSString *const WCGestureVoiceTranscriptionEnabledKey = @"com.qiu7c.onewx.chat.voice-transcription.enabled";
 NSString *const WCGestureVoiceTranscriptionIgnoreGroupKey = @"com.qiu7c.onewx.chat.voice-transcription.ignore-group";
 NSString *const WCGestureVoiceTranscriptionIgnorePrivateKey = @"com.qiu7c.onewx.chat.voice-transcription.ignore-private";
@@ -274,6 +288,20 @@ void WCGestureRegisterDefaults(void) {
             WCGestureMomentsTimeEnabledKey: @NO,
             WCGestureMomentsTimeFormatKey: @"yyyy-MM-dd HH:mm:ss",
             WCGestureAutoOriginalEnabledKey: @NO,
+            WCGestureAutoDeviceLoginEnabledKey: @NO,
+            WCGestureBackgroundKeepAliveEnabledKey: @NO,
+            WCGestureAdBlockerEnabledKey: @NO,
+            WCGestureMomentsInteractionReminderEnabledKey: @NO,
+            WCGestureMomentsInteractionReminderDetailsEnabledKey: @YES,
+            WCGestureMomentsReminderEnabledKey: @NO,
+            WCGestureMomentsReminderUsersKey: @[],
+            WCGestureMomentsReminderIntervalKey: @60,
+            WCGestureMomentsReminderForwardEnabledKey: @NO,
+            WCGestureMomentsReminderForwardTargetKey: @0,
+            WCGestureMomentsReminderForwardImagesKey: @NO,
+            WCGestureMomentsReminderForwardVideosKey: @NO,
+            WCGestureMomentsReminderSeenItemsKey: @{},
+            WCGestureMomentsInteractionStateKey: @{},
             WCGestureVoiceTranscriptionEnabledKey: @NO,
             WCGestureVoiceTranscriptionIgnoreGroupKey: @NO,
             WCGestureVoiceTranscriptionIgnorePrivateKey: @NO,

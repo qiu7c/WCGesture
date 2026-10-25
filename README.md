@@ -49,10 +49,25 @@ The search bar finds settings even when their feature is disabled and opens the 
 ## Latest WCAtlas migrations (device validation pending)
 
 - Interface cleanup: hide group title tails, screenshot sharing overlays, and selected Me-page entries. Reopen the affected page after changing title/entry visibility.
-- Moments: image rounding (0–40pt, default 8) and precise publication dates with a custom format. Rounding saves/restores native layers, rechecks reused images, clips puzzle containers as a whole, and excludes avatar/text/player containers.
-- Chat: native search button, quote location with image/video filters, and a +1 menu item sharing the existing repeat pipeline and menu management.
+- Moments: image rounding (0–40pt, default 8) and precise publication dates with a custom format. Rounding now covers the native inline video container, native grid media and the contact-profile album entrance. It preserves each target’s original layers with one owner, reapplies after private layout, and excludes avatars/text/fullscreen players; the profile/list thumbnail branches still need device hierarchies and verification.
+- Chat: native search button through MMUICommonUtil and the current chat’s MsgSearchHelper/WCSearcher, with cancel/return cleanup (latest correction awaits device validation); quote location with image/video filters; a +1 menu item sharing the existing repeat pipeline and menu management.
 - Native original-quality selection in asset picker/preview; auto transcription for visible voice cells, with private/group/self filters and reuse-safe deferred requests.
 - New feature switches default to off. Auto transcription ignores self-sent voices by default. Configuration share codes preserve old aliases and add 64 setting aliases; runtime records are excluded.
+
+## Automatic device login confirmation (device validation pending)
+
+“插件类配置 → 自动确认登录” confirms computer/tablet device-login cards through WeChat’s native confirm action. Off by default; enabling skips manual confirmation. Detached cards, disabled/error states and replaced login info are checked again before confirmation. Each login-info object is attempted once per card; a failure remains available for manual handling. The setting is included in configuration share codes.
+
+## Moments monitoring and background keep-alive (device validation pending)
+
+- 朋友圈功能 → 朋友圈特别关心: searchable friend selection with native avatars, 30–3600 second checks (default 60), an initial baseline and per-account deduplication. Optional text forwarding to yourself or File Transfer Assistant; images and videos are separate opt-ins, including the Live Photo video branch.
+- 朋友圈功能 → 朋友圈互动通知: native unread-count/message observation for likes and comments, optional details and native Moments initialization. Foreground banner queue and background local notifications open Moments when tapped.
+- 插件类配置 → 后台保活: native background tasks plus on-demand looping silent audio, with cleanup on foreground entry or disable. This remains an independent switch; enabling reminders does not enable keep-alive.
+- All three main switches and forwarding switches default to off. Runtime state is excluded from share codes. Background execution depends on iOS and cannot survive process termination; detection, notifications, media sending and audio coexistence require device testing.
+
+## Ad cleanup (device validation pending)
+
+“禁用类功能 → 广告精简” is off by default. It covers the ported Moments ad-list, public-account ad insertion/push, mini-app splash and known ad-resource URL paths. Private signatures are adapted to 8.0.79. This does not establish complete coverage of video-channel ads; refresh/reopen affected pages when testing.
 
 ## Code layout
 

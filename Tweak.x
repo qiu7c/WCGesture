@@ -17,6 +17,7 @@
 - (void)layoutSubviews {
     %orig;
     WCSeparatorHandleLayoutSubviews(self);
+    WCGestureMomentsImageCornerViewDidLayout(self);
 }
 
 %end
@@ -37,6 +38,7 @@
         // Install after %init so the dock's layoutSubviews chains into the
         // global UIView hook below instead of bypassing it.
         WCInstallKeyboardDockHook();
+        WCGestureMomentsMonitoringStart();
 
         [[NSNotificationCenter defaultCenter] addObserverForName:UIKeyboardWillChangeFrameNotification
                                                           object:nil
@@ -69,6 +71,7 @@
                 WCGestureInterfaceCleanupSettingsChanged(note.object);
                 WCGestureMomentsImageCornerSettingsChanged(note.object);
                 WCGestureMomentsTimeSettingsChanged(note.object);
+                WCGestureMomentsMonitoringSettingsChanged(note.object);
                 WCGestureChatUtilitiesSettingsChanged(note.object);
                 WCGestureVoiceTranscriptionSettingsChanged(note.object);
                 WCGestureMessageTimeSettingsChanged(note.object);

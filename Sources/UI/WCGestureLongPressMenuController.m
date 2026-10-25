@@ -52,7 +52,7 @@ static char WCLongPressToggleTitleKey;
 }
 - (void)addTitle {
     __weak typeof(self) weakSelf = self;
-    [WCPopup showInputWithTitle:@"手动添加菜单" message:@"填写菜单原名称；出现该项目时即可隐藏、排序或重命名。"
+    [WCPopup showInputWithTitle:@"手动添加菜单" message:nil
         text:nil placeholder:@"例如：复制" keyboard:UIKeyboardTypeDefault completion:^(NSString *title) {
             NSUserDefaults *d = NSUserDefaults.standardUserDefaults;
             NSMutableArray *manual = [[d arrayForKey:WCGestureLongPressMenuManualTitlesKey] mutableCopy] ?: [NSMutableArray array];
@@ -63,10 +63,6 @@ static char WCLongPressToggleTitleKey;
         }];
 }
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section { return self.titles.count; }
-- (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
-    return self.allTitles.count ? @"关闭行内开关可隐藏该项；点按修改或恢复名称，排序模式可拖动。修改在下次长按时生效，关闭总开关恢复原菜单。"
-        : @"请先长按不同类型的消息，自动收集菜单；也可点右上角“+”添加原名称。";
-}
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)path {
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"OneWxMenuItem"];
     if (!cell) cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:@"OneWxMenuItem"];
@@ -75,8 +71,7 @@ static char WCLongPressToggleTitleKey;
     id alias = [d dictionaryForKey:WCGestureLongPressMenuTitleMapKey][title];
     BOOL renamed = [alias isKindOfClass:NSString.class] && [alias length];
     cell.textLabel.text = renamed ? alias : title;
-    cell.detailTextLabel.text = renamed ? [@"原名称：" stringByAppendingString:title]
-        : ([[d arrayForKey:WCGestureLongPressMenuManualTitlesKey] containsObject:title] ? @"手动添加" : @"自动获取");
+    cell.detailTextLabel.text = renamed ? title : nil;
     cell.textLabel.font = [UIFont systemFontOfSize:16 * WCGestureSettingsScaleFactor()];
     cell.detailTextLabel.font = [UIFont systemFontOfSize:12 * WCGestureSettingsScaleFactor()];
     cell.detailTextLabel.textColor = UIColor.secondaryLabelColor;
@@ -124,7 +119,7 @@ static char WCLongPressToggleTitleKey;
 }
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)path {
     [tableView deselectRowAtIndexPath:path animated:YES]; NSString *title = self.titles[path.row];
-    [WCPopup showOptionsWithTitle:title message:@"按原名称识别项目，改名不会影响隐藏和排序。"
+    [WCPopup showOptionsWithTitle:title message:nil
         options:@[[WCPopupOption optionWithTitle:@"修改名称" value:@0], [WCPopupOption optionWithTitle:@"恢复原名" value:@1]] selected:nil completion:^(id value) {
             if (!value) return;
             if ([value integerValue] == 1) {
@@ -133,7 +128,7 @@ static char WCLongPressToggleTitleKey;
                 WCGestureSettingsPostChange(WCGestureLongPressMenuTitleMapKey); return;
             }
             NSString *saved = [NSUserDefaults.standardUserDefaults dictionaryForKey:WCGestureLongPressMenuTitleMapKey][title];
-            [WCPopup showInputWithTitle:@"修改菜单名称" message:[@"原名称：" stringByAppendingString:title] text:saved ?: title placeholder:title keyboard:UIKeyboardTypeDefault completion:^(NSString *alias) {
+            [WCPopup showInputWithTitle:@"修改菜单名称" message:nil text:saved ?: title placeholder:title keyboard:UIKeyboardTypeDefault completion:^(NSString *alias) {
                 NSMutableDictionary *map = [[NSUserDefaults.standardUserDefaults dictionaryForKey:WCGestureLongPressMenuTitleMapKey] mutableCopy] ?: [NSMutableDictionary dictionary];
                 if ([alias isEqualToString:title]) [map removeObjectForKey:title]; else map[title] = alias;
                 [NSUserDefaults.standardUserDefaults setObject:map forKey:WCGestureLongPressMenuTitleMapKey]; WCGestureSettingsPostChange(WCGestureLongPressMenuTitleMapKey);

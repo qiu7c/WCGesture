@@ -34,7 +34,17 @@
 #import "Sources/API/WCGestureMomentsTimeAPI.h"
 
 #import "Sources/API/WCGestureAutoOriginalAPI.h"
+#import "Sources/API/WCGestureAutoDeviceLoginAPI.h"
 
 #import "Sources/API/WCGestureVoiceTranscriptionAPI.h"
 
 #import "Sources/API/WCGestureMessageRepeatMenuAPI.h"
+
+#import "Sources/API/WCGestureContactsAPI.h"
+#import "Sources/API/WCGestureMessagingAPI.h"
+#import "Sources/API/WCGestureMomentsNotificationsAPI.h"
+#import "Sources/API/WCGestureMomentsMonitoringAPI.h"
+#import "Sources/API/WCGestureMomentsReminderAPI.h"
+#import "Sources/API/WCGestureMomentsInteractionReminderAPI.h"
+#import "Sources/API/WCGestureBackgroundKeeperAPI.h"
+#import "Sources/API/WCGestureAdBlockerAPI.h"

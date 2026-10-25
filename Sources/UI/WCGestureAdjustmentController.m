@@ -44,7 +44,7 @@ static NSDictionary *WCParameter(NSString *title, NSString *key, double minimum,
     self.controlsPanel.clipsToBounds = YES;
     self.controlsPanel.hidden = YES;
     UILabel *title = [UILabel new]; title.text = @"预览调节"; title.textColor = UIColor.labelColor;
-    title.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
+    title.font = [UIFont systemFontOfSize:16 weight:UIFontWeightRegular];
     UIButton *reset = [UIButton buttonWithType:UIButtonTypeSystem]; [reset setTitle:@"重置" forState:UIControlStateNormal];
     [reset addTarget:self action:@selector(reset) forControlEvents:UIControlEventTouchUpInside];
     UIButton *done = [UIButton buttonWithType:UIButtonTypeSystem]; [done setTitle:@"完成" forState:UIControlStateNormal];
@@ -170,10 +170,6 @@ static NSDictionary *WCParameter(NSString *title, NSString *key, double minimum,
     [self rebuildParameters];
 }
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section { return self.parameters.count; }
-- (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
-    return self.kind == WCGesturePreviewInputRounding
-        ? @"预览展示所选配置；开启总开关后应用到真实聊天。圆角不超过控件高度的一半，可切换多行查看。" : nil;
-}
 - (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)path {
     return self.parameters[path.row][@"minimum"] ? 86 * WCGestureSettingsScaleFactor() : 52 * WCGestureSettingsScaleFactor();
 }
@@ -277,14 +273,14 @@ static NSDictionary *WCParameter(NSString *title, NSString *key, double minimum,
     if (parameter[@"option"]) { WCGestureEditChatOption(self, parameter[@"option"]); return; }
     if (parameter[@"textKey"]) {
         NSString *key = parameter[@"textKey"];
-        [WCPopup showInputWithTitle:parameter[@"title"] message:@"实时预览气泡旁提示文字" text:[NSUserDefaults.standardUserDefaults stringForKey:key] placeholder:@"已拦截撤回"
+        [WCPopup showInputWithTitle:parameter[@"title"] message:nil text:[NSUserDefaults.standardUserDefaults stringForKey:key] placeholder:@"已拦截撤回"
             keyboard:UIKeyboardTypeDefault completion:^(NSString *text) {
                 [NSUserDefaults.standardUserDefaults setObject:text forKey:key]; WCGestureSettingsPostChange(key);
             }];
     } else if (parameter[@"minimum"]) {
         NSString *key = parameter[@"key"];
-        [WCPopup showInputWithTitle:parameter[@"title"] message:[NSString stringWithFormat:@"范围 %@ 到 %@", parameter[@"minimum"], parameter[@"maximum"]]
-            text:[NSString stringWithFormat:@"%.0f", [NSUserDefaults.standardUserDefaults doubleForKey:key]] placeholder:nil keyboard:UIKeyboardTypeNumbersAndPunctuation completion:^(NSString *text) {
+        [WCPopup showInputWithTitle:parameter[@"title"] message:nil
+            text:[NSString stringWithFormat:@"%.0f", [NSUserDefaults.standardUserDefaults doubleForKey:key]] placeholder:[NSString stringWithFormat:@"%@ - %@", parameter[@"minimum"], parameter[@"maximum"]] keyboard:UIKeyboardTypeNumbersAndPunctuation completion:^(NSString *text) {
                 NSScanner *scanner = [NSScanner scannerWithString:text]; double value;
                 if (![scanner scanDouble:&value] || !scanner.isAtEnd || !isfinite(value)) return;
                 [NSUserDefaults.standardUserDefaults setDouble:MIN([parameter[@"maximum"] doubleValue], MAX([parameter[@"minimum"] doubleValue], value)) forKey:key];

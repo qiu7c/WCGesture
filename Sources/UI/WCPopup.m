@@ -146,7 +146,7 @@ typedef NS_ENUM(NSInteger, WCPopupMode) {
 - (UIView *)makeTitleArea {
     UIView *area = [[UIView alloc] init];
     area.translatesAutoresizingMaskIntoConstraints = NO;
-    UILabel *label = [self makeLabel:self.popupTitle font:[UIFont systemFontOfSize:17 * WCGestureSettingsScaleFactor() weight:UIFontWeightSemibold]
+    UILabel *label = [self makeLabel:self.popupTitle font:[UIFont systemFontOfSize:17 * WCGestureSettingsScaleFactor() weight:UIFontWeightRegular]
                                color:UIColor.labelColor align:NSTextAlignmentCenter];
     [area addSubview:label];
     [label.leadingAnchor constraintEqualToAnchor:area.leadingAnchor constant:20].active = YES;
@@ -170,7 +170,7 @@ typedef NS_ENUM(NSInteger, WCPopupMode) {
 - (UIButton *)makeActionButton:(NSString *)title color:(UIColor *)color primary:(BOOL)primary {
     UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem];
     [button setTitle:title forState:UIControlStateNormal];
-    button.titleLabel.font = [UIFont systemFontOfSize:(primary ? 16.5 : 16.0) * WCGestureSettingsScaleFactor() weight:(primary ? UIFontWeightSemibold : UIFontWeightRegular)];
+    button.titleLabel.font = [UIFont systemFontOfSize:(primary ? 16.5 : 16.0) * WCGestureSettingsScaleFactor() weight:UIFontWeightRegular];
     [button setTitleColor:color forState:UIControlStateNormal];
     button.translatesAutoresizingMaskIntoConstraints = NO;
     return button;

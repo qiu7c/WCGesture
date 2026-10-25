@@ -9,6 +9,7 @@ void WCGestureSettingsConfigureNavigation(UIViewController *controller) {
     UINavigationItem *item = controller.navigationItem;
     item.backButtonDisplayMode = UINavigationItemBackButtonDisplayModeMinimal;
     item.largeTitleDisplayMode = UINavigationItemLargeTitleDisplayModeNever;
+    BOOL transparentHome = [controller isKindOfClass:WCGestureSettingsController.class];
     UINavigationBar *bar = controller.navigationController.navigationBar;
     // Scope appearances to our item; the host WeChat navigation bar is shared.
     NSArray *sources = @[
@@ -19,6 +20,15 @@ void WCGestureSettingsConfigureNavigation(UIViewController *controller) {
     NSMutableArray *appearances = [NSMutableArray array];
     for (UINavigationBarAppearance *source in sources) {
         UINavigationBarAppearance *appearance = [source copy];
+        NSMutableDictionary *titleAttributes = [appearance.titleTextAttributes mutableCopy] ?: [NSMutableDictionary dictionary];
+        titleAttributes[NSFontAttributeName] = [UIFont systemFontOfSize:17 * WCGestureSettingsScaleFactor() weight:UIFontWeightRegular];
+        appearance.titleTextAttributes = titleAttributes;
+        if (transparentHome) {
+            [appearance configureWithTransparentBackground];
+            appearance.backgroundEffect = nil;
+            appearance.backgroundColor = UIColor.clearColor;
+            appearance.shadowColor = UIColor.clearColor;
+        }
         UIImage *image = WCGestureSettingsBackImage();
         [appearance setBackIndicatorImage:image transitionMaskImage:image];
         // Also suppress a host-owned previous item's title on the home page.
@@ -31,6 +41,9 @@ void WCGestureSettingsConfigureNavigation(UIViewController *controller) {
     item.standardAppearance = appearances[0];
     item.scrollEdgeAppearance = appearances[1];
     item.compactAppearance = appearances[2];
+    if (@available(iOS 15.0, *)) {
+        if (transparentHome) item.compactScrollEdgeAppearance = appearances[2];
+    }
 }
 
 CGFloat WCGestureSettingsScaleFactor(void) {

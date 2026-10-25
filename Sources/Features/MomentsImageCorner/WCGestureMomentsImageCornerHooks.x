@@ -19,6 +19,39 @@
 }
 %end
 
+%hook WCSNSNodeVideoView
+- (void)layoutSubviews {
+    %orig;
+    WCGestureMomentsImageCornerLayout(self);
+}
+%end
+
+%hook MMImageGridView
+- (void)layoutSubviews {
+    %orig;
+    WCGestureMomentsImageCornerLayout(self);
+}
+%end
+
+%hook WCListPhotoCellView
+- (void)initImageGridView {
+    %orig;
+    WCGestureMomentsImageCornerLayout(self);
+}
+%end
+
+%hook WeixinContactInfoAssist
+- (id)getAlbumView {
+    id view = %orig;
+    WCGestureMomentsImageCornerRegisterProfile(view);
+    return view;
+}
+- (void)albumView:(id)view displayCellsWithDataItems:(id)items cellLeftContext:(double *)context {
+    %orig;
+    WCGestureMomentsImageCornerRegisterProfile(view);
+}
+%end
+
 %ctor {
     %init;
 }

@@ -46,6 +46,9 @@ NS_ASSUME_NONNULL_BEGIN
 @interface BaseMsgContentViewController : UIViewController
 @end
 
+@interface MsgSearchHelper : NSObject
+@end
+
 @interface SystemMessageCellView : UIView
 @end
 
@@ -125,6 +128,65 @@ NS_ASSUME_NONNULL_BEGIN
 @interface MMImagePreviewBrowserController : UIViewController
 @end
 @interface WCContentItemViewTemplateGrid : UIView
+@end
+@interface WCSNSNodeVideoView : UIView
+@end
+@interface MMImageGridView : UIView
+@end
+@interface WCListPhotoCellView : WCListBaseCellView
+@end
+@interface WeixinContactInfoAssist : NSObject
+@end
+
+@interface MultiDeviceCardLoginContentView : UIView
+@property (retain, nonatomic, nullable) id deviceLoginInfo;
+@property (retain, nonatomic, nullable) UIButton *confirmButton;
+@property (nonatomic) long long errorType;
+- (void)onTapConfirmButton;
+@end
+
+@interface MicroMessengerAppDelegate : UIResponder
+@end
+@interface WCNotificationCenterMgr : NSObject
+@end
+@interface NotificationActionsMgr : NSObject
+@end
+
+@interface WebviewJSEventHandler_adDataReport : NSObject
+@end
+@interface WCAdvertiseStatMgr : NSObject
+@end
+@interface WAAppTaskSplashADConfig : NSObject
+@end
+@interface WAJSEventHandler_showSplashAd : NSObject
+@end
+@interface WAJSEventHandler_showSplashAdMenu : NSObject
+@end
+@interface BrandTLExptConfig : NSObject
+@end
+@interface BSTLExptConfig : NSObject
+@end
+@interface BrandTLFlutterViewController : NSObject
+@end
+@interface BoxBrandTLFlutterViewController : NSObject
+@end
+@interface BSTimelineFlutterViewController : NSObject
+@end
+@interface _TtC6WeChat19MagicAdBrandService : NSObject
+@end
+@interface MagicAdPushMgrService : NSObject
+@end
+@interface BrandTimelineMsgMgr : NSObject
+@end
+@interface BoxBrandTimelineMsgMgr : NSObject
+@end
+@interface WAJSEventHandler_adOperateWXData : NSObject
+@end
+@interface WCUserComment : NSObject
+@end
+@interface BrandTLCanvasCardMgr : NSObject
+@end
+@interface WCTimelineMgr : NSObject
 @end
 
 NS_ASSUME_NONNULL_END
