@@ -12,6 +12,6 @@ TWEAK_NAME = OneWx
 OneWx_FILES = Tweak.x $(shell find Sources -type f -name '*.m' -o -type f -name '*.x')
 OneWx_OBJCFLAGS = -fobjc-arc -I$(THEOS_PROJECT_DIR)
 OneWx_LDFLAGS = -Wl,-dead_strip
-OneWx_FRAMEWORKS = UIKit Foundation QuartzCore
+OneWx_FRAMEWORKS = UIKit Foundation QuartzCore WebKit
 
 include $(THEOS_MAKE_PATH)/tweak.mk

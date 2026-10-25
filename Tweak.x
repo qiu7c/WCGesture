@@ -63,6 +63,7 @@
                                                       usingBlock:^(NSNotification *note) {
             // Resync on the next runloop so the cell re-reads the new value.
             dispatch_async(dispatch_get_main_queue(), ^{
+                WCGestureLayoutSettingsChanged(note.object);
                 WCKeyboardEnhanceRefresh();
                 WCSynchronizeVisibleReplyGestures();
                 WCSynchronizeGlobalGestures();

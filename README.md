@@ -10,9 +10,13 @@ One Wx is a WeChat enhancement plugin that grew out of WCGesture (originally ext
 - Per-gesture selectable action: 引用 (quote) · 撤回 (revoke, self only) · 复制 (copy) · 删除 (delete) · 复读 (repeat)
 - Adjustable trigger distance (36–100 points)
 
-**布局与字号 (Layout)** — chat text size and Moments spacing:
-- Chat font level override (reflows chat layout through WeChat's own font level)
-- Moments cell-height compensation for larger text
+**界面大小 (Layout)** — smaller, denser native layouts based on WCAtlas:
+- Enable “界面大小（缩小布局）” under “界面与布局”, then choose 70–100% (default 90%)
+- Scales WeChat's `#font_set` theme values (`alllevel` / `chatLevel`) from font level 1, plus WebView text
+- 100% means the unscaled level-1 baseline; switch the feature off to restore WeChat's original font level
+- Native content reflows through WeChat; fixed-size images and controls are not universally scaled
+- Restart WeChat after changing or disabling the feature to refresh cached native layouts
+- Previously enabled legacy chat-font and Moments-height settings can be adjusted or disabled when interface scaling is off; they are suspended while it is on
 
 **输入框滑动 (Input-box swipe)** — on the chat text input:
 - Left swipe clears the input
@@ -36,7 +40,7 @@ hooks; shared code sits outside `Features/`:
 | `Sources/Features/MessageGestures/` | Bubble swipes/taps, repeat path, voice-upload hooks |
 | `Sources/Features/InputGestures/` | Input-box swipes/taps and their actions |
 | `Sources/Features/KeyboardStrip/` | Keyboard bottom gesture strip |
-| `Sources/Features/ChatLayout/` | Chat font level and Moments cell-height compensation |
+| `Sources/Features/ChatLayout/` | WCAtlas theme/WebView size scaling and legacy layout compatibility |
 | `Sources/Features/Moments/` | Moments double-tap like |
 | `Sources/Features/GlobalActions/` | Multi-finger global actions and custom pages |
 | `Sources/Features/InterfaceTweaks/` | App-wide interface enhancements (separator hiding) |
@@ -55,6 +59,8 @@ translation unit that defines hooks. The app-wide `UIView` hook stays in
 
 Development conventions (layout rules, API and hook rules, new-feature
 checklist) are in [`docs/CONVENTIONS.md`](docs/CONVENTIONS.md).
+Project status, architecture notes and build/CI pitfalls are in
+[`docs/HANDOVER.md`](docs/HANDOVER.md).
 
 ## Entry
 
@@ -85,6 +91,8 @@ All keys live under the `com.qiu7c.onewx.*` namespace. Settings saved by the old
 | `com.qiu7c.onewx.chat.message-gesture.double-tap.self/other-action` | None (0) |
 | `com.qiu7c.onewx.chat.message-gesture.triple-tap.self/other-action` | None (0) |
 | `com.qiu7c.onewx.chat.input-swipe-actions` | NO |
+| `com.qiu7c.onewx.interface.page-scale.enabled` | NO |
+| `com.qiu7c.onewx.interface.page-scale.percent` | 90.0 (70–100) |
 | `com.qiu7c.onewx.chat.layout.enabled` | NO |
 | `com.qiu7c.onewx.chat.layout.font-level` | 2 |
 | `com.qiu7c.onewx.chat.layout.moments-enabled` | NO |

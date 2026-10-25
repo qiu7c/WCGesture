@@ -59,7 +59,10 @@ NSString *const WCGestureAIReplyPresetKey = @"com.qiu7c.onewx.ai.reply-preset";
 NSString *const WCGestureAIAnswerPresetKey = @"com.qiu7c.onewx.ai.answer-preset";
 NSString *const WCGestureAIPolishPresetKey = @"com.qiu7c.onewx.ai.polish-preset";
 
-// Chat layout: font level override and Moments cell-height compensation.
+NSString *const WCGesturePageScaleEnabledKey = @"com.qiu7c.onewx.interface.page-scale.enabled";
+NSString *const WCGesturePageScalePercentKey = @"com.qiu7c.onewx.interface.page-scale.percent";
+
+// Legacy settings retained for compatibility; page scaling takes priority.
 NSString *const WCChatLayoutEnabledKey = @"com.qiu7c.onewx.chat.layout.enabled";
 NSString *const WCChatLayoutFontLevelKey = @"com.qiu7c.onewx.chat.layout.font-level";
 NSString *const WCMomentsLayoutEnabledKey = @"com.qiu7c.onewx.chat.layout.moments-enabled";
@@ -243,6 +246,8 @@ void WCGestureRegisterDefaults(void) {
             WCGestureAIReplyPresetKey: @0,
             WCGestureAIAnswerPresetKey: @0,
             WCGestureAIPolishPresetKey: @0,
+            WCGesturePageScaleEnabledKey: @NO,
+            WCGesturePageScalePercentKey: @90.0,
             WCChatLayoutEnabledKey: @NO,
             WCChatLayoutFontLevelKey: @2,
             WCMomentsLayoutEnabledKey: @NO,

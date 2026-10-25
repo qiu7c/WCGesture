@@ -153,7 +153,11 @@ FOUNDATION_EXPORT NSString *const WCGestureAIReplyPresetKey;
 FOUNDATION_EXPORT NSString *const WCGestureAIAnswerPresetKey;
 FOUNDATION_EXPORT NSString *const WCGestureAIPolishPresetKey;
 
-/// Chat layout: when enabled, CLocalInfo reports this font level instead of
+/// Interface size, based on WCAtlas theme scaling (70–100%, default 90%).
+FOUNDATION_EXPORT NSString *const WCGesturePageScaleEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGesturePageScalePercentKey;
+
+/// Legacy chat layout: when enabled, CLocalInfo reports this font level instead of
 /// the system one, so WeChat reflows chat text at the chosen size.
 FOUNDATION_EXPORT NSString *const WCChatLayoutEnabledKey;
 FOUNDATION_EXPORT NSString *const WCChatLayoutFontLevelKey;

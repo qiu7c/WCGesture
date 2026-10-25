@@ -71,8 +71,18 @@ NS_ASSUME_NONNULL_BEGIN
 @end
 
 @interface CLocalInfo : NSObject
+- (unsigned int)m_uiWebviewFontLevel;
 - (unsigned int)m_uiGlobalFontLevel;
 - (void)setM_uiGlobalFontLevel:(unsigned int)level;
+@end
+
+@interface MMThemeManager : NSObject
+- (id)getValueOfProperty:(id)property inRuleSet:(id)ruleSet;
+- (id)getValueOfProperty:(id)property inRuleSet:(id)ruleSet isAdapt:(BOOL)isAdapt;
+@end
+
+@interface WAThemeProxy : NSObject
++ (id)getValueOfProperty:(id)property inRuleSet:(id)ruleSet;
 @end
 
 @interface WCListBaseCellView : UIView

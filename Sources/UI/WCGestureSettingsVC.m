@@ -101,12 +101,16 @@ static void WCPresentKeyboardNumberEditor(__unused UIViewController *presenter,
         || [defaultsKey isEqualToString:WCKeyboardStripOffsetXKeyThirdParty]
         || [defaultsKey isEqualToString:WCKeyboardStripOffsetYKeyThirdParty];
     BOOL isFontLevel = [defaultsKey isEqualToString:WCChatLayoutFontLevelKey];
+    BOOL isPageScale = [defaultsKey isEqualToString:WCGesturePageScalePercentKey];
     BOOL isScale = [defaultsKey isEqualToString:WCMomentsHeightScaleKey];
-    double minValue = isFontLevel ? 1.0 : (isScale ? 100.0 : (isWidth ? 0.0 : (isOffset ? -400.0 : 20.0)));
-    double maxValue = isFontLevel ? 8.0 : (isScale ? 160.0 : (isWidth ? 1000.0 : (isOffset ? 400.0 : 200.0)));
+    double minValue = isPageScale ? 70.0 : (isFontLevel ? 1.0 : (isScale ? 100.0 : (isWidth ? 0.0 : (isOffset ? -400.0 : 20.0))));
+    double maxValue = isPageScale ? 100.0 : (isFontLevel ? 8.0 : (isScale ? 160.0 : (isWidth ? 1000.0 : (isOffset ? 400.0 : 200.0))));
     NSString *message;
     NSString *placeholder;
-    if (isWidth) {
+    if (isPageScale) {
+        message = @"输入 70 到 100 之间的百分比，越小越紧凑。基于微信最小字号档位缩放；关闭后恢复原设置。修改或关闭后建议重启微信，使缓存布局完整刷新。";
+        placeholder = @"70 - 100（默认 90）";
+    } else if (isWidth) {
         message = @"输入 0 到 1000；0 表示与键盘同宽";
         placeholder = @"0 = 满宽";
     } else if (isFontLevel) {
@@ -130,6 +134,7 @@ static void WCPresentKeyboardNumberEditor(__unused UIViewController *presenter,
                        keyboard:(isOffset ? UIKeyboardTypeNumbersAndPunctuation : UIKeyboardTypeDecimalPad)
                      completion:^(NSString *value) {
         double d = [value doubleValue];
+        if (!isfinite(d)) return;
         if (d < minValue) d = minValue;
         if (d > maxValue) d = maxValue;
         [defaults setDouble:d forKey:defaultsKey];
@@ -1597,13 +1602,20 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
         [collapseKeys addObject:[prefix stringByAppendingString:@".global"]];
     } else if (self.category == WCGestureCategoryEnhance) {
         NSMutableArray *enhance = [NSMutableArray array];
-        [enhance addObject:WCSwitchRow(@"聊天字号定制", WCChatLayoutEnabledKey)];
-        if ([d boolForKey:WCChatLayoutEnabledKey]) {
-            [enhance addObject:WCNumberRow(@"字号级别", WCChatLayoutFontLevelKey)];
-        }
-        [enhance addObject:WCSwitchRow(@"朋友圈高度补偿", WCMomentsLayoutEnabledKey)];
-        if ([d boolForKey:WCMomentsLayoutEnabledKey]) {
-            [enhance addObject:WCNumberRow(@"高度比例 (%)", WCMomentsHeightScaleKey)];
+        [enhance addObject:WCSwitchRow(@"界面大小（缩小布局）", WCGesturePageScaleEnabledKey)];
+        if ([d boolForKey:WCGesturePageScaleEnabledKey]) {
+            [enhance addObject:WCNumberRow(@"界面比例 (%)", WCGesturePageScalePercentKey)];
+        } else {
+            // Only expose already-enabled legacy settings for adjustment or
+            // disabling; new users get one interface-size entry.
+            if ([d boolForKey:WCChatLayoutEnabledKey]) {
+                [enhance addObject:WCSwitchRow(@"旧版聊天字号定制", WCChatLayoutEnabledKey)];
+                [enhance addObject:WCNumberRow(@"字号级别", WCChatLayoutFontLevelKey)];
+            }
+            if ([d boolForKey:WCMomentsLayoutEnabledKey]) {
+                [enhance addObject:WCSwitchRow(@"旧版朋友圈高度补偿", WCMomentsLayoutEnabledKey)];
+                [enhance addObject:WCNumberRow(@"高度比例 (%)", WCMomentsHeightScaleKey)];
+            }
         }
         [enhance addObject:WCSwitchRow(@"去除所有分割线", WCHideSeparatorLinesKey)];
         [sections addObject:enhance];
