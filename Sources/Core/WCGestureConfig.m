@@ -44,6 +44,7 @@ NSString *const WCKeyboardSignatureOffsetXKey = @"com.qiu7c.onewx.input.keyboard
 NSString *const WCKeyboardSignatureOffsetYKey = @"com.qiu7c.onewx.input.keyboard.signature-offset-y";
 NSString *const WCTranslateEngineKey = @"com.qiu7c.onewx.translate.engine";
 NSString *const WCTranslatePairTargetKey = @"com.qiu7c.onewx.translate.pair-target";
+NSString *const WCTranslateEnabledKey = @"com.qiu7c.onewx.translate.enabled";
 
 NSString *const WCGestureAIEnabledKey = @"com.qiu7c.onewx.ai.enabled";
 NSString *const WCGestureAIProviderKey = @"com.qiu7c.onewx.ai.provider";
@@ -134,6 +135,7 @@ static NSArray<NSString *> *WCGestureAllSettingKeys(void) {
         WCKeyboardSignatureOffsetYKey,
         WCTranslateEngineKey,
         WCTranslatePairTargetKey,
+        WCTranslateEnabledKey,
         WCGestureAIEnabledKey,
         WCGestureAIProviderKey,
         WCGestureAIBaseURLKey,
