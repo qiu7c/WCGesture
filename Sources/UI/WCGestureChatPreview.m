@@ -41,30 +41,35 @@
     }
     return self;
 }
-- (CGFloat)contentScale {
-    if (self.kind != WCGesturePreviewLayout) return 1;
-    double percent = [NSUserDefaults.standardUserDefaults doubleForKey:WCGesturePageScalePercentKey];
-    return isfinite(percent) ? MIN(100, MAX(70, percent)) / 100 : 0.9;
+- (void)didMoveToWindow {
+    [super didMoveToWindow];
+    if (self.window && [self.avatar.accessibilityIdentifier isEqualToString:@"com.qiu7c.onewx.preview.avatar-unavailable"]) {
+        [self.avatar removeFromSuperview];
+        self.avatar = WCGestureCurrentUserAvatarView();
+        [self insertSubview:self.avatar atIndex:0];
+        [self setNeedsLayout];
+    }
 }
 - (CGSize)textSizeForWidth:(CGFloat)width {
-    CGFloat scale = self.contentScale;
-    self.body.font = [UIFont systemFontOfSize:12 * scale]; self.body.text = self.text;
+    self.body.font = [UIFont systemFontOfSize:12]; self.body.text = self.text;
     return [self.body sizeThatFits:CGSizeMake(MAX(24, width - 144), CGFLOAT_MAX)];
 }
 - (CGFloat)heightForWidth:(CGFloat)width {
     CGSize text = [self textSizeForWidth:width];
-    return MAX(53, ceil(text.height) + 20 * self.contentScale + 12);
+    return MAX(53, ceil(text.height) + 20 + 12);
 }
 - (void)layoutSubviews {
     [super layoutSubviews];
-    CGFloat width = CGRectGetWidth(self.bounds), scale = self.contentScale;
+    CGFloat width = CGRectGetWidth(self.bounds);
     // 42pt avatars are native control geometry, not the text-size percentage.
     self.avatar.frame = CGRectMake(self.sender ? width - 51 : 9, 2, 42, 42);
+    [self.avatar layoutIfNeeded];
+    WCGestureApplyGlobalAvatarRoundingToHeadView(self.avatar);
     CGSize text = [self textSizeForWidth:width];
-    CGFloat bubbleWidth = MAX(45 * scale, ceil(text.width) + 24 * scale);
-    CGFloat bubbleHeight = MAX(36 * scale, ceil(text.height) + 20 * scale);
+    CGFloat bubbleWidth = MAX(45, ceil(text.width) + 24);
+    CGFloat bubbleHeight = MAX(36, ceil(text.height) + 20);
     self.bubble.frame = CGRectMake(self.sender ? width - 60 - bubbleWidth : 60, 5, bubbleWidth, bubbleHeight);
-    self.body.frame = CGRectMake(12 * scale, 10 * scale, bubbleWidth - 24 * scale, MAX(16 * scale, bubbleHeight - 20 * scale));
+    self.body.frame = CGRectMake(12, 10, bubbleWidth - 24, MAX(16, bubbleHeight - 20));
     UIColor *fill = self.sender ? [UIColor colorWithRed:0.58 green:0.91 blue:0.43 alpha:1] : UIColor.secondarySystemGroupedBackgroundColor;
     if (self.sender) self.body.textColor = UIColor.blackColor; else self.body.textColor = UIColor.labelColor;
     UIBezierPath *path = [UIBezierPath bezierPathWithRoundedRect:self.bubble.bounds cornerRadius:5];
@@ -120,7 +125,6 @@
 @interface WCChatPreview : UIView
 @property (nonatomic, assign) WCGesturePreviewKind kind;
 @property (nonatomic, assign) BOOL editing;
-@property (nonatomic, assign) CGFloat obscuredHeight;
 @property (nonatomic, assign) NSUInteger inputLines;
 @property (nonatomic, copy) void (^backHandler)(void);
 @property (nonatomic, copy) void (^controlsHandler)(void);
@@ -138,7 +142,6 @@
 @property (nonatomic, strong) NSArray<UIImageView *> *inputIcons;
 @property (nonatomic, assign) CGSize lastViewport;
 @property (nonatomic, assign) CGFloat lastContentHeight;
-@property (nonatomic, assign) CGFloat lastObscuredHeight;
 @end
 
 @implementation WCChatPreview
@@ -151,7 +154,7 @@
         _heading.font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold]; _heading.textColor = UIColor.labelColor;
         _heading.adjustsFontSizeToFitWidth = YES; _heading.minimumScaleFactor = 0.8;
         _backButton = [UIButton buttonWithType:UIButtonTypeSystem];
-        [_backButton setImage:[UIImage systemImageNamed:@"chevron.left"] forState:UIControlStateNormal];
+        [_backButton setImage:WCGestureSettingsBackImage() forState:UIControlStateNormal];
         [_backButton addTarget:self action:@selector(back) forControlEvents:UIControlEventTouchUpInside];
         _backButton.accessibilityLabel = @"返回设置";
         _controlsButton = [UIButton buttonWithType:UIButtonTypeSystem]; [_controlsButton setTitle:@"调节" forState:UIControlStateNormal];
@@ -215,14 +218,11 @@
     self.backButton.frame = CGRectMake(4, top, 44, 44);
     self.controlsButton.frame = CGRectMake(width - 60, top, 56, 44);
     self.heading.frame = CGRectMake(52, top, MAX(0, width - 116), 44);
-    self.heading.text = @[@"聊天预览 · 消息时间", @"聊天预览 · 防撤回", @"聊天预览 · 界面大小", @"聊天预览 · 输入圆角"][self.kind];
+    self.heading.text = @[@"聊天预览 · 消息时间", @"聊天预览 · 防撤回", @"聊天预览 · 输入圆角"][self.kind];
     BOOL rounding = self.kind == WCGesturePreviewInputRounding;
-    BOOL elevated = rounding && self.obscuredHeight > 0;
     CGFloat fieldHeight = 33 + 18 * (MAX(1, self.inputLines) - 1);
-    CGFloat inputHeight = fieldHeight + 12 + (elevated ? 0 : self.safeAreaInsets.bottom);
-    // The rounding controls act like a keyboard: keep the toolbar above them
-    // so both radii remain visible while being adjusted.
-    CGFloat inputBottom = height - (elevated ? self.obscuredHeight : 0);
+    CGFloat inputHeight = fieldHeight + 12 + self.safeAreaInsets.bottom;
+    CGFloat inputBottom = height;
     self.inputBar.frame = CGRectMake(0, inputBottom - inputHeight, width, inputHeight);
     CGFloat iconY = fieldHeight - 26.5;
     self.inputIcons[0].frame = CGRectMake(8, iconY, 32, 32);
@@ -254,15 +254,14 @@
             self.localPrompt.frame = CGRectMake(20, y, MAX(0, width - 40), promptHeight); y += promptHeight;
         }
     }
-    CGFloat overlap = elevated ? 0 : MAX(0, self.obscuredHeight - inputHeight);
-    CGFloat visibleHeight = MAX(0, CGRectGetHeight(self.messages.bounds) - overlap);
+    CGFloat visibleHeight = CGRectGetHeight(self.messages.bounds);
     self.messages.contentSize = CGSizeMake(width, y + 12);
-    self.messages.contentInset = UIEdgeInsetsMake(MAX(0, visibleHeight - y - 12), 0, overlap, 0);
-    self.messages.scrollIndicatorInsets = UIEdgeInsetsMake(0, 0, overlap, 0);
-    if ((!CGSizeEqualToSize(self.lastViewport, self.messages.bounds.size) || self.lastContentHeight != y || self.lastObscuredHeight != self.obscuredHeight) && !self.messages.dragging) {
-        self.messages.contentOffset = CGPointMake(0, MAX(-self.messages.contentInset.top, y + 12 + overlap - CGRectGetHeight(self.messages.bounds)));
+    self.messages.contentInset = UIEdgeInsetsMake(MAX(0, visibleHeight - y - 12), 0, 0, 0);
+    self.messages.scrollIndicatorInsets = UIEdgeInsetsZero;
+    if ((!CGSizeEqualToSize(self.lastViewport, self.messages.bounds.size) || self.lastContentHeight != y) && !self.messages.dragging) {
+        self.messages.contentOffset = CGPointMake(0, MAX(-self.messages.contentInset.top, y + 12 - CGRectGetHeight(self.messages.bounds)));
     }
-    self.lastViewport = self.messages.bounds.size; self.lastContentHeight = y; self.lastObscuredHeight = self.obscuredHeight;
+    self.lastViewport = self.messages.bounds.size; self.lastContentHeight = y;
 }
 @end
 
@@ -280,12 +279,6 @@ void WCGestureSetPreviewNavigation(UIView *preview, void (^back)(void), void (^c
         ((WCChatPreview *)preview).backHandler = back; ((WCChatPreview *)preview).controlsHandler = controls;
     }
 }
-void WCGestureSetPreviewObscuredHeight(UIView *preview, CGFloat height) {
-    if ([preview isKindOfClass:WCChatPreview.class] && ((WCChatPreview *)preview).obscuredHeight != height) {
-        ((WCChatPreview *)preview).obscuredHeight = height; [preview setNeedsLayout];
-    }
-}
-
 void WCGestureSetPreviewInputLines(UIView *preview, NSUInteger lines) {
     if ([preview isKindOfClass:WCChatPreview.class]) {
         ((WCChatPreview *)preview).inputLines = MIN(5, MAX(1, lines)); [preview setNeedsLayout];

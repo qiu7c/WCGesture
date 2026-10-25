@@ -1,4 +1,5 @@
 #import <objc/message.h>
+#import <string.h>
 #import <objc/runtime.h>
 #import <QuartzCore/QuartzCore.h>
 
@@ -79,13 +80,35 @@ UIView *WCGestureCurrentUserAvatarView(void) {
     @try {
         id manager = WCServiceForClass(NSClassFromString(@"CContactMgr"));
         id contact = WCTweakValueForSelectorNames(manager, @[@"getSelfContact"]);
-        NSString *userName = WCContactString(contact, "m_nsUsrName");
-        NSString *url = WCContactString(contact, "m_nsHeadImgUrl") ?: @"";
-        Class avatarClass = NSClassFromString(@"MMHeadImageView");
-        SEL initializer = @selector(initWithUsrName:headImgUrl:bAutoUpdate:bRoundCorner:);
-        if (userName.length && [avatarClass instancesRespondToSelector:initializer]) {
-            id native = [[avatarClass alloc] initWithUsrName:userName headImgUrl:url bAutoUpdate:YES bRoundCorner:YES];
-            if ([native isKindOfClass:UIView.class]) view = native;
+        NSString *userName = WCPrivateContactUserName(contact);
+        if (userName.length) {
+            [NSUserDefaults.standardUserDefaults setObject:userName forKey:WCCachedWXIDKey];
+        } else {
+            userName = WCCurrentUserWXID();
+            contact = userName.length ? WCPrivateContact(userName) : nil;
+        }
+        NSString *url = nil;
+        for (NSString *key in @[@"m_nsHeadHDImgUrl", @"m_nsHeadImgUrlHD", @"m_nsHeadImgUrl", @"headImgUrl", @"headImageURL"]) {
+            url = WCContactString(contact, key.UTF8String);
+            if (url.length) break;
+        }
+        Class helper = NSClassFromString(@"MMHeadImageHelper");
+        if (userName.length) for (NSString *name in @[
+            @"getContactHeadImageViewWithUsrName:headImgUrl:bAutoUpdate:bRoundCorner:",
+            @"getMainFrameHeadImageViewWithUsrName:headImgUrl:bAutoUpdate:bRoundCorner:",
+            @"getProfileHeadImageViewWithUsrName:headImgUrl:bAutoUpdate:bRoundCorner:"
+        ]) {
+            SEL selector = NSSelectorFromString(name);
+            if (![helper respondsToSelector:selector]) continue;
+            NSMethodSignature *signature = [helper methodSignatureForSelector:selector];
+            if (!signature || signature.numberOfArguments != 6 || signature.methodReturnType[0] != '@' ||
+                [signature getArgumentTypeAtIndex:2][0] != '@' || [signature getArgumentTypeAtIndex:3][0] != '@' ||
+                !strchr("BcCsSiIlLqQ", [signature getArgumentTypeAtIndex:4][0]) ||
+                !strchr("BcCsSiIlLqQ", [signature getArgumentTypeAtIndex:5][0])) continue;
+            @try {
+                id native = ((id (*)(id, SEL, id, id, BOOL, BOOL))objc_msgSend)(helper, selector, userName, url ?: @"", YES, YES);
+                if ([native isKindOfClass:UIView.class]) { view = native; break; }
+            } @catch (__unused NSException *exception) {}
         }
         if (!view && contact) {
             id image = WCTweakValueForSelectorNames(contact, @[@"getContactHeadImage", @"contactHeadImage", @"headImage"]);
@@ -101,6 +124,6 @@ UIView *WCGestureCurrentUserAvatarView(void) {
     }
     view.userInteractionEnabled = NO;
     view.contentMode = UIViewContentModeScaleAspectFill;
-    view.layer.cornerRadius = 6; view.clipsToBounds = YES;
+    if ([view isKindOfClass:UIImageView.class]) { view.layer.cornerRadius = 6; view.clipsToBounds = YES; }
     return view;
 }

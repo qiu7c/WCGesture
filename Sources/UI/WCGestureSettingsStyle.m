@@ -1,5 +1,38 @@
 #import "Sources/API/WCGestureInternal.h"
 
+UIImage *WCGestureSettingsBackImage(void) {
+    UIImageSymbolConfiguration *configuration = [UIImageSymbolConfiguration configurationWithPointSize:20 weight:UIImageSymbolWeightSemibold];
+    return [UIImage systemImageNamed:@"chevron.left" withConfiguration:configuration];
+}
+
+void WCGestureSettingsConfigureNavigation(UIViewController *controller) {
+    UINavigationItem *item = controller.navigationItem;
+    item.backButtonDisplayMode = UINavigationItemBackButtonDisplayModeMinimal;
+    item.largeTitleDisplayMode = UINavigationItemLargeTitleDisplayModeNever;
+    UINavigationBar *bar = controller.navigationController.navigationBar;
+    // Scope appearances to our item; the host WeChat navigation bar is shared.
+    NSArray *sources = @[
+        bar.standardAppearance ?: [UINavigationBarAppearance new],
+        bar.scrollEdgeAppearance ?: bar.standardAppearance ?: [UINavigationBarAppearance new],
+        bar.compactAppearance ?: bar.standardAppearance ?: [UINavigationBarAppearance new]
+    ];
+    NSMutableArray *appearances = [NSMutableArray array];
+    for (UINavigationBarAppearance *source in sources) {
+        UINavigationBarAppearance *appearance = [source copy];
+        UIImage *image = WCGestureSettingsBackImage();
+        [appearance setBackIndicatorImage:image transitionMaskImage:image];
+        // Also suppress a host-owned previous item's title on the home page.
+        for (UIBarButtonItemStateAppearance *state in @[
+            appearance.backButtonAppearance.normal, appearance.backButtonAppearance.highlighted,
+            appearance.backButtonAppearance.disabled, appearance.backButtonAppearance.focused
+        ]) state.titlePositionAdjustment = UIOffsetMake(-1000, 0);
+        [appearances addObject:appearance];
+    }
+    item.standardAppearance = appearances[0];
+    item.scrollEdgeAppearance = appearances[1];
+    item.compactAppearance = appearances[2];
+}
+
 CGFloat WCGestureSettingsScaleFactor(void) {
     return [NSUserDefaults.standardUserDefaults boolForKey:WCGesturePageScalePluginUIKey]
         ? WCGestureLayoutScaleFactor() : 1.0;

@@ -13,6 +13,8 @@
 #import "Sources/API/WCGestureAntiRevokeAPI.h"
 #import "Sources/API/WCGestureMessageTimeAPI.h"
 #import "Sources/API/WCGestureMessageAPI.h"
+#import "Sources/API/WCGestureVoiceForwardAPI.h"
+#import "Sources/API/WCGestureLongPressMenuAPI.h"
 #import "Sources/API/WCGestureInputAPI.h"
 #import "Sources/API/WCGestureKeyboardAPI.h"
 #import "Sources/API/WCGestureGlobalAPI.h"
@@ -20,3 +22,19 @@
 #import "Sources/API/WCGestureInterfaceAPI.h"
 #import "Sources/API/WCGestureSettingsAPI.h"
 #import "Sources/API/WCGesturePopupAPI.h"
+
+#import "Sources/API/WCGestureAvatarAppearanceAPI.h"
+
+#import "Sources/API/WCGestureInterfaceCleanupAPI.h"
+
+#import "Sources/API/WCGestureMomentsImageCornerAPI.h"
+
+#import "Sources/API/WCGestureChatUtilitiesAPI.h"
+
+#import "Sources/API/WCGestureMomentsTimeAPI.h"
+
+#import "Sources/API/WCGestureAutoOriginalAPI.h"
+
+#import "Sources/API/WCGestureVoiceTranscriptionAPI.h"
+
+#import "Sources/API/WCGestureMessageRepeatMenuAPI.h"

@@ -70,6 +70,7 @@
 }
 - (void)viewDidLoad {
     [super viewDidLoad];
+    WCGestureSettingsConfigureNavigation(self);
     self.title = @"One Wx";
     WCRefreshCachedCurrentUser();
     self.tableView.backgroundColor = UIColor.systemGroupedBackgroundColor;

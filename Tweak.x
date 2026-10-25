@@ -64,6 +64,13 @@
             // Resync on the next runloop so the cell re-reads the new value.
             dispatch_async(dispatch_get_main_queue(), ^{
                 WCGestureLayoutSettingsChanged(note.object);
+                WCGestureChatInputRoundingSettingsChanged(note.object);
+                WCGestureRefreshTrackedGlobalAvatarViews();
+                WCGestureInterfaceCleanupSettingsChanged(note.object);
+                WCGestureMomentsImageCornerSettingsChanged(note.object);
+                WCGestureMomentsTimeSettingsChanged(note.object);
+                WCGestureChatUtilitiesSettingsChanged(note.object);
+                WCGestureVoiceTranscriptionSettingsChanged(note.object);
                 WCGestureMessageTimeSettingsChanged(note.object);
                 WCGestureAntiRevokeSettingsChanged(note.object);
                 WCKeyboardEnhanceRefresh();

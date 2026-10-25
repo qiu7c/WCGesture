@@ -1,5 +1,7 @@
 # One Wx
 
+Current package version: 1.0.0.
+
 One Wx is a WeChat enhancement plugin that grew out of WCGesture (originally extracted from [WCAtlas](https://github.com/qiu7c/WCAtlas)). It covers gestures, the keyboard strip, AI, translation, global actions, layout and interface tweaks.
 
 ## Features
@@ -10,7 +12,10 @@ The search bar finds settings even when their feature is disabled and opens the 
 **聊天工具 (Chat tools)**:
 - Anti-revoke ports WCAtlas's original message lookup/interception, local system-message or side-prompt display, templates, light/dark colors, optional sender reply and age filter, searchable records and optional local persistence. Disabled by default; automatic replies are also off by default.
 - Message times port WCAtlas's below-avatar / bubble-side modes, avatar spacing, custom date format, 8–18pt font, bold, light/dark colors, split-message handling and reuse-safe refresh. Disabled by default.
-- A full-page chat preview includes the chat header, native account avatars, separate message rows and an input-bar mock. The top-right control opens a panel for time / anti-revoke / layout / input-rounding adjustments, dragging, numeric entry, reset and light/dark preview.
+- A full-page chat preview includes the chat header, native account avatars, separate message rows and an input-bar mock. The top-right control opens a panel for time / anti-revoke / input-rounding adjustments, dragging, numeric entry, reset and light/dark preview. The panel has a 12pt gap from the preview. Layout scaling has no simulated preview.
+- Voice forwarding reuses the native recipient picker and existing voice resend/upload pipeline; off by default.
+- Long-press menu management supports discovery, manual names, hiding, drag sorting and renaming with the current card/search UI; off by default.
+- Global avatar rounding supports 0–100% (100% circular), restores original layers when disabled and applies to preview avatars. Avatar loading uses WCAtlas's MMHeadImageHelper factories and the current account contact.
 - The old inline previews have been removed from settings. Real labels and full-page previews share formatting/style and row-local coordinate helpers; the input bar is illustrative and sends no messages.
 - Time labels hide when there is insufficient side space. Actual message rendering and recall behavior still require device validation.
 
@@ -41,6 +46,14 @@ The search bar finds settings even when their feature is disabled and opens the 
 
 复读 (repeat) covers text, image, video, and voice messages. Voice repeat sends through WeChat's native `AudioSender` resend pipeline; other types go through the native `ForwardMessageLogicController`. Unlike WCAtlas, this build does **not** include the send-confirmation dialog — repeat fires immediately.
 
+## Latest WCAtlas migrations (device validation pending)
+
+- Interface cleanup: hide group title tails, screenshot sharing overlays, and selected Me-page entries. Reopen the affected page after changing title/entry visibility.
+- Moments: image rounding (0–40pt, default 8) and precise publication dates with a custom format. Rounding saves/restores native layers, rechecks reused images, clips puzzle containers as a whole, and excludes avatar/text/player containers.
+- Chat: native search button, quote location with image/video filters, and a +1 menu item sharing the existing repeat pipeline and menu management.
+- Native original-quality selection in asset picker/preview; auto transcription for visible voice cells, with private/group/self filters and reuse-safe deferred requests.
+- New feature switches default to off. Auto transcription ignores self-sent voices by default. Configuration share codes preserve old aliases and add 64 setting aliases; runtime records are excluded.
+
 ## Code layout
 
 `Tweak.x` contains only the app-wide `UIView` hook and the `%ctor` that wires
@@ -65,6 +78,16 @@ hooks; shared code sits outside `Features/`:
 | `Sources/Features/KeyboardStrip/` | Keyboard bottom gesture strip |
 | `Sources/Features/ChatLayout/` | WCAtlas theme/WebView size scaling and legacy layout compatibility |
 | `Sources/Features/ChatInputAppearance/` | Input/toolbar rounding, restoration and native layout hooks |
+| `Sources/Features/InterfaceCleanup/` | Group title, screenshot overlay and Me-entry visibility |
+| `Sources/Features/MomentsImageCorner/` | Scoped image rounding, reuse and original-state restoration |
+| `Sources/Features/MomentsTime/` | Precise Moments publication dates |
+| `Sources/Features/ChatUtilities/` | Native chat search and referenced-message location |
+| `Sources/Features/MessageRepeatMenu/` | +1 menu using the existing repeat API |
+| `Sources/Features/AutoOriginal/` | Original-quality picker/preview selection |
+| `Sources/Features/VoiceTranscription/` | Native visible-voice transcription with filtering and deduplication |
+| `Sources/Features/AvatarAppearance/` | Global avatar rounding and restoration |
+| `Sources/Features/VoiceForward/` | Native voice forwarding using the shared resend pipeline |
+| `Sources/Features/LongPressMenu/` | Discover, hide, order and rename native menu items |
 | `Sources/Features/Moments/` | Moments double-tap like |
 | `Sources/Features/GlobalActions/` | Multi-finger global actions and custom pages |
 | `Sources/Features/InterfaceTweaks/` | App-wide interface enhancements (separator hiding) |

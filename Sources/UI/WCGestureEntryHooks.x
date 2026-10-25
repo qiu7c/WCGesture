@@ -5,9 +5,6 @@
 
 #pragma mark - Me page entry hook
 
-@interface MoreViewController : UIViewController
-- (void)addFunctionSection;
-@end
 
 // Adds a "One Wx" row to WeChat's Me page (MoreViewController). We also
 // register through WCPluginsMgr when available; either entry opens the

@@ -40,6 +40,7 @@ NSArray<NSDictionary *> *WCGestureChatOptions(BOOL antiRevoke, BOOL includeHidde
 NSString *WCGestureChatOptionDetail(NSDictionary *option) {
     NSString *type = option[@"type"], *key = option[@"key"];
     NSUserDefaults *d = NSUserDefaults.standardUserDefaults;
+    if ([type isEqualToString:@"long-press-menu"]) return [NSString stringWithFormat:@"%lu 项", (unsigned long)WCGestureLongPressMenuTitles().count];
     if ([type isEqualToString:@"prompt-style"]) return [d integerForKey:key] == 1 ? @"气泡旁" : @"消息下方";
     if ([type isEqualToString:@"time-mode"]) return [d boolForKey:key] ? @"消息右侧" : @"头像下方";
     if ([type isEqualToString:@"format"]) return [d stringForKey:key] ?: @"MM-dd HH:mm:ss";
@@ -64,7 +65,8 @@ NSString *WCGestureChatOptionDetail(NSDictionary *option) {
 @property (nonatomic, copy) NSString *defaultsKey;
 @end
 @implementation WCChatColorPicker
-- (void)viewDidLoad { [super viewDidLoad]; self.delegate = self; self.supportsAlpha = YES; }
+- (void)viewDidLoad { [super viewDidLoad];
+    WCGestureSettingsConfigureNavigation(self); self.delegate = self; self.supportsAlpha = YES; }
 - (void)saveColor:(UIColor *)color {
     UIColor *resolved = [color resolvedColorWithTraitCollection:self.traitCollection];
     [NSUserDefaults.standardUserDefaults setObject:WCGestureHexStringFromColor(resolved) forKey:self.defaultsKey];
@@ -85,17 +87,20 @@ NSString *WCGestureChatOptionDetail(NSDictionary *option) {
 @implementation WCChatTextEditor
 - (NSString *)defaultText {
     NSString *key = self.option[@"key"];
-    if ([self.option[@"type"] isEqualToString:@"format"]) return @"MM-dd HH:mm:ss";
+    if ([self.option[@"type"] isEqualToString:@"format"]) return [key isEqualToString:WCGestureMomentsTimeFormatKey] ? @"yyyy-MM-dd HH:mm:ss" : @"MM-dd HH:mm:ss";
     return WCGestureAntiRevokeDefaultTemplate([key isEqualToString:WCGestureAntiRevokeReplyTemplateKey]);
 }
 - (void)viewDidLoad {
     [super viewDidLoad];
+    WCGestureSettingsConfigureNavigation(self);
     self.title = self.option[@"title"];
     self.view.backgroundColor = UIColor.systemGroupedBackgroundColor;
     self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"保存" style:UIBarButtonItemStyleDone target:self action:@selector(save)];
     UILabel *help = [UILabel new];
     help.text = [self.option[@"type"] isEqualToString:@"format"] ? @"支持 yyyy、MM、dd、E、HH、mm、ss，可组合分隔文字。留空恢复默认。"
         : @"支持 {用户名}、{内容}、{yyyy}、{MM}、{dd}、{HH}、{mm}、{ss} 和换行。";
+    if ([self.option[@"key"] isEqualToString:WCGestureMomentsTimeFormatKey])
+        help.text = @"支持 yyyy、MM、dd、E、HH、mm、ss；留空恢复默认。朋友圈时间保持单行，换行按空格显示。";
     help.numberOfLines = 0;
     help.font = [UIFont systemFontOfSize:13 * WCGestureSettingsScaleFactor()];
     help.textColor = UIColor.secondaryLabelColor;
@@ -155,11 +160,13 @@ NSString *WCGestureChatOptionDetail(NSDictionary *option) {
 void WCGestureEditChatOption(UIViewController *presenter, NSDictionary *option) {
     NSString *type = option[@"type"], *key = option[@"key"], *title = option[@"title"];
     NSDictionary *previewKinds = @{ @"time-position": @(WCGesturePreviewMessageTime),
-        @"revoke-position": @(WCGesturePreviewAntiRevoke), @"layout-position": @(WCGesturePreviewLayout),
+        @"revoke-position": @(WCGesturePreviewAntiRevoke),
         @"input-rounding-position": @(WCGesturePreviewInputRounding) };
     NSNumber *previewKind = previewKinds[type];
     if (previewKind) {
         [presenter.navigationController pushViewController:WCGestureCreatePositionEditor(previewKind.integerValue) animated:YES];
+    } else if ([type isEqualToString:@"long-press-menu"]) {
+        [presenter.navigationController pushViewController:WCGestureCreateLongPressMenuController() animated:YES];
     } else if ([type isEqualToString:@"records"]) {
         [presenter.navigationController pushViewController:WCGestureCreateRevokeRecordsController() animated:YES];
     } else if ([type isEqualToString:@"color"]) {

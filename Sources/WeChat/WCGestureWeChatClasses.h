@@ -17,7 +17,11 @@ NS_ASSUME_NONNULL_BEGIN
 - (instancetype)initWithTitle:(NSString *)title icon:(nullable UIImage *)icon target:(id)target action:(SEL)action;
 @end
 
-@interface CommonMessageCellView : UIView
+@interface BaseMessageCellView : UIView
+- (NSArray *)filteredMenuItems:(NSArray *)items;
+@end
+
+@interface CommonMessageCellView : BaseMessageCellView
 @property (nonatomic, strong) id viewModel;
 - (void)setViewModel:(id)viewModel;
 - (void)didMoveToWindow;
@@ -33,6 +37,10 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)onDelete:(id)sender;
 - (void)onDeleteMessage:(id)sender;
 - (void)onHeadImageLongPressed:(id)sender;
+@end
+
+@interface VoiceMessageCellView : CommonMessageCellView
+- (NSArray *)operationMenuItems;
 @end
 
 @interface BaseMsgContentViewController : UIViewController
@@ -100,6 +108,23 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface WCTimeLineCommentCellView : UIView
 + (double)getCellHeightForDataItem:(id)item RowIndex:(long long)rowIndex pageContext:(id)context;
+@end
+
+@interface FakeHeadImageView : UIView
+@end
+
+
+@interface RoomContentLogicController : NSObject
+@end
+@interface MMScreenShotViewController : UIViewController
+@end
+@interface MoreViewController : UIViewController
+@end
+@interface MMAssetPickerController : UIViewController
+@end
+@interface MMImagePreviewBrowserController : UIViewController
+@end
+@interface WCContentItemViewTemplateGrid : UIView
 @end
 
 NS_ASSUME_NONNULL_END

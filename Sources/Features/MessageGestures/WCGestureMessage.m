@@ -534,6 +534,10 @@ static BOOL WCRepeatVoiceMessage(id source, NSString *session) {
     return WCSendVoiceMessage(source, nil, session);
 }
 
+BOOL WCGestureResendVoiceMessage(id message, NSString *session) {
+    return WCSendVoiceMessage(message, nil, session);
+}
+
 static BOOL WCRepeatPlainTextMessageFallback(CommonMessageCellView *cell) {
     id source = WCMessageWrapForCell(cell);
     NSInteger messageType = [WCTweakSafeValue(source, @"m_uiMessageType") integerValue];
@@ -602,6 +606,8 @@ static BOOL WCRepeatMessage(CommonMessageCellView *cell) {
     }
     return WCRepeatPlainTextMessageFallback(cell);
 }
+
+BOOL WCGestureRepeatMessage(CommonMessageCellView *cell) { return WCRepeatMessage(cell); }
 
 #pragma mark - Perform gesture action
 

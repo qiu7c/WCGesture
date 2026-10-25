@@ -14,7 +14,6 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
 typedef NS_ENUM(NSInteger, WCGesturePreviewKind) {
     WCGesturePreviewMessageTime,
     WCGesturePreviewAntiRevoke,
-    WCGesturePreviewLayout,
     WCGesturePreviewInputRounding,
 };
 
@@ -22,13 +21,13 @@ UIView *WCGestureCreateChatPreview(WCGesturePreviewKind kind);
 void WCGestureSetPreviewEditing(UIView *preview, BOOL editing);
 void WCGestureSetChatPreviewKind(UIView *preview, WCGesturePreviewKind kind);
 void WCGestureSetPreviewNavigation(UIView *preview, void (^back)(void), void (^controls)(void));
-void WCGestureSetPreviewObscuredHeight(UIView *preview, CGFloat height);
 void WCGestureSetPreviewInputLines(UIView *preview, NSUInteger lines);
 UIViewController *WCGestureCreatePositionEditor(WCGesturePreviewKind kind);
 /// Reusable editor. Numeric descriptors use title/key/minimum/maximum/reset;
 /// option descriptors use the same option dictionaries as ChatOptions.
 UIViewController *WCGestureCreateAdjustmentEditor(NSString *title, UIView *preview, NSArray<NSDictionary *> *parameters);
 UIViewController *WCGestureCreateRevokeRecordsController(void);
+UIViewController *WCGestureCreateLongPressMenuController(void);
 NSArray<NSDictionary *> *WCGestureChatOptions(BOOL antiRevoke, BOOL includeHidden);
 NSString *WCGestureChatOptionDetail(NSDictionary *option);
 void WCGestureEditChatOption(UIViewController *presenter, NSDictionary *option);

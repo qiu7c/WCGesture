@@ -102,17 +102,26 @@ static void WCPresentKeyboardNumberEditor(__unused UIViewController *presenter,
         || [defaultsKey isEqualToString:WCKeyboardStripOffsetYKeyThirdParty];
     BOOL isFontLevel = [defaultsKey isEqualToString:WCChatLayoutFontLevelKey];
     BOOL isPageScale = [defaultsKey isEqualToString:WCGesturePageScalePercentKey];
+    BOOL isMomentsCorner = [defaultsKey isEqualToString:WCGestureMomentsImageCornerRadiusKey];
+    BOOL isAvatarCorner = [defaultsKey isEqualToString:WCGestureGlobalAvatarCornerPercentKey];
     BOOL isTimeSize = [defaultsKey isEqualToString:WCGestureMessageTimeFontSizeKey];
     BOOL isRounding = [defaultsKey isEqualToString:WCGestureChatInputInnerRadiusKey]
         || [defaultsKey isEqualToString:WCGestureChatInputOuterRadiusKey];
     BOOL isScale = [defaultsKey isEqualToString:WCMomentsHeightScaleKey];
     double minValue = isPageScale ? 70.0 : (isFontLevel ? 1.0 : (isScale ? 100.0 : (isWidth ? 0.0 : (isOffset ? -400.0 : 20.0))));
     double maxValue = isPageScale ? 100.0 : (isFontLevel ? 8.0 : (isScale ? 160.0 : (isWidth ? 1000.0 : (isOffset ? 400.0 : 200.0))));
+    if (isAvatarCorner) { minValue = 0; maxValue = 100; }
     if (isTimeSize) { minValue = 8.0; maxValue = 18.0; }
-    if (isRounding) { minValue = 0.0; maxValue = 40.0; }
+    if (isRounding || isMomentsCorner) { minValue = 0.0; maxValue = 40.0; }
     NSString *message;
     NSString *placeholder;
-    if (isRounding) {
+    if (isMomentsCorner) {
+        message = @"输入 0 到 40；0 为直角，圆角不超过图片短边的一半。仅处理朋友圈图片，关闭后恢复原样。";
+        placeholder = @"0 - 40（默认 8）";
+    } else if (isAvatarCorner) {
+        message = @"输入 0 到 100；0 为直角，100 为圆形，关闭后恢复微信原样。";
+        placeholder = @"0 - 100（默认 100）";
+    } else if (isRounding) {
         message = @"输入 0 到 40；0 为直角，实际圆角不超过控件高度的一半。可进入整页预览观察单行和多行效果。";
         placeholder = @"0 - 40";
     } else if (isTimeSize) {
@@ -734,7 +743,7 @@ static void WCPresentAITest(__unused UIViewController *presenter) {
 // Short alias → full defaults key. Only these keys are exported; defaults are
 // omitted so the code stays short. Version "v" field supports future additions.
 static NSDictionary<NSString *, NSString *> *WCConfigShareKeys(void) {
-    return @{
+    NSMutableDictionary *keys = [@{
         @"a": WCReplySwipeEnabledKey,
         @"b": WCReplySwipeSelfActionKey,
         @"c": WCReplySwipeOtherActionKey,
@@ -769,7 +778,75 @@ static NSDictionary<NSString *, NSString *> *WCConfigShareKeys(void) {
         @"F": WCKeyboardTripleTapActionKey,
         @"G": WCKeyboardHapticKey,
         @"H": WCKeyboardLongPressActionKey,
-    };
+    } mutableCopy];
+    NSArray<NSString *> *additional = @[
+        WCGestureHideGroupTitleTailKey,
+        WCGestureHideScreenshotForwardKey,
+        WCGestureHideMeFinderKey,
+        WCGestureHideMeCardsKey,
+        WCGestureHideMeEmoticonsKey,
+        WCGestureMomentsImageCornerEnabledKey,
+        WCGestureMomentsImageCornerRadiusKey,
+        WCGestureChatSearchEnabledKey,
+        WCGestureQuoteJumpEnabledKey,
+        WCGestureQuoteJumpImageKey,
+        WCGestureQuoteJumpVideoKey,
+        WCGestureMessageRepeatMenuEnabledKey,
+        WCGestureMomentsTimeEnabledKey,
+        WCGestureMomentsTimeFormatKey,
+        WCGestureAutoOriginalEnabledKey,
+        WCGestureVoiceTranscriptionEnabledKey,
+        WCGestureVoiceTranscriptionIgnoreGroupKey,
+        WCGestureVoiceTranscriptionIgnorePrivateKey,
+        WCGestureVoiceTranscriptionIgnoreSelfKey,
+        WCGestureMessageTimeBelowAvatarKey,
+        WCGestureMessageTimeBubbleSideKey,
+        WCGestureMessageTimeColorKey,
+        WCGestureMessageTimeLightColorKey,
+        WCGestureMessageTimeDarkColorKey,
+        WCGestureMessageTimeAvatarSpacingKey,
+        WCGestureAntiRevokeNotifySenderKey,
+        WCGestureAntiRevokeLocalTemplateKey,
+        WCGestureAntiRevokeReplyTemplateKey,
+        WCGestureAntiRevokeTimeFilterKey,
+        WCGestureAntiRevokePromptStyleKey,
+        WCGestureAntiRevokeSideTextKey,
+        WCGestureAntiRevokeSideOffsetXKey,
+        WCGestureAntiRevokeSideOffsetYKey,
+        WCGestureAntiRevokeLocalTextColorKey,
+        WCGestureAntiRevokeSideTextColorKey,
+        WCGestureAntiRevokeLocalLightTextColorKey,
+        WCGestureAntiRevokeLocalDarkTextColorKey,
+        WCGestureAntiRevokeSideLightTextColorKey,
+        WCGestureAntiRevokeSideDarkTextColorKey,
+        WCGestureAntiRevokePersistRecordsKey,
+        WCGesturePageScalePluginUIKey,
+        WCGestureMessageTimeOffsetXKey,
+        WCGestureMessageTimeOffsetYKey,
+        WCGesturePageScaleEnabledKey,
+        WCGestureGlobalAvatarRoundingEnabledKey,
+        WCGestureGlobalAvatarCornerPercentKey,
+        WCGestureChatInputRoundingEnabledKey,
+        WCGestureChatInputInnerRoundingKey,
+        WCGestureChatInputOuterRoundingKey,
+        WCGestureChatInputInnerRadiusKey,
+        WCGestureChatInputOuterRadiusKey,
+        WCGestureAntiRevokeEnabledKey,
+        WCGestureVoiceForwardEnabledKey,
+        WCGestureLongPressMenuEnabledKey,
+        WCGestureLongPressMenuHiddenTitlesKey,
+        WCGestureLongPressMenuPreferredOrderKey,
+        WCGestureLongPressMenuTitleMapKey,
+        WCGestureLongPressMenuManualTitlesKey,
+        WCGestureMessageTimeEnabledKey,
+        WCGestureMessageTimeFormatKey,
+        WCGestureMessageTimeFontSizeKey,
+        WCGestureMessageTimeBoldKey,
+        WCGestureMessageTimePositionKey,
+        WCGesturePageScalePercentKey,
+    ];
+    for (NSString *key in additional) keys[[@"setting:" stringByAppendingString:key]] = key;
+    return keys;
 }
 
 // 编码:JSON → Base64 → 拼前缀标记。只导出已设置的非空值,口令尽量短。
@@ -882,6 +959,7 @@ static void WCPresentInputSwipeActionPicker(__unused UIViewController *presenter
 
 typedef NS_ENUM(NSInteger, WCRowKind) {
     WCRowKindSwitch,        // toggle
+    WCRowKindSectionTitle,  // section header with no setting value
     WCRowKindGroupToggle,   // tap → fold/unfold the rows below it
     WCRowKindHint,          // small gray explanatory text, not tappable
     WCRowKindActionDetail,  // tap → message action picker
@@ -1085,7 +1163,8 @@ static NSString *WCRowDetailText(WCRow *row) {
         }
         case WCRowKindKeyboardNumber: {
             if ([row.defaultsKey isEqualToString:WCMomentsHeightScaleKey] ||
-                [row.defaultsKey isEqualToString:WCGesturePageScalePercentKey]) {
+                [row.defaultsKey isEqualToString:WCGesturePageScalePercentKey] ||
+                [row.defaultsKey isEqualToString:WCGestureGlobalAvatarCornerPercentKey]) {
                 return [NSString stringWithFormat:@"%.0f%%", [d doubleForKey:row.defaultsKey]];
             }
             if ([row.defaultsKey isEqualToString:WCKeyboardStripWidthKey]
@@ -1115,6 +1194,7 @@ static NSString *WCRowDetailText(WCRow *row) {
             return @"";
         case WCRowKindGroupToggle:
             return [d boolForKey:row.defaultsKey] ? @"收起" : @"展开";
+        case WCRowKindSectionTitle:
         case WCRowKindHint:
             return @"";
         case WCRowKindAIProvider:
@@ -1172,6 +1252,7 @@ static NSString *WCRowDetailText(WCRow *row) {
 
 - (void)viewDidLoad {
     [super viewDidLoad];
+    WCGestureSettingsConfigureNavigation(self);
     self.tableView.backgroundColor = UIColor.systemGroupedBackgroundColor;
     self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
     self.tableView.rowHeight = UITableViewAutomaticDimension;
@@ -1317,6 +1398,7 @@ static NSString *WCRowDetailText(WCRow *row) {
 
 - (void)viewDidLoad {
     [super viewDidLoad];
+    WCGestureSettingsConfigureNavigation(self);
     if (@available(iOS 15.0, *)) self.tableView.sectionHeaderTopPadding = 0;
     self.tableView.backgroundColor = [UIColor systemGroupedBackgroundColor];
     self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
@@ -1408,6 +1490,28 @@ static NSString *WCRowDetailText(WCRow *row) {
             [collapsible addObject:@YES];
             [collapseKeys addObject:[prefix stringByAppendingString:suffixes[i]]];
         }
+        [sections addObject:@[WCSwitchRow(@"语音转发", WCGestureVoiceForwardEnabledKey),
+            WCHintRow(@"长按语音选择转发，使用微信原生选择联系人与语音发送流程。")]];
+        [collapsible addObject:@YES];
+        [collapseKeys addObject:[prefix stringByAppendingString:@".chat.voice-forward"]];
+        [sections addObject:@[WCSwitchRow(@"聊天记录搜索", WCGestureChatSearchEnabledKey),
+            WCHintRow(@"在聊天顶栏增加搜索按钮，打开微信原生聊天记录搜索。")]];
+        [collapsible addObject:@YES]; [collapseKeys addObject:[prefix stringByAppendingString:@".chat.search"]];
+        [sections addObject:@[WCSwitchRow(@"引用消息定位", WCGestureQuoteJumpEnabledKey),
+            WCSwitchRow(@"定位图片引用", WCGestureQuoteJumpImageKey), WCSwitchRow(@"定位视频引用", WCGestureQuoteJumpVideoKey)]];
+        [collapsible addObject:@YES]; [collapseKeys addObject:[prefix stringByAppendingString:@".chat.quote-jump"]];
+        [sections addObject:@[WCSwitchRow(@"长按菜单消息 +1", WCGestureMessageRepeatMenuEnabledKey),
+            WCHintRow(@"为可复读消息增加 +1，可在长按菜单管理中隐藏、排序或改名。点击后立即发送。")]];
+        [collapsible addObject:@YES]; [collapseKeys addObject:[prefix stringByAppendingString:@".chat.repeat-menu"]];
+        [sections addObject:@[WCSwitchRow(@"自动勾选原图", WCGestureAutoOriginalEnabledKey),
+            WCHintRow(@"进入相册选择和图片预览时自动勾选原图；关闭后不再自动修改选择。")]];
+        [collapsible addObject:@YES]; [collapseKeys addObject:[prefix stringByAppendingString:@".chat.auto-original"]];
+        [sections addObject:@[WCSwitchRow(@"语音自动转文字", WCGestureVoiceTranscriptionEnabledKey),
+            WCSwitchRow(@"忽略群聊语音", WCGestureVoiceTranscriptionIgnoreGroupKey),
+            WCSwitchRow(@"忽略私聊语音", WCGestureVoiceTranscriptionIgnorePrivateKey),
+            WCSwitchRow(@"忽略自己发送", WCGestureVoiceTranscriptionIgnoreSelfKey),
+            WCHintRow(@"可见语音通过微信原生转文字处理；不重复请求已有结果或本次已尝试的消息。")]];
+        [collapsible addObject:@YES]; [collapseKeys addObject:[prefix stringByAppendingString:@".chat.voice-transcription"]];
     } else if (self.category == WCGestureCategoryGestures) {
         NSMutableArray *msg = [NSMutableArray array];
         [msg addObject:WCSwitchRow(@"消息手势", WCReplySwipeEnabledKey)];
@@ -1518,6 +1622,14 @@ static NSString *WCRowDetailText(WCRow *row) {
         [sections addObject:moments];
         [collapsible addObject:@YES];
         [collapseKeys addObject:[prefix stringByAppendingString:@".other.moments"]];
+        [sections addObject:@[WCSwitchRow(@"朋友圈图片圆角", WCGestureMomentsImageCornerEnabledKey),
+            WCNumberRow(@"图片圆角程度", WCGestureMomentsImageCornerRadiusKey),
+            WCHintRow(@"仅处理朋友圈图片，拼图整体裁切；不处理头像、文字块或播放器。0 为直角，关闭恢复原样。")]];
+        [collapsible addObject:@YES]; [collapseKeys addObject:[prefix stringByAppendingString:@".moments.image-corner"]];
+        WCRow *timeFormat = WCPlainRow(@"朋友圈日期格式", WCRowKindChatOption);
+        timeFormat.chatOption = @{ @"title": timeFormat.title, @"type": @"format", @"key": WCGestureMomentsTimeFormatKey };
+        [sections addObject:@[WCSwitchRow(@"朋友圈精确发布时间", WCGestureMomentsTimeEnabledKey), timeFormat]];
+        [collapsible addObject:@YES]; [collapseKeys addObject:[prefix stringByAppendingString:@".moments.precise-time"]];
     } else if (self.category == WCGestureCategoryInterface) {
         NSMutableArray *enhance = [NSMutableArray array];
         [enhance addObject:WCSwitchRow(@"界面大小", WCGesturePageScaleEnabledKey)];
@@ -1535,9 +1647,6 @@ static NSString *WCRowDetailText(WCRow *row) {
                 [enhance addObject:WCNumberRow(@"高度比例 (%)", WCMomentsHeightScaleKey)];
             }
         }
-        WCRow *layoutPreview = WCPlainRow(@"整页布局预览", WCRowKindChatOption);
-        layoutPreview.chatOption = @{ @"title": @"整页布局预览", @"type": @"layout-position", @"key": @"" };
-        [enhance addObject:layoutPreview];
         [sections addObject:enhance];
         [collapsible addObject:@YES];
         [collapseKeys addObject:[prefix stringByAppendingString:@".enhance.layout"]];
@@ -1554,7 +1663,29 @@ static NSString *WCRowDetailText(WCRow *row) {
         [sections addObject:rounding];
         [collapsible addObject:@YES];
         [collapseKeys addObject:[prefix stringByAppendingString:@".interface.chat-input-rounding"]];
+        [sections addObject:@[WCSwitchRow(@"全局头像圆角", WCGestureGlobalAvatarRoundingEnabledKey),
+            WCNumberRow(@"头像圆角程度 (%)", WCGestureGlobalAvatarCornerPercentKey),
+            WCHintRow(@"0 为直角，100 为圆形；聊天预览中的头像也应用当前设置。关闭后恢复原样。")]];
+        [collapsible addObject:@YES];
+        [collapseKeys addObject:[prefix stringByAppendingString:@".interface.avatar-rounding"]];
     } else if (self.category == WCGestureCategoryDisabled) {
+        [sections addObject:@[WCSwitchRow(@"隐藏群标题尾部", WCGestureHideGroupTitleTailKey),
+            WCHintRow(@"隐藏群人数与免打扰尾标；更改后重新进入群聊。")]];
+        [collapsible addObject:@YES]; [collapseKeys addObject:[prefix stringByAppendingString:@".interface.group-title"]];
+        [sections addObject:@[WCSwitchRow(@"隐藏截屏分享浮层", WCGestureHideScreenshotForwardKey)]];
+        [collapsible addObject:@NO]; [collapseKeys addObject:[prefix stringByAppendingString:@".interface.screenshot"]];
+        [sections addObject:@[WCPlainRow(@"我的页面入口管理", WCRowKindSectionTitle),
+            WCSwitchRow(@"隐藏作品入口", WCGestureHideMeFinderKey),
+            WCSwitchRow(@"隐藏小店与卡包", WCGestureHideMeCardsKey),
+            WCSwitchRow(@"隐藏表情入口", WCGestureHideMeEmoticonsKey),
+            WCHintRow(@"重新进入“我”页面生效，One Wx 插件入口保留。")]];
+        [collapsible addObject:@YES]; [collapseKeys addObject:[prefix stringByAppendingString:@".interface.me-menu"]];
+        WCRow *menu = WCPlainRow(@"隐藏、排序与重命名", WCRowKindChatOption);
+        menu.chatOption = @{ @"title": menu.title, @"type": @"long-press-menu", @"key": @"" };
+        [sections addObject:@[WCSwitchRow(@"长按菜单管理", WCGestureLongPressMenuEnabledKey), menu,
+            WCHintRow(@"先长按消息收集菜单，再设置隐藏、顺序和名称；下次长按生效。")]];
+        [collapsible addObject:@YES];
+        [collapseKeys addObject:[prefix stringByAppendingString:@".chat.long-press-menu"]];
         [sections addObject:@[WCSwitchRow(@"去除所有分割线", WCHideSeparatorLinesKey)]];
         [collapsible addObject:@NO];
         [collapseKeys addObject:[prefix stringByAppendingString:@".enhance.separators"]];
@@ -1719,6 +1850,7 @@ static NSString *WCRowDetailText(WCRow *row) {
     }
     if (row.kind == WCRowKindSwitch) {
         UISwitch *sw = [[UISwitch alloc] init];
+        sw.onTintColor = UIColor.systemBlueColor;
         [sw addTarget:self action:@selector(handleSwitch:) forControlEvents:UIControlEventValueChanged];
         sw.tag = section * 10000 + rowIdx;
         sw.on = [[NSUserDefaults standardUserDefaults] boolForKey:row.defaultsKey];
@@ -1730,7 +1862,7 @@ static NSString *WCRowDetailText(WCRow *row) {
             [accessory addSubview:foldArrow]; [accessory addSubview:sw];
             cell.accessoryView = accessory;
         } else cell.accessoryView = sw;
-    } else if (isGroupRow) {
+    } else if (isGroupRow || isHeaderRow) {
         cell.accessoryView = foldArrow;
         cell.detailTextLabel.text = @"";
         cell.selectionStyle = UITableViewCellSelectionStyleDefault;
@@ -1765,6 +1897,7 @@ static NSString *WCRowDetailText(WCRow *row) {
             WCGestureEditChatOption(self, row.chatOption);
             break;
         case WCRowKindSwitch:
+        case WCRowKindSectionTitle:
         case WCRowKindHint:
             break;
         case WCRowKindGroupToggle: {
@@ -1928,7 +2061,7 @@ void WCGestureRegisterEntry(void) {
     SEL registerController = sel_registerName("registerControllerWithTitle:version:controller:");
     if ([mgr respondsToSelector:registerController]) {
         ((void (*)(id, SEL, id, id, id))objc_msgSend)(mgr, registerController,
-            pluginName, @"2.0.0", NSStringFromClass([WCGestureSettingsController class]));
+            pluginName, @"1.0.0", NSStringFromClass([WCGestureSettingsController class]));
         return;
     }
 

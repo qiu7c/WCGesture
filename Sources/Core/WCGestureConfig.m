@@ -1,5 +1,25 @@
 #import "Sources/API/WCGestureInternal.h"
 
+NSString *const WCGestureHideGroupTitleTailKey = @"com.qiu7c.onewx.interface.hide-group-title-tail";
+NSString *const WCGestureHideScreenshotForwardKey = @"com.qiu7c.onewx.interface.hide-screenshot-forward";
+NSString *const WCGestureHideMeFinderKey = @"com.qiu7c.onewx.interface.me.hide-finder";
+NSString *const WCGestureHideMeCardsKey = @"com.qiu7c.onewx.interface.me.hide-cards";
+NSString *const WCGestureHideMeEmoticonsKey = @"com.qiu7c.onewx.interface.me.hide-emoticons";
+NSString *const WCGestureMomentsImageCornerEnabledKey = @"com.qiu7c.onewx.moments.image-corner.enabled";
+NSString *const WCGestureMomentsImageCornerRadiusKey = @"com.qiu7c.onewx.moments.image-corner.radius";
+NSString *const WCGestureChatSearchEnabledKey = @"com.qiu7c.onewx.chat.search-button.enabled";
+NSString *const WCGestureQuoteJumpEnabledKey = @"com.qiu7c.onewx.chat.quote-jump.enabled";
+NSString *const WCGestureQuoteJumpImageKey = @"com.qiu7c.onewx.chat.quote-jump.image";
+NSString *const WCGestureQuoteJumpVideoKey = @"com.qiu7c.onewx.chat.quote-jump.video";
+NSString *const WCGestureMessageRepeatMenuEnabledKey = @"com.qiu7c.onewx.chat.repeat-menu.enabled";
+NSString *const WCGestureMomentsTimeEnabledKey = @"com.qiu7c.onewx.moments.precise-time.enabled";
+NSString *const WCGestureMomentsTimeFormatKey = @"com.qiu7c.onewx.moments.precise-time.format";
+NSString *const WCGestureAutoOriginalEnabledKey = @"com.qiu7c.onewx.chat.auto-original.enabled";
+NSString *const WCGestureVoiceTranscriptionEnabledKey = @"com.qiu7c.onewx.chat.voice-transcription.enabled";
+NSString *const WCGestureVoiceTranscriptionIgnoreGroupKey = @"com.qiu7c.onewx.chat.voice-transcription.ignore-group";
+NSString *const WCGestureVoiceTranscriptionIgnorePrivateKey = @"com.qiu7c.onewx.chat.voice-transcription.ignore-private";
+NSString *const WCGestureVoiceTranscriptionIgnoreSelfKey = @"com.qiu7c.onewx.chat.voice-transcription.ignore-self";
+
 NSString *const WCGestureEnabledKey = @"com.qiu7c.onewx.enabled";
 NSString *const WCPluginNameKey = @"com.qiu7c.onewx.plugin-name";
 
@@ -85,12 +105,22 @@ NSString *const WCGestureMessageTimeOffsetXKey = @"com.qiu7c.onewx.chat.message-
 NSString *const WCGestureMessageTimeOffsetYKey = @"com.qiu7c.onewx.chat.message-time.offset-y";
 
 NSString *const WCGesturePageScaleEnabledKey = @"com.qiu7c.onewx.interface.page-scale.enabled";
+NSString *const WCGestureGlobalAvatarRoundingEnabledKey = @"com.qiu7c.onewx.interface.global-avatar-rounding";
+NSString *const WCGestureGlobalAvatarCornerPercentKey = @"com.qiu7c.onewx.interface.global-avatar-corner-percent";
+
 NSString *const WCGestureChatInputRoundingEnabledKey = @"com.qiu7c.onewx.interface.chat-input-rounding.enabled";
 NSString *const WCGestureChatInputInnerRoundingKey = @"com.qiu7c.onewx.interface.chat-input-rounding.inner";
 NSString *const WCGestureChatInputOuterRoundingKey = @"com.qiu7c.onewx.interface.chat-input-rounding.outer";
 NSString *const WCGestureChatInputInnerRadiusKey = @"com.qiu7c.onewx.interface.chat-input-rounding.inner-radius";
 NSString *const WCGestureChatInputOuterRadiusKey = @"com.qiu7c.onewx.interface.chat-input-rounding.outer-radius";
 NSString *const WCGestureAntiRevokeEnabledKey = @"com.qiu7c.onewx.chat.anti-revoke.enabled";
+NSString *const WCGestureVoiceForwardEnabledKey = @"com.qiu7c.onewx.chat.voice-forward.enabled";
+NSString *const WCGestureLongPressMenuEnabledKey = @"com.qiu7c.onewx.chat.long-press-menu.enabled";
+NSString *const WCGestureLongPressMenuHiddenTitlesKey = @"com.qiu7c.onewx.chat.long-press-menu.hidden";
+NSString *const WCGestureLongPressMenuPreferredOrderKey = @"com.qiu7c.onewx.chat.long-press-menu.order";
+NSString *const WCGestureLongPressMenuTitleMapKey = @"com.qiu7c.onewx.chat.long-press-menu.rename";
+NSString *const WCGestureLongPressMenuKnownTitlesKey = @"com.qiu7c.onewx.chat.long-press-menu.known";
+NSString *const WCGestureLongPressMenuManualTitlesKey = @"com.qiu7c.onewx.chat.long-press-menu.manual";
 NSString *const WCGestureMessageTimeEnabledKey = @"com.qiu7c.onewx.chat.message-time.enabled";
 NSString *const WCGestureMessageTimeFormatKey = @"com.qiu7c.onewx.chat.message-time.format";
 NSString *const WCGestureMessageTimeFontSizeKey = @"com.qiu7c.onewx.chat.message-time.font-size";
@@ -229,6 +259,25 @@ void WCGestureRegisterDefaults(void) {
             [stored setBool:NO forKey:WCGestureMessageTimeBelowAvatarKey];
         }
         NSDictionary *defaults = @{
+            WCGestureHideGroupTitleTailKey: @NO,
+            WCGestureHideScreenshotForwardKey: @NO,
+            WCGestureHideMeFinderKey: @NO,
+            WCGestureHideMeCardsKey: @NO,
+            WCGestureHideMeEmoticonsKey: @NO,
+            WCGestureMomentsImageCornerEnabledKey: @NO,
+            WCGestureMomentsImageCornerRadiusKey: @8.0,
+            WCGestureChatSearchEnabledKey: @NO,
+            WCGestureQuoteJumpEnabledKey: @NO,
+            WCGestureQuoteJumpImageKey: @YES,
+            WCGestureQuoteJumpVideoKey: @YES,
+            WCGestureMessageRepeatMenuEnabledKey: @NO,
+            WCGestureMomentsTimeEnabledKey: @NO,
+            WCGestureMomentsTimeFormatKey: @"yyyy-MM-dd HH:mm:ss",
+            WCGestureAutoOriginalEnabledKey: @NO,
+            WCGestureVoiceTranscriptionEnabledKey: @NO,
+            WCGestureVoiceTranscriptionIgnoreGroupKey: @NO,
+            WCGestureVoiceTranscriptionIgnorePrivateKey: @NO,
+            WCGestureVoiceTranscriptionIgnoreSelfKey: @YES,
             WCGestureEnabledKey: @YES,
             WCPluginNameKey: @"One Wx",
             WCReplySwipeEnabledKey: @NO,
@@ -314,12 +363,21 @@ void WCGestureRegisterDefaults(void) {
             WCGestureMessageTimeOffsetXKey: @0.0,
             WCGestureMessageTimeOffsetYKey: @0.0,
             WCGesturePageScaleEnabledKey: @NO,
+            WCGestureGlobalAvatarRoundingEnabledKey: @NO,
+            WCGestureGlobalAvatarCornerPercentKey: @100.0,
             WCGestureChatInputRoundingEnabledKey: @NO,
             WCGestureChatInputInnerRoundingKey: @YES,
             WCGestureChatInputOuterRoundingKey: @YES,
             WCGestureChatInputInnerRadiusKey: @18.0,
             WCGestureChatInputOuterRadiusKey: @22.0,
             WCGestureAntiRevokeEnabledKey: @NO,
+            WCGestureVoiceForwardEnabledKey: @NO,
+            WCGestureLongPressMenuEnabledKey: @NO,
+            WCGestureLongPressMenuHiddenTitlesKey: @[],
+            WCGestureLongPressMenuPreferredOrderKey: @[],
+            WCGestureLongPressMenuTitleMapKey: @{},
+            WCGestureLongPressMenuKnownTitlesKey: @[],
+            WCGestureLongPressMenuManualTitlesKey: @[],
             WCGestureMessageTimeEnabledKey: @NO,
             WCGestureMessageTimeFormatKey: @"MM-dd HH:mm:ss",
             WCGestureMessageTimeFontSizeKey: @10.0,

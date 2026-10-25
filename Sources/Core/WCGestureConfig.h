@@ -154,6 +154,15 @@ FOUNDATION_EXPORT NSString *const WCGestureAIAnswerPresetKey;
 FOUNDATION_EXPORT NSString *const WCGestureAIPolishPresetKey;
 
 /// Chat tools: other-user revoke protection and bubble-side message times.
+FOUNDATION_EXPORT NSString *const WCGestureVoiceForwardEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureLongPressMenuEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureLongPressMenuHiddenTitlesKey;
+FOUNDATION_EXPORT NSString *const WCGestureLongPressMenuPreferredOrderKey;
+FOUNDATION_EXPORT NSString *const WCGestureLongPressMenuTitleMapKey;
+FOUNDATION_EXPORT NSString *const WCGestureLongPressMenuKnownTitlesKey;
+FOUNDATION_EXPORT NSString *const WCGestureLongPressMenuManualTitlesKey;
+
+/// Chat tools: other-user revoke protection and bubble-side message times.
 FOUNDATION_EXPORT NSString *const WCGestureAntiRevokeEnabledKey;
 FOUNDATION_EXPORT NSString *const WCGestureMessageTimeEnabledKey;
 FOUNDATION_EXPORT NSString *const WCGestureMessageTimeFormatKey;
@@ -300,5 +309,30 @@ void WCGestureRegisterDefaults(void);
 
 /// Returns YES only when the master switch is on and the given feature key is on.
 BOOL WCGestureEnabled(NSString *key);
+
+FOUNDATION_EXPORT NSString *const WCGestureGlobalAvatarRoundingEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureGlobalAvatarCornerPercentKey;
+
+
+// WCAtlas utility migrations.
+FOUNDATION_EXPORT NSString *const WCGestureHideGroupTitleTailKey;
+FOUNDATION_EXPORT NSString *const WCGestureHideScreenshotForwardKey;
+FOUNDATION_EXPORT NSString *const WCGestureHideMeFinderKey;
+FOUNDATION_EXPORT NSString *const WCGestureHideMeCardsKey;
+FOUNDATION_EXPORT NSString *const WCGestureHideMeEmoticonsKey;
+FOUNDATION_EXPORT NSString *const WCGestureMomentsImageCornerEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureMomentsImageCornerRadiusKey;
+FOUNDATION_EXPORT NSString *const WCGestureChatSearchEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureQuoteJumpEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureQuoteJumpImageKey;
+FOUNDATION_EXPORT NSString *const WCGestureQuoteJumpVideoKey;
+FOUNDATION_EXPORT NSString *const WCGestureMessageRepeatMenuEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureMomentsTimeEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureMomentsTimeFormatKey;
+FOUNDATION_EXPORT NSString *const WCGestureAutoOriginalEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureVoiceTranscriptionEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureVoiceTranscriptionIgnoreGroupKey;
+FOUNDATION_EXPORT NSString *const WCGestureVoiceTranscriptionIgnorePrivateKey;
+FOUNDATION_EXPORT NSString *const WCGestureVoiceTranscriptionIgnoreSelfKey;
 
 NS_ASSUME_NONNULL_END

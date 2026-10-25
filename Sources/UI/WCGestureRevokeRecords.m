@@ -7,7 +7,8 @@
 @implementation WCRevokeRecordsController
 - (instancetype)init { return [super initWithStyle:UITableViewStyleInsetGrouped]; }
 - (void)viewDidLoad {
-    [super viewDidLoad]; self.title = @"防撤回记录中心";
+    [super viewDidLoad];
+    WCGestureSettingsConfigureNavigation(self); self.title = @"防撤回记录中心";
     self.tableView.rowHeight = UITableViewAutomaticDimension;
     self.tableView.estimatedRowHeight = 72 * WCGestureSettingsScaleFactor();
     self.tableView.keyboardDismissMode = UIScrollViewKeyboardDismissModeOnDrag;
