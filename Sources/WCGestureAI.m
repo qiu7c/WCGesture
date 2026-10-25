@@ -61,6 +61,10 @@ static NSString *WCAIAPIKey(void) {
     return WCAITrimmed([[NSUserDefaults standardUserDefaults] stringForKey:WCGestureAIAPIKeyKey]);
 }
 
+BOOL WCGestureAIIsEnabled(void) {
+    return [[NSUserDefaults standardUserDefaults] boolForKey:WCGestureAIEnabledKey];
+}
+
 BOOL WCGestureAIIsConfigured(void) {
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     NSInteger provider = [defaults integerForKey:WCGestureAIProviderKey];
@@ -115,19 +119,88 @@ static NSString *WCAIPresetSelectionKeyForTask(WCGestureAITask task) {
     return nil;
 }
 
-// Extra instruction of the preset (方案 1/2/3) selected for this task.
-static NSString *WCAIPresetPromptForTask(WCGestureAITask task) {
+static NSDictionary<NSString *, NSString *> *WCAISanitizedPreset(id item, NSUInteger index) {
+    NSString *name = @"";
+    NSString *prompt = @"";
+    if ([item isKindOfClass:[NSDictionary class]]) {
+        name = WCAITrimmed(((NSDictionary *)item)[@"name"]);
+        prompt = WCAITrimmed(((NSDictionary *)item)[@"prompt"]);
+    }
+    if (name.length == 0) name = [NSString stringWithFormat:@"方案 %lu", (unsigned long)index + 1];
+    return @{ @"name": name, @"prompt": prompt };
+}
+
+static NSArray<NSString *> *WCAILegacyPresetKeys(void) {
+    return @[WCGestureAIPresetPrompt1Key,
+             WCGestureAIPresetPrompt2Key,
+             WCGestureAIPresetPrompt3Key];
+}
+
+NSArray<NSDictionary<NSString *, NSString *> *> *WCGestureAIPresets(void) {
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    id stored = [defaults arrayForKey:WCGestureAIPresetsKey];
+    NSMutableArray<NSDictionary<NSString *, NSString *> *> *presets = [NSMutableArray array];
+    if ([stored isKindOfClass:[NSArray class]]) {
+        for (id item in (NSArray *)stored) {
+            if (![item isKindOfClass:[NSDictionary class]]) continue;
+            [presets addObject:WCAISanitizedPreset(item, presets.count)];
+        }
+    }
+    if (presets.count == 0) {
+        // First launch with dynamic presets: keep the three legacy prompts.
+        NSArray<NSString *> *keys = WCAILegacyPresetKeys();
+        for (NSUInteger i = 0; i < keys.count; i++) {
+            [presets addObject:WCAISanitizedPreset(
+                @{ @"name": [NSString stringWithFormat:@"方案 %lu", (unsigned long)i + 1],
+                   @"prompt": [defaults stringForKey:keys[i]] ?: @"" },
+                i)];
+        }
+    }
+    return presets;
+}
+
+void WCGestureAISetPresets(NSArray<NSDictionary *> *presets) {
+    NSMutableArray<NSDictionary<NSString *, NSString *> *> *clean = [NSMutableArray array];
+    for (id item in presets) {
+        if (![item isKindOfClass:[NSDictionary class]]) continue;
+        [clean addObject:WCAISanitizedPreset(item, clean.count)];
+    }
+    if (clean.count == 0) {
+        [clean addObject:WCAISanitizedPreset(@{}, 0)];
+    }
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    [defaults setObject:clean forKey:WCGestureAIPresetsKey];
+    // Deletions shift the list: pull out-of-range selections back to 0.
+    for (NSString *key in @[WCGestureAIReplyPresetKey,
+                            WCGestureAIAnswerPresetKey,
+                            WCGestureAIPolishPresetKey]) {
+        NSInteger index = [defaults integerForKey:key];
+        if (index < 0 || index >= (NSInteger)clean.count) [defaults setInteger:0 forKey:key];
+    }
+}
+
+NSString *WCGestureAIPresetName(NSInteger index) {
+    NSArray<NSDictionary<NSString *, NSString *> *> *presets = WCGestureAIPresets();
+    if (index < 0 || index >= (NSInteger)presets.count) index = 0;
+    return presets[(NSUInteger)index][@"name"];
+}
+
+static NSInteger WCAISelectedPresetIndex(WCGestureAITask task) {
     NSString *selectionKey = WCAIPresetSelectionKeyForTask(task);
-    if (selectionKey.length == 0) return @"";
+    if (selectionKey.length == 0) return 0;
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     NSInteger index = [defaults integerForKey:selectionKey];
-    if (index < 0 || index > 2) index = 0;
-    NSArray<NSString *> *keys = @[
-        WCGestureAIPresetPrompt1Key,
-        WCGestureAIPresetPrompt2Key,
-        WCGestureAIPresetPrompt3Key,
-    ];
-    return WCAITrimmed([defaults stringForKey:keys[(NSUInteger)index]]);
+    NSInteger count = (NSInteger)WCGestureAIPresets().count;
+    if (index < 0 || index >= count) index = 0;
+    return index;
+}
+
+// Prompt of the preset selected for this task; empty means "use built-in".
+static NSString *WCAIPresetPromptForTask(WCGestureAITask task) {
+    NSArray<NSDictionary<NSString *, NSString *> *> *presets = WCGestureAIPresets();
+    NSInteger index = WCAISelectedPresetIndex(task);
+    if (index >= (NSInteger)presets.count) return @"";
+    return WCAITrimmed(presets[(NSUInteger)index][@"prompt"]);
 }
 
 static NSString *WCAIBaseSystemPrompt(WCGestureAITask task) {
@@ -143,11 +216,15 @@ static NSString *WCAIBaseSystemPrompt(WCGestureAITask task) {
     return @"";
 }
 
+NSString *WCGestureAIDefaultPrompt(WCGestureAITask task) {
+    return WCAIBaseSystemPrompt(task);
+}
+
 static NSString *WCAISystemPrompt(WCGestureAITask task) {
-    NSMutableString *prompt = [WCAIBaseSystemPrompt(task) mutableCopy];
+    // A filled-in preset is the complete system prompt; an empty one keeps the
+    // built-in task prompt.
     NSString *preset = WCAIPresetPromptForTask(task);
-    if (preset.length > 0) [prompt appendFormat:@"补充要求：%@。", preset];
-    return prompt;
+    return preset.length > 0 ? preset : WCAIBaseSystemPrompt(task);
 }
 
 static void WCAIPerformWithSystemPrompt(NSString *systemPrompt, NSString *input,
@@ -158,6 +235,7 @@ static void WCAIPerformWithSystemPrompt(NSString *systemPrompt, NSString *input,
         dispatch_async(dispatch_get_main_queue(), ^{ completion(text, errorMessage); });
     };
 
+    if (!WCGestureAIIsEnabled()) { deliver(nil, @"AI 未开启"); return; }
     NSString *content = WCAITrimmed(input);
     if (content.length == 0) { deliver(nil, @"内容为空"); return; }
 

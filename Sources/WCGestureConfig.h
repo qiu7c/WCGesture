@@ -59,6 +59,11 @@ FOUNDATION_EXPORT NSString *const WCKeyboardStripHeightKeyThirdParty;
 FOUNDATION_EXPORT NSString *const WCKeyboardStripOffsetXKeyThirdParty;
 FOUNDATION_EXPORT NSString *const WCKeyboardStripOffsetYKeyThirdParty;
 
+/// When OFF (default), both keyboard types share the system set above, and the
+/// third-party strip's vertical offset is derived from it automatically. When
+/// ON, the four third-party values are used on their own.
+FOUNDATION_EXPORT NSString *const WCKeyboardStripSeparateAdjustKey;
+
 /// Optional small caption drawn in the middle of the gesture strip, e.g. a
 /// nickname or a short signature. Empty text turns it off.
 FOUNDATION_EXPORT NSString *const WCKeyboardSignatureTextKey;
@@ -70,6 +75,12 @@ FOUNDATION_EXPORT NSString *const WCKeyboardSignatureFontKey;
 /// Ornament wrapped around the caption ("— 文字 —", "◇ 文字 ◇"…) plus the
 /// spaced/outlined variants.
 FOUNDATION_EXPORT NSString *const WCKeyboardSignatureDecorationKey;
+/// Caption color as "#RRGGBB"; empty follows the system label color.
+FOUNDATION_EXPORT NSString *const WCKeyboardSignatureColorKey;
+/// Fine position offsets of the caption in points (positive X = right,
+/// positive Y = up); both are limited to a small range for nudging.
+FOUNDATION_EXPORT NSString *const WCKeyboardSignatureOffsetXKey;
+FOUNDATION_EXPORT NSString *const WCKeyboardSignatureOffsetYKey;
 
 typedef NS_ENUM(NSInteger, WCKeyboardSignatureFontFace) {
     WCKeyboardSignatureFontSystem = 0,    // 系统字
@@ -119,8 +130,21 @@ FOUNDATION_EXPORT NSString *const WCGestureAIProviderKey;
 FOUNDATION_EXPORT NSString *const WCGestureAIBaseURLKey;
 FOUNDATION_EXPORT NSString *const WCGestureAIModelKey;
 FOUNDATION_EXPORT NSString *const WCGestureAIAPIKeyKey;
-/// Three reusable prompt presets (方案 1/2/3). Each holds an extra instruction
-/// appended to the task prompt, e.g. "简短、口语化"; empty means default.
+/// Master switch for the AI assistant. When off, AI actions report "AI 未开启"
+/// and the settings section only shows this switch.
+FOUNDATION_EXPORT NSString *const WCGestureAIEnabledKey;
+/// Master switch for translation. When off, translation actions show a toast
+/// and the settings section only shows this switch.
+FOUNDATION_EXPORT NSString *const WCTranslateEnabledKey;
+
+/// Editable prompt presets: an array of { @"name": NSString,
+/// @"prompt": NSString }. A non-empty prompt replaces the built-in system
+/// prompt for the task; an empty one keeps the built-in prompt. When the
+/// array is empty the built-in three (方案 1/2/3) are used, migrated from the
+/// legacy keys below.
+FOUNDATION_EXPORT NSString *const WCGestureAIPresetsKey;
+
+/// Legacy fixed presets (kept for migration only).
 FOUNDATION_EXPORT NSString *const WCGestureAIPresetPrompt1Key;
 FOUNDATION_EXPORT NSString *const WCGestureAIPresetPrompt2Key;
 FOUNDATION_EXPORT NSString *const WCGestureAIPresetPrompt3Key;
@@ -168,8 +192,8 @@ typedef NS_ENUM(NSInteger, WCInputAction) {
     WCInputActionPaste = 2,   // 粘贴剪贴板
     WCInputActionCopy = 3,    // 复制输入框内容
     WCInputActionCut = 4,     // 剪切输入框内容
-    WCInputActionTranslateToTarget = 5,  // 翻译:译成互译语言,替换输入框
-    WCInputActionTranslateToChinese = 6, // 翻译:译成中文,替换输入框
+    WCInputActionTranslate = 5,       // 翻译:自动判断方向(中文→互译语言,其它→中文)
+    WCInputActionTranslateLegacy = 6, // 旧版「译成中文」;行为同互译,仅兼容已保存设置
     WCInputActionUppercase = 7,          // 转大写
     WCInputActionLowercase = 8,          // 转小写
     WCInputActionTrim = 9,               // 去空格/换行

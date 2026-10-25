@@ -267,12 +267,28 @@ static UINavigationController *WCPushNavigation(void) {
 static void WCPushGlobal(UIViewController *vc) {
     if (!vc) return;
     UINavigationController *nav = WCPushNavigation();
-    if (nav) {
+    // Only push into a navigation stack that is actually on screen; otherwise
+    // the page silently lands in a hidden controller and nothing appears.
+    if (nav && nav.view.window && !nav.isBeingDismissed && !nav.presentedViewController) {
         [nav pushViewController:vc animated:YES];
-    } else {
-        UIViewController *top = WCRootTopController();
+        return;
+    }
+    UIViewController *top = WCRootTopController();
+    if (top) {
+        vc.modalPresentationStyle = UIModalPresentationPageSheet;
         [top presentViewController:vc animated:YES completion:nil];
     }
+}
+
+// Pages WeChat itself shows as sheets (scan, QR code, payment code) do not
+// render when pushed into the chat navigation stack. Present them as a page
+// sheet: they can be swiped away, so no extra close button is needed.
+static void WCPresentGlobalSheet(UIViewController *vc) {
+    if (!vc) return;
+    UIViewController *top = WCRootTopController();
+    if (!top) return;
+    vc.modalPresentationStyle = UIModalPresentationPageSheet;
+    [top presentViewController:vc animated:YES completion:nil];
 }
 
 static NSArray<UIGestureRecognizer *> *WCNavigationReturnGesturesForView(UIView *view) {
@@ -793,6 +809,18 @@ static BOOL WCInvokeFirstMessageCellAction(CommonMessageCellView *cell, NSArray<
     return NO;
 }
 
+// Whether the voice cell currently shows its transcription result. The result
+// view stays in the hierarchy hidden/transparent, so only an actually visible
+// (or still loading) view counts; the cached message result does not.
+static BOOL WCVoiceTranscriptionVisible(CommonMessageCellView *cell) {
+    if ([WCTweakSafeValue(cell, @"m_isTranslating") boolValue]) return YES;
+    for (NSString *key in @[@"m_translateView", @"m_textTranslateView", @"m_translatingView"]) {
+        UIView *view = WCTweakSafeValue(cell, key);
+        if ([view isKindOfClass:[UIView class]] && !view.hidden && view.alpha > 0.01) return YES;
+    }
+    return NO;
+}
+
 static BOOL WCPerformMessageGestureAction(CommonMessageCellView *cell, WCReplySwipeAction action) {
     if (!cell.window || action == WCReplySwipeActionNone) return NO;
     BOOL performed = NO;
@@ -832,7 +860,14 @@ static BOOL WCPerformMessageGestureAction(CommonMessageCellView *cell, WCReplySw
             Class voiceClass = NSClassFromString(@"VoiceMessageCellView");
             BOOL isVoice = messageType == 34 || (voiceClass && [cell isKindOfClass:voiceClass]);
             if (isVoice) {
-                performed = WCInvokeFirstMessageCellAction(cell, @[@"onVoiceTrans:", @"onVoiceTrans"]);
+                // Already transcribed (or transcribing): the gesture cancels it,
+                // which is what WeChat's own "取消转文字" menu item does.
+                if (WCVoiceTranscriptionVisible(cell)) {
+                    performed = WCInvokeFirstMessageCellAction(cell,
+                        @[@"onVoiceTransClose:", @"onVoiceTransStop:", @"onVoiceTrans:"]);
+                } else {
+                    performed = WCInvokeFirstMessageCellAction(cell, @[@"onVoiceTrans:", @"onVoiceTrans"]);
+                }
             } else {
                 performed = WCInvokeFirstMessageCellAction(cell, @[@"onTranslateMsg:", @"translateMsg"]);
             }
@@ -895,12 +930,17 @@ static void WCApplyTranslation(MMGrowTextView *view, NSString *translated, NSStr
     WCShowToast(@"已翻译");
 }
 
-// Uses the configurable translation engine (Edge / MyMemory / AI). `toTarget`
-// translates into the configured pair language, otherwise into Chinese.
-static void WCTranslateInputText(MMGrowTextView *view, BOOL toTarget) {
+// One "互译" action: Chinese input is translated into the configured pair
+// language, anything else into Chinese. Uses the configurable engine
+// (Edge / MyMemory / AI).
+static void WCTranslateInputText(MMGrowTextView *view) {
+    if (![[NSUserDefaults standardUserDefaults] boolForKey:WCTranslateEnabledKey]) {
+        WCShowToast(@"翻译未开启");
+        return;
+    }
     NSString *text = WCInputText(view);
     if (text.length == 0) { WCShowToast(@"输入框为空"); return; }
-    NSString *targetCode = toTarget ? WCTranslatePairTargetCode() : @"zh-Hans";
+    NSString *targetCode = WCTranslateTargetCodeForText(text);
     WCGestureTranslateText(text, targetCode, ^(NSString *translated, NSString *errorMessage) {
         WCApplyTranslation(view, translated, errorMessage);
     });
@@ -973,8 +1013,11 @@ static void WCPerformInputAction(MMGrowTextView *view, WCInputAction action) {
         if (trimmed.length) WCReplaceInputText(view, trimmed);
         return;
     }
-    if (action == WCInputActionTranslateToTarget) { WCTranslateInputText(view, YES); return; }
-    if (action == WCInputActionTranslateToChinese) { WCTranslateInputText(view, NO); return; }
+    // The legacy "译成中文" value still resolves to the mutual action.
+    if (action == WCInputActionTranslate || action == WCInputActionTranslateLegacy) {
+        WCTranslateInputText(view);
+        return;
+    }
     if (action == WCInputActionAIAnswer) { WCAIPerformInputTask(view, WCGestureAITaskAnswer); return; }
     if (action == WCInputActionAIPolish) { WCAIPerformInputTask(view, WCGestureAITaskPolish); return; }
 }
@@ -1318,6 +1361,7 @@ static NSString *WCMessageTextForAI(id message) {
 
 static void WCAIReplyToMessage(CommonMessageCellView *cell) {
     if (!cell) return;
+    if (!WCGestureAIIsEnabled()) { WCShowToast(@"AI 未开启"); return; }
     if (!WCGestureAIIsConfigured()) { WCShowToast(@"请先在插件设置中配置 AI"); return; }
     NSString *content = WCMessageTextForAI(WCMessageWrapForCell(cell));
     if (content.length == 0) { WCShowToast(@"这条消息不支持 AI 回复"); return; }
@@ -1338,6 +1382,7 @@ static void WCAIReplyToMessage(CommonMessageCellView *cell) {
 
 static void WCAIPerformInputTask(MMGrowTextView *view, WCGestureAITask task) {
     if (!view) return;
+    if (!WCGestureAIIsEnabled()) { WCShowToast(@"AI 未开启"); return; }
     if (!WCGestureAIIsConfigured()) { WCShowToast(@"请先在插件设置中配置 AI"); return; }
     NSString *text = WCInputText(view);
     if (text.length == 0) { WCShowToast(@"输入框为空"); return; }
@@ -1427,6 +1472,7 @@ static NSString *WCKeyboardSignatureRenderedText = nil;
 static NSInteger WCKeyboardSignatureRenderedFont = -1;
 static NSInteger WCKeyboardSignatureRenderedDecoration = -1;
 static CGFloat WCKeyboardSignatureRenderedSize = 0.0;
+static NSString *WCKeyboardSignatureRenderedColor = nil;
 // The debug caption lives at the top of the screen rather than inside the
 // strip, so it never hides the band the user is trying to position.
 static UIView *WCKeyboardEnhanceHintView = nil;
@@ -1449,6 +1495,10 @@ static const CGFloat WCKeyboardEnhanceBandRaise = 14.0;
 // Third-party keyboards draw their keys right to the frame edge, so the strip
 // may only overlap by a couple of points.
 static const CGFloat WCKeyboardEnhanceThirdPartyBandRaise = 2.0;
+// With the shared (non-separate) geometry set, third-party keyboards need the
+// strip raised relative to the system keyboard because their key rows sit at a
+// different height. Measured on an iPhone 14 Pro (the 393pt reference width).
+static const CGFloat WCKeyboardEnhanceThirdPartyOffsetDelta = 90.0;
 
 // User-tunable geometry (settings → 键盘底部手势). Width 0 = full keyboard width;
 // the offsets move the strip from its default spot (positive X = right,
@@ -1469,15 +1519,24 @@ static NSString *WCKeyboardStripKey(NSString *systemKey, NSString *thirdPartyKey
     return thirdParty ? thirdPartyKey : systemKey;
 }
 
+// Third-party keyboards get their own four values only when the user turned on
+// 分开调节; otherwise both keyboards share the system set.
+static BOOL WCKeyboardEnhanceUsesThirdPartySet(BOOL thirdParty) {
+    if (!thirdParty) return NO;
+    return [[NSUserDefaults standardUserDefaults] boolForKey:WCKeyboardStripSeparateAdjustKey];
+}
+
 static CGFloat WCKeyboardEnhanceConfiguredWidth(CGFloat hostWidth, CGFloat scale, BOOL thirdParty) {
-    NSString *key = WCKeyboardStripKey(WCKeyboardStripWidthKey, WCKeyboardStripWidthKeyThirdParty, thirdParty);
+    NSString *key = WCKeyboardStripKey(WCKeyboardStripWidthKey, WCKeyboardStripWidthKeyThirdParty,
+                                       WCKeyboardEnhanceUsesThirdPartySet(thirdParty));
     CGFloat configured = [[NSUserDefaults standardUserDefaults] doubleForKey:key];
     if (configured <= 0.0) return hostWidth;
     return MIN(configured * scale, hostWidth);
 }
 
 static CGFloat WCKeyboardEnhanceConfiguredHeight(CGFloat hostHeight, CGFloat scale, BOOL thirdParty) {
-    NSString *key = WCKeyboardStripKey(WCKeyboardStripHeightKey, WCKeyboardStripHeightKeyThirdParty, thirdParty);
+    NSString *key = WCKeyboardStripKey(WCKeyboardStripHeightKey, WCKeyboardStripHeightKeyThirdParty,
+                                       WCKeyboardEnhanceUsesThirdPartySet(thirdParty));
     CGFloat configured = [[NSUserDefaults standardUserDefaults] doubleForKey:key] * scale;
     if (configured < 20.0) configured = 20.0;
     if (hostHeight > 0.0 && configured > hostHeight) configured = hostHeight;
@@ -1485,13 +1544,19 @@ static CGFloat WCKeyboardEnhanceConfiguredHeight(CGFloat hostHeight, CGFloat sca
 }
 
 static CGFloat WCKeyboardEnhanceHorizontalOffset(BOOL thirdParty) {
-    NSString *key = WCKeyboardStripKey(WCKeyboardStripOffsetXKey, WCKeyboardStripOffsetXKeyThirdParty, thirdParty);
+    NSString *key = WCKeyboardStripKey(WCKeyboardStripOffsetXKey, WCKeyboardStripOffsetXKeyThirdParty,
+                                       WCKeyboardEnhanceUsesThirdPartySet(thirdParty));
     return [[NSUserDefaults standardUserDefaults] doubleForKey:key];
 }
 
 static CGFloat WCKeyboardEnhanceVerticalOffset(BOOL thirdParty) {
-    NSString *key = WCKeyboardStripKey(WCKeyboardStripOffsetYKey, WCKeyboardStripOffsetYKeyThirdParty, thirdParty);
-    return [[NSUserDefaults standardUserDefaults] doubleForKey:key];
+    BOOL ownSet = WCKeyboardEnhanceUsesThirdPartySet(thirdParty);
+    NSString *key = WCKeyboardStripKey(WCKeyboardStripOffsetYKey, WCKeyboardStripOffsetYKeyThirdParty, ownSet);
+    CGFloat offset = [[NSUserDefaults standardUserDefaults] doubleForKey:key];
+    // Shared set: a third-party keyboard needs a higher band than the system
+    // keyboard for the same visual position.
+    if (thirdParty && !ownSet) offset += WCKeyboardEnhanceThirdPartyOffsetDelta;
+    return offset;
 }
 
 static void WCKeyboardEnhanceStartReassertTimer(void);
@@ -1736,6 +1801,27 @@ static UIFont *WCKeyboardSignatureFont(CGFloat size, NSInteger face) {
     return font;
 }
 
+// "#RRGGBB" → UIColor. Anything malformed returns nil so the default color is
+// used instead of rendering the caption invisible.
+static UIColor *WCKeyboardSignatureColorFromHex(NSString *hex) {
+    if (![hex isKindOfClass:[NSString class]]) return nil;
+    NSString *value = [hex stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+    if ([value hasPrefix:@"#"]) value = [value substringFromIndex:1];
+    if (value.length != 6) return nil;
+    NSScanner *scanner = [NSScanner scannerWithString:value];
+    unsigned int rgb = 0;
+    if (![scanner scanHexInt:&rgb] || !scanner.isAtEnd) return nil;
+    return [UIColor colorWithRed:((rgb >> 16) & 0xFF) / 255.0
+                           green:((rgb >> 8) & 0xFF) / 255.0
+                            blue:(rgb & 0xFF) / 255.0
+                           alpha:0.85];
+}
+
+static UIColor *WCKeyboardSignatureColor(void) {
+    NSString *hex = [[NSUserDefaults standardUserDefaults] stringForKey:WCKeyboardSignatureColorKey];
+    return WCKeyboardSignatureColorFromHex(hex) ?: [UIColor.labelColor colorWithAlphaComponent:0.5];
+}
+
 // Signature text is user-supplied and may be empty: then the label stays
 // hidden. `scale` follows the keyboard width so the type keeps its relative
 // size on other screens.
@@ -1778,12 +1864,14 @@ static void WCKeyboardEnhanceUpdateSignature(CGFloat scale) {
             break;
     }
 
+    NSString *colorHex = [defaults stringForKey:WCKeyboardSignatureColorKey] ?: @"";
     BOOL unchanged = [WCKeyboardSignatureRenderedText isEqualToString:display]
         && WCKeyboardSignatureRenderedFont == face
         && WCKeyboardSignatureRenderedDecoration == decoration
-        && fabs(WCKeyboardSignatureRenderedSize - size) < 0.1;
+        && fabs(WCKeyboardSignatureRenderedSize - size) < 0.1
+        && [WCKeyboardSignatureRenderedColor isEqualToString:colorHex];
     if (!unchanged) {
-        UIColor *color = [UIColor.labelColor colorWithAlphaComponent:0.5];
+        UIColor *color = WCKeyboardSignatureColor();
         NSMutableAttributedString *attributed = [[NSMutableAttributedString alloc] initWithString:display];
         NSRange range = NSMakeRange(0, display.length);
         NSMutableParagraphStyle *paragraph = [[NSMutableParagraphStyle alloc] init];
@@ -1799,8 +1887,7 @@ static void WCKeyboardEnhanceUpdateSignature(CGFloat scale) {
             // Negative width fills and strokes; a clear fill leaves a hollow,
             // engraved-looking glyph.
             [attributed addAttribute:NSStrokeWidthAttributeName value:@(-2.0) range:range];
-            [attributed addAttribute:NSStrokeColorAttributeName
-                               value:[UIColor.labelColor colorWithAlphaComponent:0.6] range:range];
+            [attributed addAttribute:NSStrokeColorAttributeName value:color range:range];
             [attributed addAttribute:NSForegroundColorAttributeName value:UIColor.clearColor range:range];
         }
         label.attributedText = attributed;
@@ -1808,12 +1895,24 @@ static void WCKeyboardEnhanceUpdateSignature(CGFloat scale) {
         WCKeyboardSignatureRenderedFont = face;
         WCKeyboardSignatureRenderedDecoration = decoration;
         WCKeyboardSignatureRenderedSize = size;
+        WCKeyboardSignatureRenderedColor = colorHex;
     }
 
     // Keep the caption filling the strip so adjustsFontSizeToFitWidth has a
-    // width to work with.
+    // width to work with; the fine position offsets move the centered text
+    // without changing its layout width. Positive Y = up, like the strip.
+    // Compare bounds, not frame: the translation below makes frame differ from
+    // the host even when the layout already matches.
     UIView *host = label.superview;
-    if (host && !CGRectEqualToRect(label.frame, host.bounds)) label.frame = host.bounds;
+    if (host && !CGRectEqualToRect(label.bounds, host.bounds)) {
+        label.transform = CGAffineTransformIdentity;
+        label.frame = host.bounds;
+    }
+    CGFloat offsetX = [defaults doubleForKey:WCKeyboardSignatureOffsetXKey];
+    CGFloat offsetY = [defaults doubleForKey:WCKeyboardSignatureOffsetYKey];
+    offsetX = MAX(-60.0, MIN(60.0, offsetX));
+    offsetY = MAX(-60.0, MIN(60.0, offsetY));
+    label.transform = CGAffineTransformMakeTranslation(offsetX, -offsetY);
     if (label.hidden) label.hidden = NO;
 }
 
@@ -2618,13 +2717,13 @@ static void WCPerformGlobalLockScreen(void) {
     [top dismissViewControllerAnimated:YES completion:nil];
 }
 
-// 扫一扫:创建 CameraScanViewController 并 push
+// 扫一扫:模态打开（微信本身也是模态展示，不需要全屏 push）
 static void WCPerformGlobalScanQR(void) {
     Class scanClass = NSClassFromString(@"CameraScanViewController");
     if (!scanClass) { WCShowToast(@"扫一扫：当前微信版本不支持"); return; }
     id scanVC = [[scanClass alloc] init];
     if (!scanVC) { WCShowToast(@"扫一扫：初始化失败"); return; }
-    WCPushGlobal(scanVC);
+    WCPresentGlobalSheet(scanVC);
 }
 
 #pragma mark - Custom page
@@ -2649,20 +2748,62 @@ static void WCOpenAddFriend(void) {
 static void WCOpenMyQRCode(void) {
     Class cls = NSClassFromString(@"CameraQRCodeListViewController");
     if (!cls) { WCShowToast(@"我的二维码：当前微信版本不支持"); return; }
-    @try { WCPushGlobal([[cls alloc] init]); } @catch (__unused NSException *e) {}
+    @try { WCPresentGlobalSheet([[cls alloc] init]); } @catch (__unused NSException *e) {}
+}
+
+// UIApplication treats our own weixin:// scheme as a no-op inside WeChat, but
+// the system application workspace still routes it to the app's URL handler,
+// which is what opens the payment code.
+static BOOL WCOpenURLViaWorkspace(NSString *string) {
+    NSURL *url = [NSURL URLWithString:string];
+    if (!url) return NO;
+    Class workspaceClass = NSClassFromString(@"LSApplicationWorkspace");
+    SEL defaultSelector = NSSelectorFromString(@"defaultWorkspace");
+    id workspace = nil;
+    if (workspaceClass && [workspaceClass respondsToSelector:defaultSelector]) {
+        workspace = ((id (*)(id, SEL))objc_msgSend)(workspaceClass, defaultSelector);
+    }
+    for (NSString *name in @[@"openSensitiveURL:withOptions:", @"openURL:withOptions:"]) {
+        SEL selector = NSSelectorFromString(name);
+        if (!workspace || ![workspace respondsToSelector:selector]) continue;
+        @try {
+            BOOL opened = ((BOOL (*)(id, SEL, id, id))objc_msgSend)(workspace, selector, url, nil);
+            if (opened) return YES;
+        } @catch (__unused NSException *e) {}
+    }
+    UIApplication *app = [UIApplication sharedApplication];
+    if ([app canOpenURL:url]) {
+        [app openURL:url options:@{} completionHandler:nil];
+        return YES;
+    }
+    return NO;
 }
 
 static void WCOpenPayCode(void) {
     Class cls = NSClassFromString(@"KindaViewController");
-    if (!cls) { WCShowToast(@"付款码：当前微信版本不支持"); return; }
-    @try { WCPushGlobal([[cls alloc] init]); } @catch (__unused NSException *e) {}
+    if (cls) {
+        @try {
+            WCPresentGlobalSheet([[cls alloc] init]);
+            return;
+        } @catch (__unused NSException *e) {}
+    }
+    if (WCOpenURLViaWorkspace(@"weixin://widget/pay")) return;
+    WCShowToast(@"付款码：当前微信版本不支持");
 }
 
 static void WCPushCustomPageEntry(NSDictionary *entry) {
     NSString *className = [entry[@"class"] isKindOfClass:[NSString class]] ? entry[@"class"] : nil;
     Class cls = className.length > 0 ? NSClassFromString(className) : nil;
     if (!cls) { WCShowToast(@"自定义页面：类名无效"); return; }
-    @try { WCPushGlobal([[cls alloc] init]); } @catch (__unused NSException *e) {}
+    // Each entry chooses 全屏 (push) or 模态 (page sheet); entries saved before
+    // the option existed default to 全屏.
+    NSString *mode = [entry[@"mode"] isKindOfClass:[NSString class]] ? entry[@"mode"] : @"";
+    BOOL modal = [mode isEqualToString:@"modal"];
+    @try {
+        UIViewController *page = [[cls alloc] init];
+        if (modal) WCPresentGlobalSheet(page);
+        else WCPushGlobal(page);
+    } @catch (__unused NSException *e) {}
 }
 
 static void WCOpenCustomPage(void) {

@@ -15,6 +15,12 @@ NSString *WCTranslateLanguageName(NSString *code);
 /// The configured target code of the pair; never "zh-Hans".
 NSString *WCTranslatePairTargetCode(void);
 
+/// Target code for the one-tap "互译" action: Chinese input (Han characters,
+/// no kana/Hangul) goes to the other side of the pair, anything else goes to
+/// Simplified Chinese. Traditional input is treated as Chinese text and thus
+/// converted to Simplified, so the pair works in both directions.
+NSString *WCTranslateTargetCodeForText(NSString *text);
+
 /// Translates text into `targetCode`. "zh-Hans" means Simplified Chinese,
 /// otherwise the configured language pair's other side is used as source.
 /// Completion runs on the main queue.

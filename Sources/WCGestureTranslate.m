@@ -41,6 +41,46 @@ NSString *WCTranslateLanguageName(NSString *code) {
     return entry ? entry[@"title"] : @"英语";
 }
 
+static BOOL WCTranslateHasHan(NSString *text) {
+    for (NSUInteger i = 0; i < text.length; i++) {
+        unichar c = [text characterAtIndex:i];
+        if ((c >= 0x4E00 && c <= 0x9FFF) || (c >= 0x3400 && c <= 0x4DBF) ||
+            (c >= 0xF900 && c <= 0xFAFF)) return YES;
+    }
+    return NO;
+}
+
+static BOOL WCTranslateHasScript(NSString *text, unichar lower, unichar upper) {
+    for (NSUInteger i = 0; i < text.length; i++) {
+        unichar c = [text characterAtIndex:i];
+        if (c >= lower && c <= upper) return YES;
+    }
+    return NO;
+}
+
+// Shared Han characters cover both Chinese scripts, so a handful of very
+// common traditional forms is enough to tell which side of 简/繁 was typed.
+static BOOL WCTranslateLooksTraditional(NSString *text) {
+    static NSString *markers = @"這說時會來為對國學麼樣兒頭長開關門東車馬語話讀寫聽請謝還進過發現實問題們個著裡與從沒讓給當點後";
+    for (NSUInteger i = 0; i < text.length; i++) {
+        unichar c = [text characterAtIndex:i];
+        if ([markers rangeOfString:[NSString stringWithCharacters:&c length:1]].location != NSNotFound) return YES;
+    }
+    return NO;
+}
+
+NSString *WCTranslateTargetCodeForText(NSString *text) {
+    NSString *pair = WCTranslatePairTargetCode();
+    // Kana/Hangul can contain Han characters too, but such text is Japanese or
+    // Korean, not Chinese, so it should be translated into Chinese.
+    BOOL chinese = WCTranslateHasHan(text)
+        && !WCTranslateHasScript(text, 0x3040, 0x30FF)  // hiragana + katakana
+        && !WCTranslateHasScript(text, 0xAC00, 0xD7AF); // hangul syllables
+    if (!chinese) return @"zh-Hans";
+    if ([pair isEqualToString:@"zh-Hant"] && WCTranslateLooksTraditional(text)) return @"zh-Hans";
+    return pair;
+}
+
 static NSString *WCTranslateEntryValue(NSString *code, NSString *field, NSString *fallback) {
     NSDictionary *entry = WCTranslateLanguageEntry(code);
     NSString *value = entry[field];

@@ -34,17 +34,23 @@ NSString *const WCKeyboardStripWidthKeyThirdParty = @"com.qiu7c.wcgesture.input.
 NSString *const WCKeyboardStripHeightKeyThirdParty = @"com.qiu7c.wcgesture.input.keyboard.strip-height-3p";
 NSString *const WCKeyboardStripOffsetXKeyThirdParty = @"com.qiu7c.wcgesture.input.keyboard.strip-offset-x-3p";
 NSString *const WCKeyboardStripOffsetYKeyThirdParty = @"com.qiu7c.wcgesture.input.keyboard.strip-offset-y-3p";
+NSString *const WCKeyboardStripSeparateAdjustKey = @"com.qiu7c.wcgesture.input.keyboard.strip-separate";
 NSString *const WCKeyboardSignatureTextKey = @"com.qiu7c.wcgesture.input.keyboard.signature-text";
 NSString *const WCKeyboardSignatureSizeKey = @"com.qiu7c.wcgesture.input.keyboard.signature-size";
 NSString *const WCKeyboardSignatureFontKey = @"com.qiu7c.wcgesture.input.keyboard.signature-font";
 NSString *const WCKeyboardSignatureDecorationKey = @"com.qiu7c.wcgesture.input.keyboard.signature-decoration";
+NSString *const WCKeyboardSignatureColorKey = @"com.qiu7c.wcgesture.input.keyboard.signature-color";
+NSString *const WCKeyboardSignatureOffsetXKey = @"com.qiu7c.wcgesture.input.keyboard.signature-offset-x";
+NSString *const WCKeyboardSignatureOffsetYKey = @"com.qiu7c.wcgesture.input.keyboard.signature-offset-y";
 NSString *const WCTranslateEngineKey = @"com.qiu7c.wcgesture.translate.engine";
 NSString *const WCTranslatePairTargetKey = @"com.qiu7c.wcgesture.translate.pair-target";
 
+NSString *const WCGestureAIEnabledKey = @"com.qiu7c.wcgesture.ai.enabled";
 NSString *const WCGestureAIProviderKey = @"com.qiu7c.wcgesture.ai.provider";
 NSString *const WCGestureAIBaseURLKey = @"com.qiu7c.wcgesture.ai.base-url";
 NSString *const WCGestureAIModelKey = @"com.qiu7c.wcgesture.ai.model";
 NSString *const WCGestureAIAPIKeyKey = @"com.qiu7c.wcgesture.ai.api-key";
+NSString *const WCGestureAIPresetsKey = @"com.qiu7c.wcgesture.ai.presets";
 NSString *const WCGestureAIPresetPrompt1Key = @"com.qiu7c.wcgesture.ai.preset1-prompt";
 NSString *const WCGestureAIPresetPrompt2Key = @"com.qiu7c.wcgesture.ai.preset2-prompt";
 NSString *const WCGestureAIPresetPrompt3Key = @"com.qiu7c.wcgesture.ai.preset3-prompt";
@@ -91,30 +97,42 @@ void WCGestureRegisterDefaults(void) {
             WCInputDoubleTapActionKey: @(WCInputActionNone),
             WCInputTripleTapActionKey: @(WCInputActionNone),
             WCKeyboardEnhanceEnabledKey: @NO,
-            WCKeyboardSwipeLeftActionKey: @(WCInputActionTranslateToTarget),
-            WCKeyboardSwipeRightActionKey: @(WCInputActionTranslateToChinese),
+            WCKeyboardSwipeLeftActionKey: @(WCInputActionTranslate),
+            // The former "译成中文" gesture is now folded into 互译, so the
+            // right swipe starts empty instead of repeating the same action.
+            WCKeyboardSwipeRightActionKey: @(WCInputActionNone),
             WCKeyboardDoubleTapActionKey: @(WCInputActionNone),
             WCKeyboardTripleTapActionKey: @(WCInputActionNone),
             WCKeyboardLongPressActionKey: @(WCInputActionNone),
             WCKeyboardDebugFrameKey: @YES,
-            WCKeyboardStripWidthKey: @0.0,
+            // Same baseline as the third-party set: the width scales with the
+            // screen (250 at the 393pt reference), keeping the band between
+            // the globe and mic keys instead of spanning the whole keyboard.
+            WCKeyboardStripWidthKey: @250.0,
             WCKeyboardStripHeightKey: @50.0,
             WCKeyboardStripOffsetXKey: @0.0,
-            WCKeyboardStripOffsetYKey: @(-20.0),
+            WCKeyboardStripOffsetYKey: @(-25.0),
             WCKeyboardStripWidthKeyThirdParty: @250.0,
             WCKeyboardStripHeightKeyThirdParty: @50.0,
             WCKeyboardStripOffsetXKeyThirdParty: @0.0,
-            WCKeyboardStripOffsetYKeyThirdParty: @60.0,
+            WCKeyboardStripOffsetYKeyThirdParty: @65.0,
+            WCKeyboardStripSeparateAdjustKey: @NO,
             WCKeyboardSignatureTextKey: @"",
             WCKeyboardSignatureSizeKey: @11.0,
             WCKeyboardSignatureFontKey: @(WCKeyboardSignatureFontSystem),
             WCKeyboardSignatureDecorationKey: @(WCKeyboardSignatureDecorationNone),
+            WCKeyboardSignatureColorKey: @"",
+            WCKeyboardSignatureOffsetXKey: @0.0,
+            WCKeyboardSignatureOffsetYKey: @0.0,
+            WCTranslateEnabledKey: @YES,
             WCTranslateEngineKey: @(WCTranslateEngineEdge),
             WCTranslatePairTargetKey: @"en",
+            WCGestureAIEnabledKey: @YES,
             WCGestureAIProviderKey: @(WCGestureAIProviderDeepSeek),
             WCGestureAIBaseURLKey: @"",
             WCGestureAIModelKey: @"",
             WCGestureAIAPIKeyKey: @"",
+            WCGestureAIPresetsKey: @[],
             WCGestureAIPresetPrompt1Key: @"",
             WCGestureAIPresetPrompt2Key: @"",
             WCGestureAIPresetPrompt3Key: @"",
