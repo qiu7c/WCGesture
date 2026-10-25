@@ -85,6 +85,11 @@ NSString *const WCGestureMessageTimeOffsetXKey = @"com.qiu7c.onewx.chat.message-
 NSString *const WCGestureMessageTimeOffsetYKey = @"com.qiu7c.onewx.chat.message-time.offset-y";
 
 NSString *const WCGesturePageScaleEnabledKey = @"com.qiu7c.onewx.interface.page-scale.enabled";
+NSString *const WCGestureChatInputRoundingEnabledKey = @"com.qiu7c.onewx.interface.chat-input-rounding.enabled";
+NSString *const WCGestureChatInputInnerRoundingKey = @"com.qiu7c.onewx.interface.chat-input-rounding.inner";
+NSString *const WCGestureChatInputOuterRoundingKey = @"com.qiu7c.onewx.interface.chat-input-rounding.outer";
+NSString *const WCGestureChatInputInnerRadiusKey = @"com.qiu7c.onewx.interface.chat-input-rounding.inner-radius";
+NSString *const WCGestureChatInputOuterRadiusKey = @"com.qiu7c.onewx.interface.chat-input-rounding.outer-radius";
 NSString *const WCGestureAntiRevokeEnabledKey = @"com.qiu7c.onewx.chat.anti-revoke.enabled";
 NSString *const WCGestureMessageTimeEnabledKey = @"com.qiu7c.onewx.chat.message-time.enabled";
 NSString *const WCGestureMessageTimeFormatKey = @"com.qiu7c.onewx.chat.message-time.format";
@@ -309,6 +314,11 @@ void WCGestureRegisterDefaults(void) {
             WCGestureMessageTimeOffsetXKey: @0.0,
             WCGestureMessageTimeOffsetYKey: @0.0,
             WCGesturePageScaleEnabledKey: @NO,
+            WCGestureChatInputRoundingEnabledKey: @NO,
+            WCGestureChatInputInnerRoundingKey: @YES,
+            WCGestureChatInputOuterRoundingKey: @YES,
+            WCGestureChatInputInnerRadiusKey: @18.0,
+            WCGestureChatInputOuterRadiusKey: @22.0,
             WCGestureAntiRevokeEnabledKey: @NO,
             WCGestureMessageTimeEnabledKey: @NO,
             WCGestureMessageTimeFormatKey: @"MM-dd HH:mm:ss",

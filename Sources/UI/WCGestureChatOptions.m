@@ -11,7 +11,7 @@ NSArray<NSDictionary *> *WCGestureChatOptions(BOOL antiRevoke, BOOL includeHidde
     if (antiRevoke) {
         BOOL side = [d integerForKey:WCGestureAntiRevokePromptStyleKey] == 1;
         [rows addObject:WCOption(@"防撤回提示方案", @"prompt-style", WCGestureAntiRevokePromptStyleKey)];
-        if (side || includeHidden) [rows addObject:WCOption(@"提示外观预览", @"revoke-position", nil)];
+        [rows addObject:WCOption(@"整页提示预览", @"revoke-position", nil)];
         if (!side || includeHidden) [rows addObject:WCOption(@"本地提示模板", @"template", WCGestureAntiRevokeLocalTemplateKey)];
         [rows addObject:WCOption(@"浅色模式提示颜色", @"color", side ? WCGestureAntiRevokeSideLightTextColorKey : WCGestureAntiRevokeLocalLightTextColorKey)];
         [rows addObject:WCOption(@"深色模式提示颜色", @"color", side ? WCGestureAntiRevokeSideDarkTextColorKey : WCGestureAntiRevokeLocalDarkTextColorKey)];
@@ -25,7 +25,7 @@ NSArray<NSDictionary *> *WCGestureChatOptions(BOOL antiRevoke, BOOL includeHidde
     } else {
         BOOL side = [d boolForKey:WCGestureMessageTimeBubbleSideKey];
         [rows addObject:WCOption(@"时间显示位置", @"time-mode", WCGestureMessageTimeBubbleSideKey)];
-        [rows addObject:WCOption(@"位置与外观预览", @"time-position", nil)];
+        [rows addObject:WCOption(@"整页聊天预览与调节", @"time-position", nil)];
         if (side || includeHidden) [rows addObject:WCOption(@"消息旁垂直位置", @"time-position", WCGestureMessageTimePositionKey)];
         if (!side || includeHidden) [rows addObject:WCOption(@"头像时间间距", @"time-position", WCGestureMessageTimeAvatarSpacingKey)];
         [rows addObject:WCOption(@"时间格式", @"format", WCGestureMessageTimeFormatKey)];
@@ -154,8 +154,12 @@ NSString *WCGestureChatOptionDetail(NSDictionary *option) {
 
 void WCGestureEditChatOption(UIViewController *presenter, NSDictionary *option) {
     NSString *type = option[@"type"], *key = option[@"key"], *title = option[@"title"];
-    if ([type isEqualToString:@"time-position"] || [type isEqualToString:@"revoke-position"]) {
-        [presenter.navigationController pushViewController:WCGestureCreatePositionEditor([type isEqualToString:@"time-position"] ? WCGesturePreviewMessageTime : WCGesturePreviewAntiRevoke) animated:YES];
+    NSDictionary *previewKinds = @{ @"time-position": @(WCGesturePreviewMessageTime),
+        @"revoke-position": @(WCGesturePreviewAntiRevoke), @"layout-position": @(WCGesturePreviewLayout),
+        @"input-rounding-position": @(WCGesturePreviewInputRounding) };
+    NSNumber *previewKind = previewKinds[type];
+    if (previewKind) {
+        [presenter.navigationController pushViewController:WCGestureCreatePositionEditor(previewKind.integerValue) animated:YES];
     } else if ([type isEqualToString:@"records"]) {
         [presenter.navigationController pushViewController:WCGestureCreateRevokeRecordsController() animated:YES];
     } else if ([type isEqualToString:@"color"]) {

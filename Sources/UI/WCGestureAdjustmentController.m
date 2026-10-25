@@ -1,4 +1,5 @@
 #import <math.h>
+#import <QuartzCore/QuartzCore.h>
 #import "Sources/API/WCGestureInternal.h"
 
 // Parameters describe the controls rather than the feature. More layout
@@ -12,6 +13,11 @@
 @property (nonatomic, copy) NSString *customTitle;
 @property (nonatomic, strong) UIView *customPreview;
 @property (nonatomic, assign) NSInteger previewTheme;
+@property (nonatomic, strong) UIView *controlsPanel;
+@property (nonatomic, strong) NSLayoutConstraint *panelHeight;
+@property (nonatomic, assign) BOOL capturedNavigationState;
+@property (nonatomic, assign) BOOL previousNavigationHidden;
+@property (nonatomic, assign) NSInteger inputLineSelection;
 @end
 
 static NSDictionary *WCParameter(NSString *title, NSString *key, double minimum, double maximum, double reset) {
@@ -28,20 +34,77 @@ static NSDictionary *WCParameter(NSString *title, NSString *key, double minimum,
     self.table = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStyleInsetGrouped];
     self.table.dataSource = self; self.table.delegate = self;
     self.table.backgroundColor = UIColor.systemGroupedBackgroundColor;
-    for (UIView *view in @[self.preview, self.table]) { view.translatesAutoresizingMaskIntoConstraints = NO; [self.view addSubview:view]; }
+    self.table.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
+    self.controlsPanel = [UIView new];
+    self.controlsPanel.backgroundColor = UIColor.secondarySystemGroupedBackgroundColor;
+    self.controlsPanel.layer.cornerRadius = 20;
+    self.controlsPanel.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
+    self.controlsPanel.clipsToBounds = YES;
+    self.controlsPanel.hidden = YES;
+    UILabel *title = [UILabel new]; title.text = @"预览调节"; title.textColor = UIColor.labelColor;
+    title.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
+    UIButton *reset = [UIButton buttonWithType:UIButtonTypeSystem]; [reset setTitle:@"重置" forState:UIControlStateNormal];
+    [reset addTarget:self action:@selector(reset) forControlEvents:UIControlEventTouchUpInside];
+    UIButton *done = [UIButton buttonWithType:UIButtonTypeSystem]; [done setTitle:@"完成" forState:UIControlStateNormal];
+    [done addTarget:self action:@selector(togglePanel) forControlEvents:UIControlEventTouchUpInside];
+    for (UIView *view in @[self.preview, self.controlsPanel]) { view.translatesAutoresizingMaskIntoConstraints = NO; [self.view addSubview:view]; }
+    for (UIView *view in @[title, reset, done, self.table]) { view.translatesAutoresizingMaskIntoConstraints = NO; [self.controlsPanel addSubview:view]; }
+    self.panelHeight = [self.controlsPanel.heightAnchor constraintEqualToConstant:360];
+    NSLayoutYAxisAnchor *previewTop = self.customPreview ? self.view.safeAreaLayoutGuide.topAnchor : self.view.topAnchor;
     [NSLayoutConstraint activateConstraints:@[
-        [self.preview.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:16],
-        [self.preview.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-16],
-        [self.preview.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor constant:12],
-        [self.preview.heightAnchor constraintEqualToConstant:230],
-        [self.table.topAnchor constraintEqualToAnchor:self.preview.bottomAnchor constant:8],
-        [self.table.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
-        [self.table.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
-        [self.table.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
+        [self.preview.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
+        [self.preview.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
+        [self.preview.topAnchor constraintEqualToAnchor:previewTop],
+        [self.preview.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
+        [self.controlsPanel.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
+        [self.controlsPanel.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
+        [self.controlsPanel.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor], self.panelHeight,
+        [title.leadingAnchor constraintEqualToAnchor:self.controlsPanel.leadingAnchor constant:20],
+        [title.topAnchor constraintEqualToAnchor:self.controlsPanel.topAnchor constant:14],
+        [done.trailingAnchor constraintEqualToAnchor:self.controlsPanel.trailingAnchor constant:-16],
+        [done.centerYAnchor constraintEqualToAnchor:title.centerYAnchor],
+        [reset.trailingAnchor constraintEqualToAnchor:done.leadingAnchor constant:-20],
+        [reset.centerYAnchor constraintEqualToAnchor:title.centerYAnchor],
+        [self.table.topAnchor constraintEqualToAnchor:title.bottomAnchor constant:10],
+        [self.table.leadingAnchor constraintEqualToAnchor:self.controlsPanel.leadingAnchor],
+        [self.table.trailingAnchor constraintEqualToAnchor:self.controlsPanel.trailingAnchor],
+        [self.table.bottomAnchor constraintEqualToAnchor:self.controlsPanel.bottomAnchor],
     ]];
-    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"重置位置" style:UIBarButtonItemStylePlain target:self action:@selector(reset)];
+    __weak typeof(self) weakSelf = self;
+    WCGestureSetPreviewNavigation(self.preview, ^{ [weakSelf.navigationController popViewControllerAnimated:YES]; }, ^{ [weakSelf togglePanel]; });
+    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"调节" style:UIBarButtonItemStylePlain target:self action:@selector(togglePanel)];
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(changed:) name:WCGestureDidChangeNotification object:nil];
     [self rebuildParameters];
+}
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    if (!self.capturedNavigationState) {
+        self.previousNavigationHidden = self.navigationController.navigationBarHidden;
+        self.capturedNavigationState = YES;
+    }
+    if (!self.customPreview) [self.navigationController setNavigationBarHidden:YES animated:animated];
+}
+- (void)viewWillDisappear:(BOOL)animated {
+    [super viewWillDisappear:animated];
+    if (!self.customPreview) [self.navigationController setNavigationBarHidden:self.previousNavigationHidden animated:animated];
+}
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    CGFloat available = CGRectGetHeight(self.view.bounds) - self.view.safeAreaInsets.top - 60;
+    CGFloat height = MIN(MAX(180, available), MIN(420, CGRectGetHeight(self.view.bounds) * 0.55));
+    if (fabs(self.panelHeight.constant - height) > 0.5) self.panelHeight.constant = height;
+    self.table.contentInset = UIEdgeInsetsMake(0, 0, self.view.safeAreaInsets.bottom, 0);
+    WCGestureSetPreviewObscuredHeight(self.preview, self.controlsPanel.hidden ? 0 : self.panelHeight.constant);
+}
+- (void)togglePanel {
+    self.controlsPanel.hidden = !self.controlsPanel.hidden;
+    WCGestureSetPreviewObscuredHeight(self.preview, self.controlsPanel.hidden ? 0 : self.panelHeight.constant);
+    [self.view layoutIfNeeded];
+}
+- (UIStatusBarStyle)preferredStatusBarStyle {
+    if (self.previewTheme == 2) return UIStatusBarStyleLightContent;
+    if (self.previewTheme == 1) return UIStatusBarStyleDarkContent;
+    return [super preferredStatusBarStyle];
 }
 - (void)dealloc { [NSNotificationCenter.defaultCenter removeObserver:self]; }
 - (void)rebuildParameters {
@@ -52,22 +115,44 @@ static NSDictionary *WCParameter(NSString *title, NSString *key, double minimum,
     }
     BOOL revoke = self.kind == WCGesturePreviewAntiRevoke;
     BOOL side = [NSUserDefaults.standardUserDefaults boolForKey:WCGestureMessageTimeBubbleSideKey];
-    NSMutableArray *parameters = [NSMutableArray arrayWithObject:@{ @"title": @"预览外观", @"themes": @[@"系统", @"浅色", @"深色"] }];
+    NSMutableArray *parameters = [NSMutableArray arrayWithObjects:
+        @{ @"title": @"调节项目", @"targets": @[@"时间", @"防撤回", @"布局", @"圆角"] },
+        @{ @"title": @"预览外观", @"themes": @[@"系统", @"浅色", @"深色"] }, nil];
+    if (self.kind == WCGesturePreviewInputRounding) {
+        [parameters addObject:@{ @"title": @"输入框高度", @"inputLines": @[@"单行", @"三行", @"五行"] }];
+        [parameters addObject:@{ @"option": @{ @"title": @"聊天输入栏圆角", @"type": @"bool", @"key": WCGestureChatInputRoundingEnabledKey } }];
+        [parameters addObject:@{ @"option": @{ @"title": @"输入框内部圆角", @"type": @"bool", @"key": WCGestureChatInputInnerRoundingKey } }];
+        [parameters addObject:WCParameter(@"内部圆角程度", WCGestureChatInputInnerRadiusKey, 0, 40, 18)];
+        [parameters addObject:@{ @"option": @{ @"title": @"外部工具栏圆角", @"type": @"bool", @"key": WCGestureChatInputOuterRoundingKey } }];
+        [parameters addObject:WCParameter(@"外部圆角程度", WCGestureChatInputOuterRadiusKey, 0, 40, 22)];
+        self.parameters = parameters; [self.table reloadData]; [self.preview setNeedsLayout]; return;
+    }
+    if (self.kind == WCGesturePreviewLayout) {
+        [parameters addObject:WCParameter(@"界面比例 (%)", WCGesturePageScalePercentKey, 70, 100, 90)];
+        [parameters addObject:@{ @"option": @{ @"title": @"界面大小", @"type": @"bool", @"key": WCGesturePageScaleEnabledKey } }];
+        [parameters addObject:@{ @"option": @{ @"title": @"包含插件界面", @"type": @"bool", @"key": WCGesturePageScalePluginUIKey } }];
+        self.parameters = parameters; [self.table reloadData]; [self.preview setNeedsLayout]; return;
+    }
     NSArray *options = WCGestureChatOptions(revoke, NO);
     if (!revoke) {
         [parameters addObject:@{ @"option": options.firstObject }];
         if (side) [parameters addObject:@{ @"title": @"垂直基准", @"segments": @[@"顶部", @"中间", @"底部"], @"key": WCGestureMessageTimePositionKey, @"reset": @2 }];
     } else {
-        [parameters addObject:@{ @"title": @"提示文字", @"textKey": WCGestureAntiRevokeSideTextKey }];
+        [parameters addObject:@{ @"option": options.firstObject }];
+        if ([NSUserDefaults.standardUserDefaults integerForKey:WCGestureAntiRevokePromptStyleKey] == 1)
+            [parameters addObject:@{ @"title": @"提示文字", @"textKey": WCGestureAntiRevokeSideTextKey }];
     }
-    if (revoke || side) {
+    BOOL revokeSide = revoke && [NSUserDefaults.standardUserDefaults integerForKey:WCGestureAntiRevokePromptStyleKey] == 1;
+    if (revokeSide || (!revoke && side)) {
         [parameters addObject:WCParameter(@"水平位置 X", revoke ? WCGestureAntiRevokeSideOffsetXKey : WCGestureMessageTimeOffsetXKey, -80, 80, 0)];
         [parameters addObject:WCParameter(@"垂直位置 Y", revoke ? WCGestureAntiRevokeSideOffsetYKey : WCGestureMessageTimeOffsetYKey, -80, 80, revoke ? 10 : 0)];
-    } else [parameters addObject:WCParameter(@"头像时间间距", WCGestureMessageTimeAvatarSpacingKey, -6, 8, -2)];
+    } else if (!revoke) [parameters addObject:WCParameter(@"头像时间间距", WCGestureMessageTimeAvatarSpacingKey, -6, 8, -2)];
     if (!revoke) [parameters addObject:WCParameter(@"时间字号", WCGestureMessageTimeFontSizeKey, 8, 18, 10)];
     for (NSDictionary *option in options) {
         NSString *type = option[@"type"];
-        if ([type isEqualToString:@"color"] || [type isEqualToString:@"format"] || ([type isEqualToString:@"bool"] && !revoke)) [parameters addObject:@{ @"option": option }];
+        if ([type isEqualToString:@"color"] || [type isEqualToString:@"format"] ||
+            ([type isEqualToString:@"template"] && [option[@"key"] isEqualToString:WCGestureAntiRevokeLocalTemplateKey]) ||
+            ([type isEqualToString:@"bool"] && !revoke)) [parameters addObject:@{ @"option": option }];
     }
     self.parameters = parameters;
     [self.table reloadData];
@@ -83,6 +168,10 @@ static NSDictionary *WCParameter(NSString *title, NSString *key, double minimum,
     [self rebuildParameters];
 }
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section { return self.parameters.count; }
+- (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
+    return self.kind == WCGesturePreviewInputRounding
+        ? @"预览展示所选配置；开启总开关后应用到真实聊天。圆角不超过控件高度的一半，可切换多行查看。" : nil;
+}
 - (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)path {
     return self.parameters[path.row][@"minimum"] ? 86 * WCGestureSettingsScaleFactor() : 52 * WCGestureSettingsScaleFactor();
 }
@@ -92,7 +181,18 @@ static NSDictionary *WCParameter(NSString *title, NSString *key, double minimum,
     cell.backgroundColor = UIColor.secondarySystemGroupedBackgroundColor;
     cell.textLabel.font = [UIFont systemFontOfSize:15 * WCGestureSettingsScaleFactor()];
     NSDictionary *option = parameter[@"option"];
-    if (parameter[@"themes"]) {
+    if (parameter[@"targets"]) {
+        cell.textLabel.text = parameter[@"title"];
+        UISegmentedControl *segments = [[UISegmentedControl alloc] initWithItems:parameter[@"targets"]];
+        segments.selectedSegmentIndex = self.kind;
+        [segments addTarget:self action:@selector(targetChanged:) forControlEvents:UIControlEventValueChanged]; cell.accessoryView = segments;
+    } else if (parameter[@"inputLines"]) {
+        cell.textLabel.text = parameter[@"title"];
+        UISegmentedControl *segments = [[UISegmentedControl alloc] initWithItems:parameter[@"inputLines"]];
+        segments.selectedSegmentIndex = self.inputLineSelection;
+        [segments addTarget:self action:@selector(inputLinesChanged:) forControlEvents:UIControlEventValueChanged];
+        cell.accessoryView = segments;
+    } else if (parameter[@"themes"]) {
         cell.textLabel.text = parameter[@"title"];
         UISegmentedControl *segments = [[UISegmentedControl alloc] initWithItems:parameter[@"themes"]];
         segments.selectedSegmentIndex = self.previewTheme;
@@ -158,6 +258,16 @@ static NSDictionary *WCParameter(NSString *title, NSString *key, double minimum,
     self.previewTheme = segments.selectedSegmentIndex;
     self.preview.overrideUserInterfaceStyle = (UIUserInterfaceStyle)self.previewTheme;
     [self.preview setNeedsLayout];
+    [self setNeedsStatusBarAppearanceUpdate];
+}
+- (void)targetChanged:(UISegmentedControl *)segments {
+    self.kind = segments.selectedSegmentIndex;
+    WCGestureSetChatPreviewKind(self.preview, self.kind);
+    [self rebuildParameters];
+}
+- (void)inputLinesChanged:(UISegmentedControl *)segments {
+    self.inputLineSelection = segments.selectedSegmentIndex;
+    WCGestureSetPreviewInputLines(self.preview, 1 + 2 * self.inputLineSelection);
 }
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)path {
     [tableView deselectRowAtIndexPath:path animated:YES];

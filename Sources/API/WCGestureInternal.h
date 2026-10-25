@@ -5,9 +5,11 @@
 
 #import "Sources/API/WCGestureSupportAPI.h"
 #import "Sources/API/WCGestureAppearanceAPI.h"
+#import "Sources/API/WCGestureAccountAPI.h"
 #import "Sources/API/WCGestureAIAPI.h"
 #import "Sources/API/WCGestureTranslateAPI.h"
 #import "Sources/API/WCGestureChatLayoutAPI.h"
+#import "Sources/API/WCGestureChatInputAppearanceAPI.h"
 #import "Sources/API/WCGestureAntiRevokeAPI.h"
 #import "Sources/API/WCGestureMessageTimeAPI.h"
 #import "Sources/API/WCGestureMessageAPI.h"

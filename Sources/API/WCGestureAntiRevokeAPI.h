@@ -6,6 +6,7 @@ BOOL WCGestureAntiRevokeHandle(id manager, id _Nullable incomingMessage);
 void WCGestureAntiRevokeSetPersistenceEnabled(BOOL enabled);
 NSArray<NSDictionary *> *WCGestureAntiRevokeRecords(void);
 NSString *WCGestureAntiRevokeDefaultTemplate(BOOL reply);
+NSString *WCGestureAntiRevokeFormatPrompt(NSString *templateText, NSString *name, NSString *summary, NSDate *date);
 NSString *WCGestureAntiRevokeMessageTypeName(NSUInteger type);
 NSString * _Nullable WCGestureAntiRevokeSidePromptForMessage(id _Nullable message);
 BOOL WCGestureAntiRevokeIsLocalPromptMessage(id _Nullable message);

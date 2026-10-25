@@ -1,138 +1,293 @@
 #import <math.h>
+#import <QuartzCore/QuartzCore.h>
 #import "Sources/API/WCGestureInternal.h"
 
-@interface WCChatPreview : UIView
-@property (nonatomic, assign) WCGesturePreviewKind kind;
+// Measured from the supplied 393pt WeChat view tree: a short message row is
+// 53pt, its avatar is (9,2,42,42), and its content starts at (60,5).
+// Metadata is laid out inside each row, never in the whole preview's bounds.
+@interface WCPreviewMessageRow : UIView
+@property (nonatomic, assign) BOOL sender;
+@property (nonatomic, assign) BOOL revoked;
 @property (nonatomic, assign) BOOL editing;
+@property (nonatomic, assign) WCGesturePreviewKind kind;
+@property (nonatomic, copy) NSString *text;
+@property (nonatomic, strong) NSDate *date;
+@property (nonatomic, strong) UIView *avatar;
+@property (nonatomic, strong) UIView *bubble;
+@property (nonatomic, strong) CAShapeLayer *bubbleShape;
+@property (nonatomic, strong) UILabel *body;
+@property (nonatomic, strong) UILabel *timeLabel;
+@property (nonatomic, strong) UILabel *revokeLabel;
+@property (nonatomic, strong) UIPanGestureRecognizer *timePan;
+@property (nonatomic, strong) UIPanGestureRecognizer *revokePan;
 @property (nonatomic, assign) CGPoint panStart;
-@property (nonatomic, strong) UILabel *caption;
-@property (nonatomic, strong) UILabel *localPrompt;
-@property (nonatomic, strong) NSArray<UILabel *> *avatars;
-@property (nonatomic, strong) NSArray<UILabel *> *bubbles;
-@property (nonatomic, strong) NSArray<UILabel *> *metadata;
-@property (nonatomic, strong) NSArray<UILabel *> *times;
+- (CGFloat)heightForWidth:(CGFloat)width;
 @end
 
-@implementation WCChatPreview
+@implementation WCPreviewMessageRow
 - (instancetype)initWithFrame:(CGRect)frame {
     self = [super initWithFrame:frame];
     if (self) {
-        self.backgroundColor = UIColor.tertiarySystemGroupedBackgroundColor;
-        self.layer.cornerRadius = 16;
-        _caption = [UILabel new];
-        _caption.font = [UIFont systemFontOfSize:12];
-        _caption.textColor = UIColor.secondaryLabelColor;
-        [self addSubview:_caption];
-        _localPrompt = [UILabel new];
-        _localPrompt.font = [UIFont systemFontOfSize:12];
-        _localPrompt.numberOfLines = 0;
-        _localPrompt.textAlignment = NSTextAlignmentCenter;
-        [self addSubview:_localPrompt];
-        NSMutableArray *avatars = [NSMutableArray array], *bubbles = [NSMutableArray array];
-        NSMutableArray *metadata = [NSMutableArray array], *times = [NSMutableArray array];
-        for (NSUInteger i = 0; i < 2; i++) {
-            UILabel *avatar = [UILabel new];
-            avatar.text = i ? @"我" : @"对";
-            avatar.textColor = UIColor.labelColor;
-            avatar.textAlignment = NSTextAlignmentCenter;
-            avatar.backgroundColor = [UIColor.systemBlueColor colorWithAlphaComponent:0.13];
-            avatar.layer.cornerRadius = 9; avatar.layer.masksToBounds = YES;
-            [self addSubview:avatar]; [avatars addObject:avatar];
-            UILabel *bubble = [UILabel new];
-            bubble.textColor = UIColor.labelColor;
-            bubble.textAlignment = NSTextAlignmentCenter;
-            bubble.layer.cornerRadius = 8; bubble.layer.masksToBounds = YES;
-            bubble.backgroundColor = i ? [UIColor.systemGreenColor colorWithAlphaComponent:0.3] : UIColor.secondarySystemGroupedBackgroundColor;
-            [self addSubview:bubble]; [bubbles addObject:bubble];
-            UILabel *label = [UILabel new]; label.tag = i;
-            [label addGestureRecognizer:[[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(dragged:)]];
-            [self addSubview:label]; [metadata addObject:label];
-            UILabel *time = [UILabel new]; [self addSubview:time]; [times addObject:time];
-        }
-        _avatars = avatars; _bubbles = bubbles; _metadata = metadata; _times = times;
+        _avatar = WCGestureCurrentUserAvatarView();
+        _bubble = [UIView new];
+        _bubbleShape = [CAShapeLayer layer]; [_bubble.layer addSublayer:_bubbleShape];
+        _body = [UILabel new]; _body.numberOfLines = 0; _body.textColor = UIColor.labelColor;
+        [_bubble addSubview:_body];
+        _timeLabel = [UILabel new]; _revokeLabel = [UILabel new];
+        _timePan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(dragged:)];
+        _revokePan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(dragged:)];
+        [_timeLabel addGestureRecognizer:_timePan]; [_revokeLabel addGestureRecognizer:_revokePan];
+        for (UIView *view in @[_avatar, _bubble, _timeLabel, _revokeLabel]) [self addSubview:view];
     }
     return self;
 }
+- (CGFloat)contentScale {
+    if (self.kind != WCGesturePreviewLayout) return 1;
+    double percent = [NSUserDefaults.standardUserDefaults doubleForKey:WCGesturePageScalePercentKey];
+    return isfinite(percent) ? MIN(100, MAX(70, percent)) / 100 : 0.9;
+}
+- (CGSize)textSizeForWidth:(CGFloat)width {
+    CGFloat scale = self.contentScale;
+    self.body.font = [UIFont systemFontOfSize:12 * scale]; self.body.text = self.text;
+    return [self.body sizeThatFits:CGSizeMake(MAX(24, width - 144), CGFLOAT_MAX)];
+}
+- (CGFloat)heightForWidth:(CGFloat)width {
+    CGSize text = [self textSizeForWidth:width];
+    return MAX(53, ceil(text.height) + 20 * self.contentScale + 12);
+}
 - (void)layoutSubviews {
     [super layoutSubviews];
-    self.caption.font = [UIFont systemFontOfSize:12 * WCGestureSettingsScaleFactor()];
+    CGFloat width = CGRectGetWidth(self.bounds), scale = self.contentScale;
+    // 42pt avatars are native control geometry, not the text-size percentage.
+    self.avatar.frame = CGRectMake(self.sender ? width - 51 : 9, 2, 42, 42);
+    CGSize text = [self textSizeForWidth:width];
+    CGFloat bubbleWidth = MAX(45 * scale, ceil(text.width) + 24 * scale);
+    CGFloat bubbleHeight = MAX(36 * scale, ceil(text.height) + 20 * scale);
+    self.bubble.frame = CGRectMake(self.sender ? width - 60 - bubbleWidth : 60, 5, bubbleWidth, bubbleHeight);
+    self.body.frame = CGRectMake(12 * scale, 10 * scale, bubbleWidth - 24 * scale, MAX(16 * scale, bubbleHeight - 20 * scale));
+    UIColor *fill = self.sender ? [UIColor colorWithRed:0.58 green:0.91 blue:0.43 alpha:1] : UIColor.secondarySystemGroupedBackgroundColor;
+    if (self.sender) self.body.textColor = UIColor.blackColor; else self.body.textColor = UIColor.labelColor;
+    UIBezierPath *path = [UIBezierPath bezierPathWithRoundedRect:self.bubble.bounds cornerRadius:5];
+    CGFloat tailX = self.sender ? bubbleWidth : 0;
+    [path moveToPoint:CGPointMake(tailX, 10)];
+    [path addLineToPoint:CGPointMake(tailX + (self.sender ? 5 : -5), 15)];
+    [path addLineToPoint:CGPointMake(tailX, 20)]; [path closePath];
+    self.bubbleShape.frame = self.bubble.bounds; self.bubbleShape.path = path.CGPath;
+    self.bubbleShape.fillColor = [fill resolvedColorWithTraitCollection:self.traitCollection].CGColor;
+
     NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
-    BOOL revoke = self.kind == WCGesturePreviewAntiRevoke;
-    BOOL local = revoke && [defaults integerForKey:WCGestureAntiRevokePromptStyleKey] == 0;
-    BOOL enabled = [defaults boolForKey:revoke ? WCGestureAntiRevokeEnabledKey : WCGestureMessageTimeEnabledKey];
-    self.caption.text = self.editing ? @"拖动文字或用下方控件精调 · 自动保存" : @"效果预览（示意）";
-    if (self.kind == WCGesturePreviewMessageTime && !self.editing) self.caption.text = enabled ? @"消息时间预览（已开启）" : @"消息时间预览（仅预览）";
-    self.caption.frame = CGRectMake(12, 8, MAX(0, self.bounds.size.width - 24), 20);
-    CGFloat scale = self.kind == WCGesturePreviewLayout ? WCGestureLayoutScaleFactor() : 1;
-    BOOL sideTime = [defaults boolForKey:WCGestureMessageTimeBubbleSideKey];
-    for (NSUInteger i = 0; i < 2; i++) {
-        UILabel *avatar = self.avatars[i], *bubble = self.bubbles[i], *label = self.metadata[i], *time = self.times[i];
-        avatar.hidden = bubble.hidden = local && i == 1;
-        CGFloat rowY = 44 + i * 88;
-        avatar.frame = CGRectMake(i ? self.bounds.size.width - 44 : 12, rowY, 32, 32);
-        CGFloat width = MIN(116 * scale, MAX(48, self.bounds.size.width - 180));
-        bubble.frame = CGRectMake(i ? CGRectGetMinX(avatar.frame) - 8 - width : CGRectGetMaxX(avatar.frame) + 8, rowY, width, 42 * scale);
-        bubble.text = i ? @"这是一条回复" : @"这是一条消息";
-        bubble.font = [UIFont systemFontOfSize:14 * scale];
-        WCGestureMessageTimeStyleLabel(time, [NSDate dateWithTimeIntervalSince1970:1700000000 + i * 60]);
-        CGSize timeSize = [time sizeThatFits:CGSizeMake(160, 26)];
-        timeSize.width = MIN(118, MAX(50, timeSize.width + 4));
-        timeSize.height = MAX(12, ceil(time.font.pointSize * 1.5));
-        time.frame = sideTime ? WCGestureMessageTimeSideFrame(self.bounds, bubble.frame, i == 1, timeSize)
-            : WCGestureMessageTimeAvatarFrame(self.bounds, avatar.frame, timeSize);
-        time.hidden = !revoke || local || !WCGestureEnabled(WCGestureMessageTimeEnabledKey) || CGRectIsEmpty(time.frame);
-        if (revoke) {
-            WCGestureAntiRevokeStyleLabel(label);
-            label.frame = WCGestureAntiRevokeSideFrame(self.bounds, bubble.frame, i == 1, [label sizeThatFits:CGSizeMake(160, 18)]);
-            if (!time.hidden && CGRectIntersectsRect(CGRectInset(label.frame, -2, -2), time.frame)) {
-                CGRect adjusted = label.frame;
-                CGFloat below = CGRectGetMaxY(time.frame) + 2;
-                CGFloat above = CGRectGetMinY(time.frame) - adjusted.size.height - 2;
-                if (below + adjusted.size.height <= self.bounds.size.height) adjusted.origin.y = below;
-                else if (above >= 0) adjusted.origin.y = above;
-                else adjusted = CGRectZero;
-                label.frame = adjusted;
-            }
-            label.hidden = local || CGRectIsEmpty(label.frame);
-        } else {
-            WCGestureMessageTimeStyleLabel(label, [NSDate dateWithTimeIntervalSince1970:1700000000 + i * 60]);
-            label.frame = time.frame;
-            label.hidden = CGRectIsEmpty(label.frame) || (self.kind == WCGesturePreviewLayout && !WCGestureEnabled(WCGestureMessageTimeEnabledKey));
-        }
-        label.userInteractionEnabled = self.editing && !label.hidden;
+    BOOL side = [defaults boolForKey:WCGestureMessageTimeBubbleSideKey];
+    WCGestureMessageTimeStyleLabel(self.timeLabel, self.date);
+    CGSize size = [self.timeLabel sizeThatFits:CGSizeMake(160, 26)];
+    size.width = MIN(118, MAX(50, ceil(size.width) + 4));
+    size.height = MAX(12, ceil(self.timeLabel.font.pointSize * 1.5));
+    self.timeLabel.frame = side ? WCGestureMessageTimeSideFrame(self.bounds, self.bubble.frame, self.sender, size)
+        : WCGestureMessageTimeAvatarFrame(self.bounds, self.avatar.frame, size);
+    self.timeLabel.hidden = (self.kind != WCGesturePreviewMessageTime && !WCGestureEnabled(WCGestureMessageTimeEnabledKey)) || CGRectIsEmpty(self.timeLabel.frame);
+    self.timeLabel.userInteractionEnabled = self.editing && self.kind == WCGesturePreviewMessageTime && !self.timeLabel.hidden;
+    self.timePan.enabled = self.timeLabel.userInteractionEnabled;
+
+    BOOL prompt = self.revoked && (self.kind == WCGesturePreviewAntiRevoke || WCGestureEnabled(WCGestureAntiRevokeEnabledKey));
+    WCGestureAntiRevokeStyleLabel(self.revokeLabel);
+    CGRect proposed = WCGestureAntiRevokeSideFrame(self.bounds, self.bubble.frame, self.sender,
+        [self.revokeLabel sizeThatFits:CGSizeMake(160, 18)]);
+    if (!self.timeLabel.hidden && !CGRectIsEmpty(proposed) && CGRectIntersectsRect(CGRectInset(proposed, -2, -2), self.timeLabel.frame)) {
+        CGFloat below = CGRectGetMaxY(self.timeLabel.frame) + 2;
+        CGFloat above = CGRectGetMinY(self.timeLabel.frame) - proposed.size.height - 2;
+        if (below + proposed.size.height <= CGRectGetHeight(self.bounds)) proposed.origin.y = below;
+        else if (above >= 0) proposed.origin.y = above;
+        else proposed = CGRectZero;
     }
-    self.localPrompt.hidden = !local;
-    if (local) {
-        NSString *text = [defaults stringForKey:WCGestureAntiRevokeLocalTemplateKey];
-        if (!text.length) text = WCGestureAntiRevokeDefaultTemplate(NO);
-        NSDictionary *fields = @{ @"用户名": @"好友", @"内容": @"这是一条消息", @"yyyy": @"2026", @"MM": @"10", @"dd": @"25", @"HH": @"12", @"mm": @"30", @"ss": @"00" };
-        for (NSString *key in fields) text = [text stringByReplacingOccurrencesOfString:[NSString stringWithFormat:@"{%@}", key] withString:fields[key]];
-        self.localPrompt.text = text;
-        self.localPrompt.textColor = WCGestureDynamicColorForDefaultsKeys(WCGestureAntiRevokeLocalLightTextColorKey, WCGestureAntiRevokeLocalDarkTextColorKey, WCGestureAntiRevokeLocalTextColorKey, UIColor.secondaryLabelColor, UIColor.secondaryLabelColor);
-        self.localPrompt.frame = CGRectMake(16, 100, MAX(0, self.bounds.size.width - 32), MAX(0, self.bounds.size.height - 110));
-    }
+    self.revokeLabel.frame = proposed;
+    self.revokeLabel.hidden = !prompt || [defaults integerForKey:WCGestureAntiRevokePromptStyleKey] != 1 || CGRectIsEmpty(proposed);
+    self.revokeLabel.userInteractionEnabled = self.editing && self.kind == WCGesturePreviewAntiRevoke && !self.revokeLabel.hidden;
+    self.revokePan.enabled = self.revokeLabel.userInteractionEnabled;
 }
 - (void)dragged:(UIPanGestureRecognizer *)gesture {
-    BOOL revoke = self.kind == WCGesturePreviewAntiRevoke;
+    BOOL revoke = gesture == self.revokePan;
     BOOL avatar = !revoke && ![NSUserDefaults.standardUserDefaults boolForKey:WCGestureMessageTimeBubbleSideKey];
     NSString *xKey = revoke ? WCGestureAntiRevokeSideOffsetXKey : WCGestureMessageTimeOffsetXKey;
     NSString *yKey = revoke ? WCGestureAntiRevokeSideOffsetYKey : (avatar ? WCGestureMessageTimeAvatarSpacingKey : WCGestureMessageTimeOffsetYKey);
     NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
     if (gesture.state == UIGestureRecognizerStateBegan) self.panStart = CGPointMake([defaults doubleForKey:xKey], [defaults doubleForKey:yKey]);
     CGPoint translation = [gesture translationInView:self];
-    if (!avatar) {
-        CGFloat direction = gesture.view.tag == 1 ? 1 : -1;
-        [defaults setDouble:MIN(80, MAX(-80, self.panStart.x + translation.x * direction)) forKey:xKey];
-    }
+    if (!avatar) [defaults setDouble:MIN(80, MAX(-80, self.panStart.x + translation.x * (self.sender ? 1 : -1))) forKey:xKey];
     [defaults setDouble:MIN(avatar ? 8 : 80, MAX(avatar ? -6 : -80, self.panStart.y + translation.y)) forKey:yKey];
-    [self setNeedsLayout];
-    WCGestureSettingsPostChange(yKey);
+    [self setNeedsLayout]; WCGestureSettingsPostChange(yKey);
+}
+@end
+
+@interface WCChatPreview : UIView
+@property (nonatomic, assign) WCGesturePreviewKind kind;
+@property (nonatomic, assign) BOOL editing;
+@property (nonatomic, assign) CGFloat obscuredHeight;
+@property (nonatomic, assign) NSUInteger inputLines;
+@property (nonatomic, copy) void (^backHandler)(void);
+@property (nonatomic, copy) void (^controlsHandler)(void);
+@property (nonatomic, strong) UIView *navigation;
+@property (nonatomic, strong) UILabel *heading;
+@property (nonatomic, strong) UIButton *backButton;
+@property (nonatomic, strong) UIButton *controlsButton;
+@property (nonatomic, strong) UIScrollView *messages;
+@property (nonatomic, strong) UILabel *separatorTime;
+@property (nonatomic, strong) UILabel *localPrompt;
+@property (nonatomic, strong) NSArray<WCPreviewMessageRow *> *rows;
+@property (nonatomic, strong) UIView *inputBar;
+@property (nonatomic, strong) UIView *inputField;
+@property (nonatomic, strong) UILabel *placeholder;
+@property (nonatomic, strong) NSArray<UIImageView *> *inputIcons;
+@property (nonatomic, assign) CGSize lastViewport;
+@property (nonatomic, assign) CGFloat lastContentHeight;
+@property (nonatomic, assign) CGFloat lastObscuredHeight;
+@end
+
+@implementation WCChatPreview
+- (instancetype)initWithFrame:(CGRect)frame {
+    self = [super initWithFrame:frame];
+    if (self) {
+        _inputLines = 1;
+        _navigation = [UIView new]; _navigation.backgroundColor = UIColor.secondarySystemGroupedBackgroundColor;
+        _heading = [UILabel new]; _heading.textAlignment = NSTextAlignmentCenter;
+        _heading.font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold]; _heading.textColor = UIColor.labelColor;
+        _heading.adjustsFontSizeToFitWidth = YES; _heading.minimumScaleFactor = 0.8;
+        _backButton = [UIButton buttonWithType:UIButtonTypeSystem];
+        [_backButton setImage:[UIImage systemImageNamed:@"chevron.left"] forState:UIControlStateNormal];
+        [_backButton addTarget:self action:@selector(back) forControlEvents:UIControlEventTouchUpInside];
+        _backButton.accessibilityLabel = @"返回设置";
+        _controlsButton = [UIButton buttonWithType:UIButtonTypeSystem]; [_controlsButton setTitle:@"调节" forState:UIControlStateNormal];
+        [_controlsButton addTarget:self action:@selector(controls) forControlEvents:UIControlEventTouchUpInside];
+        for (UIView *view in @[_heading, _backButton, _controlsButton]) [_navigation addSubview:view];
+        _messages = [UIScrollView new]; _messages.alwaysBounceVertical = YES;
+        _messages.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
+        _separatorTime = [UILabel new]; _separatorTime.text = @"16:32";
+        _separatorTime.font = [UIFont systemFontOfSize:12]; _separatorTime.textColor = UIColor.secondaryLabelColor;
+        _separatorTime.textAlignment = NSTextAlignmentCenter; [_messages addSubview:_separatorTime];
+        _localPrompt = [UILabel new]; _localPrompt.numberOfLines = 0; _localPrompt.textAlignment = NSTextAlignmentCenter;
+        _localPrompt.font = [UIFont systemFontOfSize:12]; [_messages addSubview:_localPrompt];
+        NSArray *samples = @[@{ @"text": @"你好", @"sender": @YES }, @{ @"text": @"收到", @"sender": @NO },
+            @{ @"text": @"看一下时间", @"sender": @YES }, @{ @"text": @"这是一条消息", @"sender": @NO, @"revoked": @YES },
+            @{ @"text": @"长消息也使用独立的消息行。调节时间的位置时，可以一起检查头像下方和消息旁的显示效果。", @"sender": @YES },
+            @{ @"text": @"预览不会发送消息", @"sender": @NO }];
+        NSMutableArray *rows = [NSMutableArray array];
+        NSDate *baseDate = [NSCalendar.currentCalendar dateBySettingHour:16 minute:32 second:45 ofDate:NSDate.date options:0];
+        for (NSUInteger i = 0; i < samples.count; i++) {
+            WCPreviewMessageRow *row = [WCPreviewMessageRow new]; row.text = samples[i][@"text"];
+            row.sender = [samples[i][@"sender"] boolValue]; row.revoked = [samples[i][@"revoked"] boolValue];
+            row.date = [baseDate dateByAddingTimeInterval:i * 10];
+            [_messages addSubview:row]; [rows addObject:row];
+            [_messages.panGestureRecognizer requireGestureRecognizerToFail:row.timePan];
+            [_messages.panGestureRecognizer requireGestureRecognizerToFail:row.revokePan];
+        }
+        _rows = rows;
+        _inputBar = [UIView new]; _inputBar.backgroundColor = UIColor.secondarySystemGroupedBackgroundColor;
+        _inputField = [UIView new]; _inputField.backgroundColor = UIColor.tertiarySystemGroupedBackgroundColor;
+        _inputField.layer.cornerRadius = 5; [_inputBar addSubview:_inputField];
+        _placeholder = [UILabel new]; _placeholder.text = @"示例聊天 · 右上角调节";
+        _placeholder.font = [UIFont systemFontOfSize:13]; _placeholder.textColor = UIColor.tertiaryLabelColor; [_inputField addSubview:_placeholder];
+        NSMutableArray *icons = [NSMutableArray array];
+        for (NSString *name in @[@"waveform.circle", @"face.smiling", @"plus.circle"]) {
+            UIImageView *icon = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:name]];
+            icon.tintColor = UIColor.labelColor; icon.contentMode = UIViewContentModeScaleAspectFit;
+            [_inputBar addSubview:icon]; [icons addObject:icon];
+        }
+        _inputIcons = icons;
+        for (UIView *view in @[_messages, _navigation, _inputBar]) [self addSubview:view];
+    }
+    return self;
+}
+- (void)back { if (self.backHandler) self.backHandler(); }
+- (void)controls { if (self.controlsHandler) self.controlsHandler(); }
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    CGFloat width = CGRectGetWidth(self.bounds), height = CGRectGetHeight(self.bounds);
+    if (width < 1 || height < 1) return;
+    self.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *traits) {
+        return traits.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.08 alpha:1] : [UIColor colorWithWhite:0.93 alpha:1];
+    }];
+    self.navigation.backgroundColor = self.backgroundColor;
+    self.inputBar.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *traits) {
+        return [UIColor colorWithWhite:traits.userInterfaceStyle == UIUserInterfaceStyleDark ? 0.12 : 0.97 alpha:1];
+    }];
+    self.inputField.backgroundColor = UIColor.secondarySystemGroupedBackgroundColor;
+    CGFloat top = self.safeAreaInsets.top;
+    CGFloat navigationHeight = top + 44;
+    self.navigation.frame = CGRectMake(0, 0, width, navigationHeight);
+    self.backButton.frame = CGRectMake(4, top, 44, 44);
+    self.controlsButton.frame = CGRectMake(width - 60, top, 56, 44);
+    self.heading.frame = CGRectMake(52, top, MAX(0, width - 116), 44);
+    self.heading.text = @[@"聊天预览 · 消息时间", @"聊天预览 · 防撤回", @"聊天预览 · 界面大小", @"聊天预览 · 输入圆角"][self.kind];
+    BOOL rounding = self.kind == WCGesturePreviewInputRounding;
+    BOOL elevated = rounding && self.obscuredHeight > 0;
+    CGFloat fieldHeight = 33 + 18 * (MAX(1, self.inputLines) - 1);
+    CGFloat inputHeight = fieldHeight + 12 + (elevated ? 0 : self.safeAreaInsets.bottom);
+    // The rounding controls act like a keyboard: keep the toolbar above them
+    // so both radii remain visible while being adjusted.
+    CGFloat inputBottom = height - (elevated ? self.obscuredHeight : 0);
+    self.inputBar.frame = CGRectMake(0, inputBottom - inputHeight, width, inputHeight);
+    CGFloat iconY = fieldHeight - 26.5;
+    self.inputIcons[0].frame = CGRectMake(8, iconY, 32, 32);
+    self.inputIcons[1].frame = CGRectMake(width - 80, iconY, 32, 32);
+    self.inputIcons[2].frame = CGRectMake(width - 40, iconY, 32, 32);
+    self.inputField.frame = CGRectMake(48, 6, MAX(0, width - 136), fieldHeight);
+    self.placeholder.numberOfLines = self.inputLines;
+    self.placeholder.text = self.inputLines > 1 ? @"多行输入预览\n观察圆角随高度变化\n不会发送消息" : @"示例聊天 · 右上角调节";
+    self.placeholder.frame = CGRectInset(self.inputField.bounds, 8, 0);
+    WCGestureChatInputRoundingApplyToViews(self.inputField, self.inputBar, rounding);
+    self.messages.frame = CGRectMake(0, navigationHeight, width, MAX(0, CGRectGetMinY(self.inputBar.frame) - navigationHeight));
+    self.separatorTime.frame = CGRectMake(0, 0, width, 41);
+    NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
+    BOOL local = [defaults integerForKey:WCGestureAntiRevokePromptStyleKey] == 0 &&
+        (self.kind == WCGesturePreviewAntiRevoke || WCGestureEnabled(WCGestureAntiRevokeEnabledKey));
+    CGFloat y = 41;
+    self.localPrompt.hidden = !local;
+    for (WCPreviewMessageRow *row in self.rows) {
+        row.kind = self.kind; row.editing = self.editing;
+        row.frame = CGRectMake(0, y, width, [row heightForWidth:width]); [row setNeedsLayout];
+        y += CGRectGetHeight(row.frame);
+        if (local && row.revoked) {
+            NSString *templateText = [defaults stringForKey:WCGestureAntiRevokeLocalTemplateKey];
+            if (!templateText.length) templateText = WCGestureAntiRevokeDefaultTemplate(NO);
+            self.localPrompt.text = WCGestureAntiRevokeFormatPrompt(templateText, @"预览好友", row.text, row.date);
+            self.localPrompt.textColor = WCGestureDynamicColorForDefaultsKeys(WCGestureAntiRevokeLocalLightTextColorKey,
+                WCGestureAntiRevokeLocalDarkTextColorKey, WCGestureAntiRevokeLocalTextColorKey, UIColor.secondaryLabelColor, UIColor.secondaryLabelColor);
+            CGFloat promptHeight = [self.localPrompt sizeThatFits:CGSizeMake(MAX(0, width - 40), CGFLOAT_MAX)].height + 16;
+            self.localPrompt.frame = CGRectMake(20, y, MAX(0, width - 40), promptHeight); y += promptHeight;
+        }
+    }
+    CGFloat overlap = elevated ? 0 : MAX(0, self.obscuredHeight - inputHeight);
+    CGFloat visibleHeight = MAX(0, CGRectGetHeight(self.messages.bounds) - overlap);
+    self.messages.contentSize = CGSizeMake(width, y + 12);
+    self.messages.contentInset = UIEdgeInsetsMake(MAX(0, visibleHeight - y - 12), 0, overlap, 0);
+    self.messages.scrollIndicatorInsets = UIEdgeInsetsMake(0, 0, overlap, 0);
+    if ((!CGSizeEqualToSize(self.lastViewport, self.messages.bounds.size) || self.lastContentHeight != y || self.lastObscuredHeight != self.obscuredHeight) && !self.messages.dragging) {
+        self.messages.contentOffset = CGPointMake(0, MAX(-self.messages.contentInset.top, y + 12 + overlap - CGRectGetHeight(self.messages.bounds)));
+    }
+    self.lastViewport = self.messages.bounds.size; self.lastContentHeight = y; self.lastObscuredHeight = self.obscuredHeight;
 }
 @end
 
 UIView *WCGestureCreateChatPreview(WCGesturePreviewKind kind) {
-    WCChatPreview *view = [[WCChatPreview alloc] initWithFrame:CGRectZero]; view.kind = kind; return view;
+    WCChatPreview *view = [WCChatPreview new]; view.kind = kind; return view;
 }
 void WCGestureSetPreviewEditing(UIView *preview, BOOL editing) {
     if ([preview isKindOfClass:WCChatPreview.class]) { ((WCChatPreview *)preview).editing = editing; [preview setNeedsLayout]; }
+}
+void WCGestureSetChatPreviewKind(UIView *preview, WCGesturePreviewKind kind) {
+    if ([preview isKindOfClass:WCChatPreview.class]) { ((WCChatPreview *)preview).kind = kind; [preview setNeedsLayout]; }
+}
+void WCGestureSetPreviewNavigation(UIView *preview, void (^back)(void), void (^controls)(void)) {
+    if ([preview isKindOfClass:WCChatPreview.class]) {
+        ((WCChatPreview *)preview).backHandler = back; ((WCChatPreview *)preview).controlsHandler = controls;
+    }
+}
+void WCGestureSetPreviewObscuredHeight(UIView *preview, CGFloat height) {
+    if ([preview isKindOfClass:WCChatPreview.class] && ((WCChatPreview *)preview).obscuredHeight != height) {
+        ((WCChatPreview *)preview).obscuredHeight = height; [preview setNeedsLayout];
+    }
+}
+
+void WCGestureSetPreviewInputLines(UIView *preview, NSUInteger lines) {
+    if ([preview isKindOfClass:WCChatPreview.class]) {
+        ((WCChatPreview *)preview).inputLines = MIN(5, MAX(1, lines)); [preview setNeedsLayout];
+    }
 }

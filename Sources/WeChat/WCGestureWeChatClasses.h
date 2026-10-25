@@ -9,6 +9,10 @@ NS_ASSUME_NONNULL_BEGIN
 @interface CMessageWrap : NSObject
 @end
 
+@interface MMHeadImageView : UIView
+- (instancetype)initWithUsrName:(id)userName headImgUrl:(id)url bAutoUpdate:(BOOL)autoUpdate bRoundCorner:(BOOL)round;
+@end
+
 @interface MMMenuItem : NSObject
 - (instancetype)initWithTitle:(NSString *)title icon:(nullable UIImage *)icon target:(id)target action:(SEL)action;
 @end

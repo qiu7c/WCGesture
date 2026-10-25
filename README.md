@@ -10,8 +10,8 @@ The search bar finds settings even when their feature is disabled and opens the 
 **聊天工具 (Chat tools)**:
 - Anti-revoke ports WCAtlas's original message lookup/interception, local system-message or side-prompt display, templates, light/dark colors, optional sender reply and age filter, searchable records and optional local persistence. Disabled by default; automatic replies are also off by default.
 - Message times port WCAtlas's below-avatar / bubble-side modes, avatar spacing, custom date format, 8–18pt font, bold, light/dark colors, split-message handling and reuse-safe refresh. Disabled by default.
-- A dedicated position preview page provides dragging, sliders, exact numeric entry, reset and light/dark preview; the same editor infrastructure accepts other preview views and parameter descriptors.
-- Existing inline chat-time, anti-revoke and layout previews remain available. Real labels and previews share formatting/style and coordinate helpers.
+- A full-page chat preview includes the chat header, native account avatars, separate message rows and an input-bar mock. The top-right control opens a panel for time / anti-revoke / layout / input-rounding adjustments, dragging, numeric entry, reset and light/dark preview.
+- The old inline previews have been removed from settings. Real labels and full-page previews share formatting/style and row-local coordinate helpers; the input bar is illustrative and sends no messages.
 - Time labels hide when there is insufficient side space. Actual message rendering and recall behavior still require device validation.
 
 **消息手势 (Message gestures)** — on chat message bubbles:
@@ -28,6 +28,12 @@ The search bar finds settings even when their feature is disabled and opens the 
 - Native content reflows through WeChat; fixed-size images and controls are not universally scaled
 - Restart WeChat after changing or disabling the feature to refresh cached native layouts
 - Previously enabled legacy chat-font and Moments-height settings can be adjusted or disabled when interface scaling is off; they are suspended while it is on
+
+**聊天输入栏圆角 (Chat input rounding)** — ported from WCAtlas:
+- Under 界面类功能, independently round the input field and outer toolbar (0–40pt; defaults 18/22)
+- Master switch is off by default; disabling restores each view's original radius, corner curve and clipping
+- The full-page preview has a 圆角 target with single/three/five-line input modes, sliders and numeric entry
+- Radius is capped at half the current view height; native and preview controls use the same implementation
 
 **输入框滑动 (Input-box swipe)** — on the chat text input:
 - Left swipe clears the input
@@ -49,15 +55,16 @@ hooks; shared code sits outside `Features/`:
 | `Sources/Services/` | Cross-feature services: AI completion client and translation engines |
 | `Sources/UI/` | Settings page, popup helpers, the Me-page entry hook |
 | `Sources/UI/WCGestureSettingsHome.m` | Six-category home and settings search |
-| `Sources/UI/WCGestureChatPreview.m` | Illustrative chat/settings previews |
+| `Sources/UI/WCGestureChatPreview.m` | Full-page chat scene and row-local metadata previews |
 | `Sources/Features/AntiRevoke/` | Verified other-party revoke interception |
 | `Sources/Features/MessageTime/` | WCAtlas message-time modes, split-part selection and reuse cleanup |
 | `Sources/UI/WCGestureChatOptions.m` | Shared full WCAtlas chat-settings catalog and editors |
-| `Sources/UI/WCGestureAdjustmentController.m` | Reusable independent position/appearance preview editor |
+| `Sources/UI/WCGestureAdjustmentController.m` | Full-page preview with an optional adjustment panel |
 | `Sources/Features/MessageGestures/` | Bubble swipes/taps, repeat path, voice-upload hooks |
 | `Sources/Features/InputGestures/` | Input-box swipes/taps and their actions |
 | `Sources/Features/KeyboardStrip/` | Keyboard bottom gesture strip |
 | `Sources/Features/ChatLayout/` | WCAtlas theme/WebView size scaling and legacy layout compatibility |
+| `Sources/Features/ChatInputAppearance/` | Input/toolbar rounding, restoration and native layout hooks |
 | `Sources/Features/Moments/` | Moments double-tap like |
 | `Sources/Features/GlobalActions/` | Multi-finger global actions and custom pages |
 | `Sources/Features/InterfaceTweaks/` | App-wide interface enhancements (separator hiding) |
@@ -121,6 +128,11 @@ All keys live under the `com.qiu7c.onewx.*` namespace. Settings saved by the old
 | `com.qiu7c.onewx.interface.page-scale.enabled` | NO |
 | `com.qiu7c.onewx.interface.page-scale.percent` | 90.0 (70–100) |
 | `com.qiu7c.onewx.interface.page-scale.plugin-ui` | NO |
+| `com.qiu7c.onewx.interface.chat-input-rounding.enabled` | NO |
+| `com.qiu7c.onewx.interface.chat-input-rounding.inner` | YES |
+| `com.qiu7c.onewx.interface.chat-input-rounding.outer` | YES |
+| `com.qiu7c.onewx.interface.chat-input-rounding.inner-radius` | 18.0 (0–40) |
+| `com.qiu7c.onewx.interface.chat-input-rounding.outer-radius` | 22.0 (0–40) |
 | `com.qiu7c.onewx.chat.layout.enabled` | NO |
 | `com.qiu7c.onewx.chat.layout.font-level` | 2 |
 | `com.qiu7c.onewx.chat.layout.moments-enabled` | NO |

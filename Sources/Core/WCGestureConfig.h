@@ -187,6 +187,13 @@ FOUNDATION_EXPORT NSString *const WCGestureMessageTimeOffsetXKey;
 FOUNDATION_EXPORT NSString *const WCGestureMessageTimeOffsetYKey;
 
 
+/// WCAtlas chat input/toolbar rounding, with independent inner and outer radii.
+FOUNDATION_EXPORT NSString *const WCGestureChatInputRoundingEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureChatInputInnerRoundingKey;
+FOUNDATION_EXPORT NSString *const WCGestureChatInputOuterRoundingKey;
+FOUNDATION_EXPORT NSString *const WCGestureChatInputInnerRadiusKey;
+FOUNDATION_EXPORT NSString *const WCGestureChatInputOuterRadiusKey;
+
 /// Interface size, based on WCAtlas theme scaling (70–100%, default 90%).
 FOUNDATION_EXPORT NSString *const WCGesturePageScaleEnabledKey;
 FOUNDATION_EXPORT NSString *const WCGesturePageScalePercentKey;

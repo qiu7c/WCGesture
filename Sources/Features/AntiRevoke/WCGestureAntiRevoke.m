@@ -348,6 +348,10 @@ NSString *WCGestureAntiRevokeDefaultTemplate(BOOL reply) {
     return reply ? WCGestureDefaultRevokeReplyTemplate : WCGestureDefaultLocalRevokeTemplate;
 }
 
+NSString *WCGestureAntiRevokeFormatPrompt(NSString *templateText, NSString *name, NSString *summary, NSDate *date) {
+    return WCGestureApplyRevokeTemplate(templateText, name, summary, date);
+}
+
 NSString *WCGestureAntiRevokeMessageTypeName(NSUInteger type) {
     return WCGestureMessageTypeName(type);
 }

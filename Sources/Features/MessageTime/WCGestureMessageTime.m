@@ -403,6 +403,7 @@ void WCGestureMessageTimeStyleLabel(UILabel *label, NSDate *date) {
         UIColor.secondaryLabelColor, UIColor.secondaryLabelColor);
     label.text = WCGestureMessageTimeText(date.timeIntervalSince1970, format);
     label.numberOfLines = 1;
+    label.textAlignment = NSTextAlignmentCenter;
     label.userInteractionEnabled = NO;
     label.adjustsFontSizeToFitWidth = YES;
     label.minimumScaleFactor = 0.8;

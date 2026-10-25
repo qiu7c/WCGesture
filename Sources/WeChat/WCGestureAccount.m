@@ -1,5 +1,6 @@
 #import <objc/message.h>
 #import <objc/runtime.h>
+#import <QuartzCore/QuartzCore.h>
 
 #import "Sources/API/WCGestureInternal.h"
 
@@ -70,4 +71,36 @@ BOOL WCRefreshCachedCurrentUser(void) {
     if (wxid.length == 0) return NO;
     [[NSUserDefaults standardUserDefaults] setObject:wxid forKey:WCCachedWXIDKey];
     return YES;
+}
+
+UIView *WCGestureCurrentUserAvatarView(void) {
+    NSCAssert(NSThread.isMainThread, @"Avatar views must be created on the main thread");
+    UIView *view = nil;
+    @try {
+        id manager = WCServiceForClass(NSClassFromString(@"CContactMgr"));
+        id contact = WCTweakValueForSelectorNames(manager, @[@"getSelfContact"]);
+        NSString *userName = WCContactString(contact, "m_nsUsrName");
+        NSString *url = WCContactString(contact, "m_nsHeadImgUrl") ?: @"";
+        Class avatarClass = NSClassFromString(@"MMHeadImageView");
+        SEL initializer = @selector(initWithUsrName:headImgUrl:bAutoUpdate:bRoundCorner:);
+        if (userName.length && [avatarClass instancesRespondToSelector:initializer]) {
+            id native = [[avatarClass alloc] initWithUsrName:userName headImgUrl:url bAutoUpdate:YES bRoundCorner:YES];
+            if ([native isKindOfClass:UIView.class]) view = native;
+        }
+        if (!view && contact) {
+            id image = WCTweakValueForSelectorNames(contact, @[@"getContactHeadImage", @"contactHeadImage", @"headImage"]);
+            if ([image isKindOfClass:UIImage.class]) view = [[UIImageView alloc] initWithImage:image];
+        }
+    } @catch (NSException *exception) {
+        WCLog(@"预览头像暂不可用：%@", exception.name);
+    }
+    if (!view) {
+        view = [UIView new];
+        view.backgroundColor = UIColor.tertiarySystemGroupedBackgroundColor;
+        view.accessibilityIdentifier = @"com.qiu7c.onewx.preview.avatar-unavailable";
+    }
+    view.userInteractionEnabled = NO;
+    view.contentMode = UIViewContentModeScaleAspectFill;
+    view.layer.cornerRadius = 6; view.clipsToBounds = YES;
+    return view;
 }

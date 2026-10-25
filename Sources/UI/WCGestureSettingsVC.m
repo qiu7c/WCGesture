@@ -103,15 +103,21 @@ static void WCPresentKeyboardNumberEditor(__unused UIViewController *presenter,
     BOOL isFontLevel = [defaultsKey isEqualToString:WCChatLayoutFontLevelKey];
     BOOL isPageScale = [defaultsKey isEqualToString:WCGesturePageScalePercentKey];
     BOOL isTimeSize = [defaultsKey isEqualToString:WCGestureMessageTimeFontSizeKey];
+    BOOL isRounding = [defaultsKey isEqualToString:WCGestureChatInputInnerRadiusKey]
+        || [defaultsKey isEqualToString:WCGestureChatInputOuterRadiusKey];
     BOOL isScale = [defaultsKey isEqualToString:WCMomentsHeightScaleKey];
     double minValue = isPageScale ? 70.0 : (isFontLevel ? 1.0 : (isScale ? 100.0 : (isWidth ? 0.0 : (isOffset ? -400.0 : 20.0))));
     double maxValue = isPageScale ? 100.0 : (isFontLevel ? 8.0 : (isScale ? 160.0 : (isWidth ? 1000.0 : (isOffset ? 400.0 : 200.0))));
-    if (isTimeSize) { minValue = 8.0; maxValue = 16.0; }
+    if (isTimeSize) { minValue = 8.0; maxValue = 18.0; }
+    if (isRounding) { minValue = 0.0; maxValue = 40.0; }
     NSString *message;
     NSString *placeholder;
-    if (isTimeSize) {
-        message = @"输入 8 到 16 之间的字号，修改后立即更新预览与当前聊天";
-        placeholder = @"8 - 16（默认 10）";
+    if (isRounding) {
+        message = @"输入 0 到 40；0 为直角，实际圆角不超过控件高度的一半。可进入整页预览观察单行和多行效果。";
+        placeholder = @"0 - 40";
+    } else if (isTimeSize) {
+        message = @"输入 8 到 18 之间的字号，修改后立即更新预览与当前聊天";
+        placeholder = @"8 - 18（默认 10）";
     } else if (isPageScale) {
         message = @"输入 70 到 100 之间的百分比，越小越紧凑。基于微信最小字号档位缩放；关闭后恢复原设置。修改或关闭后建议重启微信，使缓存布局完整刷新。";
         placeholder = @"70 - 100（默认 90）";
@@ -913,14 +919,7 @@ typedef NS_ENUM(NSInteger, WCRowKind) {
     WCRowKindExport,         // tap → export config
     WCRowKindImport,        // tap → import config
     WCRowKindChatOption,
-    WCRowKindMessageTimePreview,
-    WCRowKindAntiRevokePreview,
-    WCRowKindLayoutPreview,
 };
-
-static BOOL WCRowIsPreview(WCRowKind kind) {
-    return kind == WCRowKindMessageTimePreview || kind == WCRowKindAntiRevokePreview || kind == WCRowKindLayoutPreview;
-}
 
 @interface WCRow : NSObject
 @property (nonatomic, copy) NSString *title;
@@ -1053,10 +1052,6 @@ static NSString *WCRowDetailText(WCRow *row) {
     NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
     switch (row.kind) {
         case WCRowKindChatOption: return WCGestureChatOptionDetail(row.chatOption);
-        case WCRowKindMessageTimePreview:
-        case WCRowKindAntiRevokePreview:
-        case WCRowKindLayoutPreview:
-            return @"";
         case WCRowKindSwitch:
             return [d boolForKey:row.defaultsKey] ? @"开" : @"关";
         case WCRowKindActionDetail:
@@ -1346,7 +1341,7 @@ static NSString *WCRowDetailText(WCRow *row) {
             NSString *groupKey = @"";
             for (WCRow *row in rows) {
                 if (row.kind == WCRowKindGroupToggle) groupKey = row.defaultsKey;
-                if (row.kind == WCRowKindHint || WCRowIsPreview(row.kind)) continue;
+                if (row.kind == WCRowKindHint) continue;
                 [entries addObject:@{ @"title": row.title, @"category": @(category),
                     @"categoryTitle": detail.title, @"sectionTitle": rows.firstObject.title,
                     @"sectionKey": detail.collapseKeys[section], @"groupKey": groupKey }];
@@ -1407,8 +1402,6 @@ static NSString *WCRowDetailText(WCRow *row) {
                 row.chatOption = option;
                 [rows addObject:row];
             }
-            [rows addObject:WCPlainRow(i == 0 ? @"防撤回预览" : @"消息时间预览",
-                i == 0 ? WCRowKindAntiRevokePreview : WCRowKindMessageTimePreview)];
             [rows addObject:WCHintRow(i == 0 ? @"回复撤回者默认关闭；开启后会自动向该会话发送回复模板。"
                 : @"可先调节并预览；开启开关后应用到实际聊天。")];
             [sections addObject:rows];
@@ -1542,10 +1535,25 @@ static NSString *WCRowDetailText(WCRow *row) {
                 [enhance addObject:WCNumberRow(@"高度比例 (%)", WCMomentsHeightScaleKey)];
             }
         }
-        [enhance addObject:WCPlainRow(@"布局大小预览", WCRowKindLayoutPreview)];
+        WCRow *layoutPreview = WCPlainRow(@"整页布局预览", WCRowKindChatOption);
+        layoutPreview.chatOption = @{ @"title": @"整页布局预览", @"type": @"layout-position", @"key": @"" };
+        [enhance addObject:layoutPreview];
         [sections addObject:enhance];
         [collapsible addObject:@YES];
         [collapseKeys addObject:[prefix stringByAppendingString:@".enhance.layout"]];
+        NSMutableArray *rounding = [NSMutableArray arrayWithObjects:
+            WCSwitchRow(@"聊天输入栏圆角", WCGestureChatInputRoundingEnabledKey),
+            WCSwitchRow(@"输入框内部圆角", WCGestureChatInputInnerRoundingKey),
+            WCNumberRow(@"内部圆角程度", WCGestureChatInputInnerRadiusKey),
+            WCSwitchRow(@"外部工具栏圆角", WCGestureChatInputOuterRoundingKey),
+            WCNumberRow(@"外部圆角程度", WCGestureChatInputOuterRadiusKey), nil];
+        WCRow *roundingPreview = WCPlainRow(@"整页圆角预览与调节", WCRowKindChatOption);
+        roundingPreview.chatOption = @{ @"title": roundingPreview.title, @"type": @"input-rounding-position", @"key": @"" };
+        [rounding addObject:roundingPreview];
+        [rounding addObject:WCHintRow(@"可先预览再开启。半径 0–40，实际不超过控件高度的一半；关闭后恢复微信原样。")];
+        [sections addObject:rounding];
+        [collapsible addObject:@YES];
+        [collapseKeys addObject:[prefix stringByAppendingString:@".interface.chat-input-rounding"]];
     } else if (self.category == WCGestureCategoryDisabled) {
         [sections addObject:@[WCSwitchRow(@"去除所有分割线", WCHideSeparatorLinesKey)]];
         [collapsible addObject:@NO];
@@ -1663,23 +1671,6 @@ static NSString *WCRowDetailText(WCRow *row) {
     NSInteger section = indexPath.section;
     NSInteger rowIdx = indexPath.row;
     WCRow *row = self.sections[section][rowIdx];
-    if (WCRowIsPreview(row.kind)) {
-        UITableViewCell *previewCell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:nil];
-        previewCell.selectionStyle = UITableViewCellSelectionStyleNone;
-        WCGesturePreviewKind kind = row.kind == WCRowKindAntiRevokePreview ? WCGesturePreviewAntiRevoke
-            : (row.kind == WCRowKindLayoutPreview ? WCGesturePreviewLayout : WCGesturePreviewMessageTime);
-        UIView *preview = WCGestureCreateChatPreview(kind);
-        preview.translatesAutoresizingMaskIntoConstraints = NO;
-        [previewCell.contentView addSubview:preview];
-        [NSLayoutConstraint activateConstraints:@[
-            [preview.leadingAnchor constraintEqualToAnchor:previewCell.contentView.leadingAnchor constant:12],
-            [preview.trailingAnchor constraintEqualToAnchor:previewCell.contentView.trailingAnchor constant:-12],
-            [preview.topAnchor constraintEqualToAnchor:previewCell.contentView.topAnchor constant:8],
-            [preview.bottomAnchor constraintEqualToAnchor:previewCell.contentView.bottomAnchor constant:-8],
-            [preview.heightAnchor constraintEqualToConstant:230],
-        ]];
-        return previewCell;
-    }
     NSString *cellId = @"WCGestureCell";
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:cellId];
     if (!cell) {
@@ -1772,10 +1763,6 @@ static NSString *WCRowDetailText(WCRow *row) {
     switch (row.kind) {
         case WCRowKindChatOption:
             WCGestureEditChatOption(self, row.chatOption);
-            break;
-        case WCRowKindMessageTimePreview:
-        case WCRowKindAntiRevokePreview:
-        case WCRowKindLayoutPreview:
             break;
         case WCRowKindSwitch:
         case WCRowKindHint:
