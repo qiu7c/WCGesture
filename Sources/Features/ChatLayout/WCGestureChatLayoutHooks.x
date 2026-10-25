@@ -8,7 +8,8 @@
 %hook CLocalInfo
 
 - (unsigned int)m_uiGlobalFontLevel {
-    return WCChatLayoutResolvedFontLevel(%orig);
+    unsigned int original = %orig;
+    return WCChatLayoutResolvedFontLevel(original);
 }
 
 %end
@@ -22,7 +23,8 @@
                             width:(double)width
                  isFirstOneInsection:(BOOL)first
                  isLastOneInSection:(BOOL)last {
-    return WCMomentsLayoutAdjustedHeight(%orig);
+    double height = %orig;
+    return WCMomentsLayoutAdjustedHeight(height);
 }
 
 %end
@@ -32,7 +34,8 @@
 + (double)getCellHeightForDataItem:(id)item
                           RowIndex:(long long)rowIndex
                        pageContext:(id)context {
-    return WCMomentsLayoutAdjustedHeight(%orig);
+    double height = %orig;
+    return WCMomentsLayoutAdjustedHeight(height);
 }
 
 %end
