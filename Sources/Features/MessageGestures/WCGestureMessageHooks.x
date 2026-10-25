@@ -7,13 +7,16 @@
 %hook CommonMessageCellView
 
 - (void)setViewModel:(id)viewModel {
+    WCGestureMessageTimeHide(self);
     %orig;
     WCSynchronizeReplyGesture(self);
+    [self setNeedsLayout];
 }
 
 - (void)didMoveToWindow {
     %orig;
     WCSynchronizeReplyGesture(self);
+    WCGestureMessageTimeLayout(self);
 }
 
 %new

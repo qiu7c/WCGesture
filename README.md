@@ -4,6 +4,15 @@ One Wx is a WeChat enhancement plugin that grew out of WCGesture (originally ext
 
 ## Features
 
+The home page has six categories: 聊天类功能 / 手势类功能 / 朋友圈功能 / 界面类功能 / 禁用类功能 / 插件类配置.
+The search bar finds settings even when their feature is disabled and opens the relevant group without enabling it.
+
+**聊天工具 (Chat tools)**:
+- Anti-revoke retains already-received messages recalled by the other party; your own recalls keep native behavior. Disabled by default.
+- Message times beside bubbles, with format, 8–16pt font, bold and top/center/bottom placement. Disabled by default.
+- Chat-time, anti-revoke and layout settings include illustrative previews; message-time previews share the live label styling and positioning code.
+- Time labels hide when there is insufficient side space. Actual message rendering and recall behavior still require device validation.
+
 **消息手势 (Message gestures)** — on chat message bubbles:
 - Left swipe / right swipe (separately for your own vs. the other party's messages)
 - Double tap / triple tap (separately for your own vs. the other party's)
@@ -37,6 +46,10 @@ hooks; shared code sits outside `Features/`:
 | `Sources/WeChat/` | WeChat class declarations, account/current user, private API wrappers |
 | `Sources/Services/` | Cross-feature services: AI completion client and translation engines |
 | `Sources/UI/` | Settings page, popup helpers, the Me-page entry hook |
+| `Sources/UI/WCGestureSettingsHome.m` | Six-category home and settings search |
+| `Sources/UI/WCGestureChatPreview.m` | Illustrative chat/settings previews |
+| `Sources/Features/AntiRevoke/` | Verified other-party revoke interception |
+| `Sources/Features/MessageTime/` | Bubble-side message-time labels and reuse cleanup |
 | `Sources/Features/MessageGestures/` | Bubble swipes/taps, repeat path, voice-upload hooks |
 | `Sources/Features/InputGestures/` | Input-box swipes/taps and their actions |
 | `Sources/Features/KeyboardStrip/` | Keyboard bottom gesture strip |
@@ -91,6 +104,12 @@ All keys live under the `com.qiu7c.onewx.*` namespace. Settings saved by the old
 | `com.qiu7c.onewx.chat.message-gesture.double-tap.self/other-action` | None (0) |
 | `com.qiu7c.onewx.chat.message-gesture.triple-tap.self/other-action` | None (0) |
 | `com.qiu7c.onewx.chat.input-swipe-actions` | NO |
+| `com.qiu7c.onewx.chat.anti-revoke.enabled` | NO |
+| `com.qiu7c.onewx.chat.message-time.enabled` | NO |
+| `com.qiu7c.onewx.chat.message-time.format` | HH:mm:ss |
+| `com.qiu7c.onewx.chat.message-time.font-size` | 10.0 (8–16) |
+| `com.qiu7c.onewx.chat.message-time.bold` | NO |
+| `com.qiu7c.onewx.chat.message-time.position` | 2 (bottom; 0 top, 1 center) |
 | `com.qiu7c.onewx.interface.page-scale.enabled` | NO |
 | `com.qiu7c.onewx.interface.page-scale.percent` | 90.0 (70–100) |
 | `com.qiu7c.onewx.chat.layout.enabled` | NO |

@@ -60,6 +60,12 @@ NSString *const WCGestureAIAnswerPresetKey = @"com.qiu7c.onewx.ai.answer-preset"
 NSString *const WCGestureAIPolishPresetKey = @"com.qiu7c.onewx.ai.polish-preset";
 
 NSString *const WCGesturePageScaleEnabledKey = @"com.qiu7c.onewx.interface.page-scale.enabled";
+NSString *const WCGestureAntiRevokeEnabledKey = @"com.qiu7c.onewx.chat.anti-revoke.enabled";
+NSString *const WCGestureMessageTimeEnabledKey = @"com.qiu7c.onewx.chat.message-time.enabled";
+NSString *const WCGestureMessageTimeFormatKey = @"com.qiu7c.onewx.chat.message-time.format";
+NSString *const WCGestureMessageTimeFontSizeKey = @"com.qiu7c.onewx.chat.message-time.font-size";
+NSString *const WCGestureMessageTimeBoldKey = @"com.qiu7c.onewx.chat.message-time.bold";
+NSString *const WCGestureMessageTimePositionKey = @"com.qiu7c.onewx.chat.message-time.position";
 NSString *const WCGesturePageScalePercentKey = @"com.qiu7c.onewx.interface.page-scale.percent";
 
 // Legacy settings retained for compatibility; page scaling takes priority.
@@ -247,6 +253,12 @@ void WCGestureRegisterDefaults(void) {
             WCGestureAIAnswerPresetKey: @0,
             WCGestureAIPolishPresetKey: @0,
             WCGesturePageScaleEnabledKey: @NO,
+            WCGestureAntiRevokeEnabledKey: @NO,
+            WCGestureMessageTimeEnabledKey: @NO,
+            WCGestureMessageTimeFormatKey: @"HH:mm:ss",
+            WCGestureMessageTimeFontSizeKey: @10.0,
+            WCGestureMessageTimeBoldKey: @NO,
+            WCGestureMessageTimePositionKey: @2,
             WCGesturePageScalePercentKey: @90.0,
             WCChatLayoutEnabledKey: @NO,
             WCChatLayoutFontLevelKey: @2,

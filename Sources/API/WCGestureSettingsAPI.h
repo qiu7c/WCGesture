@@ -2,14 +2,33 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-/// Home page: two rounded cards (聊天页手势 / 其他手势) + footer info.
+typedef NS_ENUM(NSInteger, WCGestureCategory) {
+    WCGestureCategoryChat,
+    WCGestureCategoryGestures,
+    WCGestureCategoryMoments,
+    WCGestureCategoryInterface,
+    WCGestureCategoryDisabled,
+    WCGestureCategoryPlugin,
+};
+
+typedef NS_ENUM(NSInteger, WCGesturePreviewKind) {
+    WCGesturePreviewMessageTime,
+    WCGesturePreviewAntiRevoke,
+    WCGesturePreviewLayout,
+};
+
+UIView *WCGestureCreateChatPreview(WCGesturePreviewKind kind);
+
+/// Searchable home with six feature categories.
 /// Registered with WeChat's WCPluginsMgr; instantiated by class name.
-@interface WCGestureSettingsController : UIViewController
+@interface WCGestureSettingsController : UITableViewController
 @end
 
 /// Detail page for a category of gestures.
 @interface WCGestureDetailController : UITableViewController
 - (instancetype)initWithCategory:(NSInteger)category;
++ (NSArray<NSDictionary *> *)searchEntries;
+- (void)focusSearchResult:(NSDictionary *)result;
 @end
 
 /// Presents the WCGesture settings sheet (ActionSheet style) from the given

@@ -57,6 +57,8 @@ NS_ASSUME_NONNULL_BEGIN
 @end
 
 @interface CMessageMgr : NSObject
+- (id)GetMsg:(id)session n64SvrID:(long long)serverID;
+- (void)onNewSyncNotAddDBMessage:(id)message;
 - (void)AddMsg:(NSString *)session MsgWrap:(id)message;
 - (void)AddLocalMsg:(NSString *)session MsgWrap:(id)message;
 - (BOOL)SaveMesVoice:(NSData *)data MsgWrap:(id)message;

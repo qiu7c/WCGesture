@@ -7,6 +7,8 @@
 #import "Sources/API/WCGestureAIAPI.h"
 #import "Sources/API/WCGestureTranslateAPI.h"
 #import "Sources/API/WCGestureChatLayoutAPI.h"
+#import "Sources/API/WCGestureAntiRevokeAPI.h"
+#import "Sources/API/WCGestureMessageTimeAPI.h"
 #import "Sources/API/WCGestureMessageAPI.h"
 #import "Sources/API/WCGestureInputAPI.h"
 #import "Sources/API/WCGestureKeyboardAPI.h"

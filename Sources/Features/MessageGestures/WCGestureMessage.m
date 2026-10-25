@@ -59,6 +59,10 @@ static id WCMessageWrapForCell(id cell) {
         @[@"messageWrap", @"m_messageWrap", @"msgWrap", @"wrap", @"message"]);
 }
 
+id WCGestureMessageWrapForCell(UIView *cell) {
+    return WCMessageWrapForCell(cell);
+}
+
 static BOOL WCMessageCellIsSender(CommonMessageCellView *cell) {
     id viewModel = WCTweakSafeValue(cell, @"viewModel") ?: WCTweakSafeValue(cell, @"m_viewModel");
     id senderValue = WCTweakSafeValue(viewModel, @"isSender");

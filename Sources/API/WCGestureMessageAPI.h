@@ -4,6 +4,9 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+/// Shared message-wrap resolution, including split-message parent models.
+id _Nullable WCGestureMessageWrapForCell(UIView *cell);
+
 /// Creates/removes the swipe and multi-tap recognizers on one message bubble.
 void WCSynchronizeReplyGesture(CommonMessageCellView *cell);
 

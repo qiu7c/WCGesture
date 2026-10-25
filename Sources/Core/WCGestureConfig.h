@@ -153,6 +153,14 @@ FOUNDATION_EXPORT NSString *const WCGestureAIReplyPresetKey;
 FOUNDATION_EXPORT NSString *const WCGestureAIAnswerPresetKey;
 FOUNDATION_EXPORT NSString *const WCGestureAIPolishPresetKey;
 
+/// Chat tools: other-user revoke protection and bubble-side message times.
+FOUNDATION_EXPORT NSString *const WCGestureAntiRevokeEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureMessageTimeEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureMessageTimeFormatKey;
+FOUNDATION_EXPORT NSString *const WCGestureMessageTimeFontSizeKey;
+FOUNDATION_EXPORT NSString *const WCGestureMessageTimeBoldKey;
+FOUNDATION_EXPORT NSString *const WCGestureMessageTimePositionKey;
+
 /// Interface size, based on WCAtlas theme scaling (70–100%, default 90%).
 FOUNDATION_EXPORT NSString *const WCGesturePageScaleEnabledKey;
 FOUNDATION_EXPORT NSString *const WCGesturePageScalePercentKey;
