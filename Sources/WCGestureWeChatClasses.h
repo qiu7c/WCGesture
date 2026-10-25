@@ -1,0 +1,65 @@
+#import <UIKit/UIKit.h>
+
+// Forward declarations of the WeChat classes the tweak hooks or messages.
+// Only the methods we actually call are declared; everything else is reached
+// through KVC helpers in WCGestureSupport.h.
+
+NS_ASSUME_NONNULL_BEGIN
+
+@interface CMessageWrap : NSObject
+@end
+
+@interface MMMenuItem : NSObject
+- (instancetype)initWithTitle:(NSString *)title icon:(nullable UIImage *)icon target:(id)target action:(SEL)action;
+@end
+
+@interface CommonMessageCellView : UIView
+@property (nonatomic, strong) id viewModel;
+- (void)setViewModel:(id)viewModel;
+- (void)didMoveToWindow;
+- (void)prepareForReuse;
+- (void)layoutSubviews;
+- (void)updateStatus;
+- (void)updateNodeStatus;
+- (void)handleTapReferMessage;
+- (void)handleTapForReferMsg:(id)sender;
+- (void)onShowMsgReplyMenuItem:(id)sender;
+- (void)onRevokeMsg:(id)sender;
+- (void)onCopy:(id)sender;
+- (void)onDelete:(id)sender;
+- (void)onDeleteMessage:(id)sender;
+- (void)onHeadImageLongPressed:(id)sender;
+@end
+
+@interface BaseMsgContentViewController : UIViewController
+@end
+
+@interface MMGrowTextView : UIView
+- (void)didMoveToWindow;
+- (void)textViewDidChange:(id)textView;
+@end
+
+@interface MMInputToolView : UIView
+@end
+
+@interface ForwardMessageLogicController : NSObject
+- (void)setDelegate:(id)delegate;
+- (void)forwardNoConfirmForMsgList:(NSArray *)messages toContacts:(NSArray *)contacts;
+@end
+
+@interface AudioSender : NSObject
+- (void)ResendVoiceMsg:(NSString *)session MsgWrap:(id)message;
+- (id)uploaderForMsgWrap:(id)message;
+@end
+
+@interface ForwardMsgUtil : NSObject
++ (BOOL)canBeForwardWithMsg:(id)message;
+@end
+
+@interface CMessageMgr : NSObject
+- (void)AddMsg:(NSString *)session MsgWrap:(id)message;
+- (void)AddLocalMsg:(NSString *)session MsgWrap:(id)message;
+- (BOOL)SaveMesVoice:(NSData *)data MsgWrap:(id)message;
+@end
+
+NS_ASSUME_NONNULL_END

@@ -16,6 +16,27 @@ WCGesture is a standalone WeChat gesture tweak, extracted from [WCAtlas](https:/
 
 复读 (repeat) covers text, image, video, and voice messages. Voice repeat sends through WeChat's native `AudioSender` resend pipeline; other types go through the native `ForwardMessageLogicController`. Unlike WCAtlas, this build does **not** include the send-confirmation dialog — repeat fires immediately.
 
+## Code layout
+
+`Tweak.x` only contains the Logos hooks and the `%ctor` that wires everything
+together. Feature logic lives in `Sources/`, one module per area:
+
+| File | Responsibility |
+|---|---|
+| `WCGestureSupport.{h,m}` | KVC helpers, active window, presentation helpers, toast, haptics |
+| `WCGestureMessage.{h,m}` | Message bubble gestures, transform animation, repeat path, AI reply action |
+| `WCGestureInput.{h,m}` | Input-box text access and the configured input actions |
+| `WCGestureKeyboard.{h,m}` | Keyboard bottom gesture strip (geometry, signature, debug frame) |
+| `WCGestureGlobal.{h,m}` | Multi-finger global actions and custom pages |
+| `WCGestureConfig.{h,m}` | Settings keys, enums and defaults |
+| `WCGestureSettingsVC.{h,m}` | Settings UI |
+| `WCGestureAI.{h,m}` / `WCGestureTranslate.{h,m}` | AI completion and translation clients |
+| `WCGestureAccount.{h,m}` / `WCGesturePrivateAPI.{h,m}` | WeChat services, current user and contact lookup |
+| `WCPopup.{h,m}` | Alert/action-sheet helpers used by settings |
+
+Hooks stay in a single Logos translation unit, so each module only exposes
+plain C functions in its header.
+
 ## Entry
 
 A **微信手势** row is injected into WeChat's Me page (`MoreViewController`) function section. Tapping it opens the settings sheet. When WeChat's `WCPluginsMgr` registration API is available, the entry is also registered there.
