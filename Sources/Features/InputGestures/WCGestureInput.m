@@ -1,9 +1,7 @@
-#import "WCGestureInput.h"
-#import "WCGestureSupport.h"
-#import "WCGestureTranslate.h"
-#import "WCGestureAI.h"
 #import <objc/message.h>
 #import <objc/runtime.h>
+
+#import "Sources/API/WCGestureInternal.h"
 
 static char WCInputSwipeLeftRecognizerKey;
 static char WCInputSwipeRightRecognizerKey;

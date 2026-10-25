@@ -1,8 +1,7 @@
-#import "WCGestureKeyboard.h"
-#import "WCGestureSupport.h"
-#import "WCGestureInput.h"
 #import <QuartzCore/QuartzCore.h>
 #import <math.h>
+
+#import "Sources/API/WCGestureInternal.h"
 
 #pragma mark - Keyboard bottom gesture strip
 

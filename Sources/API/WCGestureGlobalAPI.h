@@ -1,5 +1,5 @@
 #import <UIKit/UIKit.h>
-#import "WCGestureConfig.h"
+#import "Sources/Core/WCGestureConfig.h"
 
 NS_ASSUME_NONNULL_BEGIN
 

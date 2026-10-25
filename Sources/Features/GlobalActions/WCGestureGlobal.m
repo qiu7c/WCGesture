@@ -1,9 +1,6 @@
-#import "WCGestureGlobal.h"
-#import "WCGestureSupport.h"
-#import "WCGestureConfig.h"
-#import "WCGestureSettingsVC.h"
-#import "WCPopup.h"
 #import <objc/runtime.h>
+
+#import "Sources/API/WCGestureInternal.h"
 
 #pragma mark - Global multi-finger long-press gestures
 

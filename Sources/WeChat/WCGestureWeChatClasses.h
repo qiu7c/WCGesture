@@ -62,4 +62,25 @@ NS_ASSUME_NONNULL_BEGIN
 - (BOOL)SaveMesVoice:(NSData *)data MsgWrap:(id)message;
 @end
 
+/// The Moments (朋友圈) cell whose content is double-tapped to like it.
+@interface WCTimeLineCellView : UIView
+- (void)onAccessibilityLike;
+- (void)didMoveToWindow;
+- (void)setViewModel:(id)viewModel;
+- (void)prepareForReuse;
+@end
+
+@interface CLocalInfo : NSObject
+- (unsigned int)m_uiGlobalFontLevel;
+- (void)setM_uiGlobalFontLevel:(unsigned int)level;
+@end
+
+@interface WCListBaseCellView : UIView
++ (double)getLayoutHeightWithGroup:(id)group groupItem:(id)item width:(double)width isFirstOneInsection:(BOOL)first isLastOneInSection:(BOOL)last;
+@end
+
+@interface WCTimeLineCommentCellView : UIView
++ (double)getCellHeightForDataItem:(id)item RowIndex:(long long)rowIndex pageContext:(id)context;
+@end
+
 NS_ASSUME_NONNULL_END

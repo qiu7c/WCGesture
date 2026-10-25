@@ -1,14 +1,8 @@
-#import "WCGestureMessage.h"
-#import "WCGestureSupport.h"
-#import "WCGestureConfig.h"
-#import "WCGestureWeChatClasses.h"
-#import "WCGestureInput.h"
-#import "WCGestureAI.h"
-#import "WCGestureAccount.h"
-#import "WCGesturePrivateAPI.h"
 #import <objc/message.h>
 #import <objc/runtime.h>
 #import <math.h>
+
+#import "Sources/API/WCGestureInternal.h"
 
 // Defined in the AI helper block below; the gesture action switch calls it.
 static void WCAIReplyToMessage(CommonMessageCellView *cell);

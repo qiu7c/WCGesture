@@ -1,6 +1,4 @@
-#import "WCGestureTranslate.h"
-#import "WCGestureConfig.h"
-#import "WCGestureAI.h"
+#import "Sources/API/WCGestureInternal.h"
 
 // Languages offered as the other side of the translation pair. "zh-Hans" is
 // intentionally absent: it is always the Chinese side of the pair.

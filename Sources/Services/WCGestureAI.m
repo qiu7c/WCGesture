@@ -1,5 +1,4 @@
-#import "WCGestureAI.h"
-#import "WCGestureConfig.h"
+#import "Sources/API/WCGestureInternal.h"
 
 static NSString *WCAITrimmed(NSString *text) {
     if (![text isKindOfClass:[NSString class]]) return @"";

@@ -7,11 +7,11 @@ INSTALL_TARGET_PROCESSES = WeChat
 
 include $(THEOS)/makefiles/common.mk
 
-TWEAK_NAME = WCGesture
+TWEAK_NAME = OneWx
 
-WCGesture_FILES = Tweak.x $(wildcard Sources/*.m)
-WCGesture_OBJCFLAGS = -fobjc-arc
-WCGesture_LDFLAGS = -Wl,-dead_strip
-WCGesture_FRAMEWORKS = UIKit Foundation QuartzCore
+OneWx_FILES = Tweak.x $(shell find Sources -type f -name '*.m' -o -type f -name '*.x')
+OneWx_OBJCFLAGS = -fobjc-arc -I$(THEOS_PROJECT_DIR)
+OneWx_LDFLAGS = -Wl,-dead_strip
+OneWx_FRAMEWORKS = UIKit Foundation QuartzCore
 
 include $(THEOS_MAKE_PATH)/tweak.mk

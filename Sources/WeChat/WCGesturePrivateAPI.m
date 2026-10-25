@@ -1,7 +1,7 @@
-#import "WCGesturePrivateAPI.h"
-#import "WCGestureAccount.h"
 #import <objc/message.h>
 #import <objc/runtime.h>
+
+#import "Sources/API/WCGestureInternal.h"
 
 static NSString *WCNonemptyString(id value) {
     if (![value isKindOfClass:[NSString class]]) return nil;

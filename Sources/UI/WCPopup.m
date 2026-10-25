@@ -1,5 +1,6 @@
-#import "WCPopup.h"
 #import <objc/runtime.h>
+
+#import "Sources/API/WCGestureInternal.h"
 
 #pragma mark - Option
 

@@ -1,12 +1,8 @@
-#import "WCGestureSettingsVC.h"
-#import "WCGestureConfig.h"
-#import "WCGestureAccount.h"
-#import "WCGestureTranslate.h"
-#import "WCGestureAI.h"
-#import "WCPopup.h"
 #import <objc/message.h>
 #import <objc/runtime.h>
 #import <math.h>
+
+#import "Sources/API/WCGestureInternal.h"
 
 #pragma mark - Helpers
 
@@ -127,13 +123,21 @@ static void WCPresentKeyboardNumberEditor(__unused UIViewController *presenter,
         || [defaultsKey isEqualToString:WCKeyboardStripOffsetYKey]
         || [defaultsKey isEqualToString:WCKeyboardStripOffsetXKeyThirdParty]
         || [defaultsKey isEqualToString:WCKeyboardStripOffsetYKeyThirdParty];
-    double minValue = isWidth ? 0.0 : (isOffset ? -400.0 : 20.0);
-    double maxValue = isWidth ? 1000.0 : (isOffset ? 400.0 : 200.0);
+    BOOL isFontLevel = [defaultsKey isEqualToString:WCChatLayoutFontLevelKey];
+    BOOL isScale = [defaultsKey isEqualToString:WCMomentsHeightScaleKey];
+    double minValue = isFontLevel ? 1.0 : (isScale ? 100.0 : (isWidth ? 0.0 : (isOffset ? -400.0 : 20.0)));
+    double maxValue = isFontLevel ? 8.0 : (isScale ? 160.0 : (isWidth ? 1000.0 : (isOffset ? 400.0 : 200.0)));
     NSString *message;
     NSString *placeholder;
     if (isWidth) {
         message = @"输入 0 到 1000；0 表示与键盘同宽";
         placeholder = @"0 = 满宽";
+    } else if (isFontLevel) {
+        message = @"输入 1 到 8 之间的字号级别";
+        placeholder = @"1 - 8";
+    } else if (isScale) {
+        message = @"输入 100 到 160 之间的百分比";
+        placeholder = @"100 - 160";
     } else if (isOffset) {
         message = @"输入 -400 到 400；正数向右、向上";
         placeholder = @"-400 - 400";
@@ -409,15 +413,15 @@ static void WCPresentHapticStylePicker(__unused UIViewController *presenter) {
 
 static void WCPresentPluginNameEditor(__unused UIViewController *presenter) {
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    NSString *name = [defaults stringForKey:WCPluginNameKey] ?: @"微信手势";
+    NSString *name = [defaults stringForKey:WCPluginNameKey] ?: @"One Wx";
     [WCPopup showInputWithTitle:@"插件名称"
                         message:@"设置在微信插件管理页显示的名字"
                            text:name
-                    placeholder:@"微信手势"
+                    placeholder:@"One Wx"
                        keyboard:UIKeyboardTypeDefault
                      completion:^(NSString *value) {
         NSString *text = [value stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
-        if (text.length == 0) text = @"微信手势";
+        if (text.length == 0) text = @"One Wx";
         [defaults setObject:text forKey:WCPluginNameKey];
         WCPostChange(WCPluginNameKey);
     }];
@@ -1060,7 +1064,7 @@ static NSString *WCRowDetailText(WCRow *row) {
         case WCRowKindGlobalAction:
             return WCGlobalActionName([d integerForKey:row.defaultsKey]);
         case WCRowKindPluginName:
-            return [d stringForKey:WCPluginNameKey] ?: @"微信手势";
+            return [d stringForKey:WCPluginNameKey] ?: @"One Wx";
         case WCRowKindHapticStyle:
             return WCHapticStyleName([d integerForKey:WCGestureHapticStyleKey]);
         case WCRowKindCustomPages: {
@@ -1083,6 +1087,9 @@ static NSString *WCRowDetailText(WCRow *row) {
             return [NSString stringWithFormat:@"%.0f", v <= 0 ? 56.0 : v];
         }
         case WCRowKindKeyboardNumber: {
+            if ([row.defaultsKey isEqualToString:WCMomentsHeightScaleKey]) {
+                return [NSString stringWithFormat:@"%.0f%%", [d doubleForKey:row.defaultsKey]];
+            }
             if ([row.defaultsKey isEqualToString:WCKeyboardStripWidthKey]
                 || [row.defaultsKey isEqualToString:WCKeyboardStripWidthKeyThirdParty]) {
                 double w = [d doubleForKey:row.defaultsKey];
@@ -1213,24 +1220,24 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.title = @"WCGesture";
+    self.title = @"One Wx";
     self.view.backgroundColor = [UIColor systemGroupedBackgroundColor];
     WCRefreshCachedCurrentUser();
 
     CGFloat margin = 16;
-    UIView *chatCard = WCMakeCard(@"聊天页手势",
+    UIView *chatCard = WCMakeCard(@"聊天与输入",
         @"bubble.left", UIColor.systemBlueColor, UIColor.secondarySystemGroupedBackgroundColor);
     UIView *globalCard = WCMakeCard(@"全局手势",
         @"hand.tap", UIColor.systemGreenColor, UIColor.secondarySystemGroupedBackgroundColor);
-    UIView *otherCard = WCMakeCard(@"其他手势",
+    UIView *otherCard = WCMakeCard(@"朋友圈",
         @"heart", UIColor.systemPinkColor, UIColor.secondarySystemGroupedBackgroundColor);
-    UIView *enhanceCard = WCMakeCard(@"拓展设置",
+    UIView *enhanceCard = WCMakeCard(@"界面与布局",
         @"wand.and.stars", UIColor.systemPurpleColor, UIColor.secondarySystemGroupedBackgroundColor);
-    UIView *pluginCard = WCMakeCard(@"插件设置",
+    UIView *pluginCard = WCMakeCard(@"插件与 AI",
         @"gearshape", UIColor.systemOrangeColor, UIColor.secondarySystemGroupedBackgroundColor);
 
     UILabel *versionLabel = [[UILabel alloc] init];
-    versionLabel.text = @"版本 1.0.0";
+    versionLabel.text = @"版本 2.0.0";
     versionLabel.font = [UIFont systemFontOfSize:13];
     versionLabel.textColor = UIColor.tertiaryLabelColor;
     versionLabel.textAlignment = NSTextAlignmentCenter;
@@ -1463,11 +1470,11 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
     if (self) {
         _category = category;
         switch (category) {
-            case WCGestureCategoryChat: self.title = @"聊天页手势"; break;
+            case WCGestureCategoryChat: self.title = @"聊天与输入"; break;
             case WCGestureCategoryGlobal: self.title = @"全局手势"; break;
-            case WCGestureCategoryOther: self.title = @"其他手势"; break;
-            case WCGestureCategoryEnhance: self.title = @"拓展设置"; break;
-            default: self.title = @"插件设置"; break;
+            case WCGestureCategoryOther: self.title = @"朋友圈"; break;
+            case WCGestureCategoryEnhance: self.title = @"界面与布局"; break;
+            default: self.title = @"插件与 AI"; break;
         }
         [self rebuildRows];
     }
@@ -1499,7 +1506,7 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
     NSMutableArray *sections = [NSMutableArray array];
     NSMutableArray *collapsible = [NSMutableArray array];
     NSMutableArray *collapseKeys = [NSMutableArray array];
-    NSString *prefix = @"com.qiu7c.wcgesture.collapse";
+    NSString *prefix = @"com.qiu7c.onewx.collapse";
     if (self.category == WCGestureCategoryChat) {
         NSMutableArray *msg = [NSMutableArray array];
         [msg addObject:WCSwitchRow(@"消息手势", WCReplySwipeEnabledKey)];
@@ -1613,6 +1620,14 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
         [collapseKeys addObject:[prefix stringByAppendingString:@".global"]];
     } else if (self.category == WCGestureCategoryEnhance) {
         NSMutableArray *enhance = [NSMutableArray array];
+        [enhance addObject:WCSwitchRow(@"聊天字号定制", WCChatLayoutEnabledKey)];
+        if ([d boolForKey:WCChatLayoutEnabledKey]) {
+            [enhance addObject:WCNumberRow(@"字号级别", WCChatLayoutFontLevelKey)];
+        }
+        [enhance addObject:WCSwitchRow(@"朋友圈高度补偿", WCMomentsLayoutEnabledKey)];
+        if ([d boolForKey:WCMomentsLayoutEnabledKey]) {
+            [enhance addObject:WCNumberRow(@"高度比例 (%)", WCMomentsHeightScaleKey)];
+        }
         [enhance addObject:WCSwitchRow(@"去除所有分割线", WCHideSeparatorLinesKey)];
         [sections addObject:enhance];
         [collapsible addObject:@NO];
@@ -1959,11 +1974,11 @@ void WCGestureRegisterEntry(void) {
 
     // Register a controller-based entry. WeChat instantiates the controller
     // by the class name string we pass here. Title is user-customizable.
-    NSString *pluginName = [[NSUserDefaults standardUserDefaults] stringForKey:WCPluginNameKey] ?: @"微信手势";
+    NSString *pluginName = [[NSUserDefaults standardUserDefaults] stringForKey:WCPluginNameKey] ?: @"One Wx";
     SEL registerController = sel_registerName("registerControllerWithTitle:version:controller:");
     if ([mgr respondsToSelector:registerController]) {
         ((void (*)(id, SEL, id, id, id))objc_msgSend)(mgr, registerController,
-            pluginName, @"1.0.0", NSStringFromClass([WCGestureSettingsController class]));
+            pluginName, @"2.0.0", NSStringFromClass([WCGestureSettingsController class]));
         return;
     }
 

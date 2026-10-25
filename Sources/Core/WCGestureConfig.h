@@ -153,6 +153,17 @@ FOUNDATION_EXPORT NSString *const WCGestureAIReplyPresetKey;
 FOUNDATION_EXPORT NSString *const WCGestureAIAnswerPresetKey;
 FOUNDATION_EXPORT NSString *const WCGestureAIPolishPresetKey;
 
+/// Chat layout: when enabled, CLocalInfo reports this font level instead of
+/// the system one, so WeChat reflows chat text at the chosen size.
+FOUNDATION_EXPORT NSString *const WCChatLayoutEnabledKey;
+FOUNDATION_EXPORT NSString *const WCChatLayoutFontLevelKey;
+
+/// Moments cell-height compensation. The two height class methods in
+/// WCListBaseCellView / WCTimeLineCommentCellView are scaled by this
+/// percentage while the switch is on.
+FOUNDATION_EXPORT NSString *const WCMomentsLayoutEnabledKey;
+FOUNDATION_EXPORT NSString *const WCMomentsHeightScaleKey;
+
 /// Moments (朋友圈) double-tap like.
 FOUNDATION_EXPORT NSString *const WCMomentsDoubleTapLikeKey;
 FOUNDATION_EXPORT NSString *const WCMomentsLikeHapticKey;
@@ -234,6 +245,10 @@ typedef NS_ENUM(NSInteger, WCGlobalAction) {
     WCGlobalActionMyQRCode = 10,    // 我的二维码
     WCGlobalActionPayCode = 11,     // 付款码
 };
+
+/// Copies settings stored under the legacy WCGesture key namespace into the
+/// One Wx namespace. Call once at startup, before registering defaults.
+void WCGestureMigrateLegacyDefaults(void);
 
 /// Registers the default values for all keys once per process.
 void WCGestureRegisterDefaults(void);

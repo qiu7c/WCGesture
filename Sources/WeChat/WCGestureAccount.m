@@ -1,8 +1,9 @@
-#import "WCGestureAccount.h"
 #import <objc/message.h>
 #import <objc/runtime.h>
 
-static NSString *const WCCachedWXIDKey = @"com.qiu7c.wcgesture.cached-wxid";
+#import "Sources/API/WCGestureInternal.h"
+
+static NSString *const WCCachedWXIDKey = @"com.qiu7c.onewx.cached-wxid";
 
 static id WCServiceCenterFromCurrentContext(void) {
     Class contextClass = objc_getClass("MMContext");

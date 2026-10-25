@@ -1,6 +1,6 @@
 #import <UIKit/UIKit.h>
-#import "WCGestureConfig.h"
-#import "WCGestureWeChatClasses.h"
+#import "Sources/Core/WCGestureConfig.h"
+#import "Sources/WeChat/WCGestureWeChatClasses.h"
 
 NS_ASSUME_NONNULL_BEGIN
 

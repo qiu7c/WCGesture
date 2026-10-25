@@ -1,6 +1,6 @@
-#import "WCGestureSupport.h"
-#import "WCGestureConfig.h"
 #import <objc/message.h>
+
+#import "Sources/API/WCGestureInternal.h"
 
 #pragma mark - KVC helpers
 
