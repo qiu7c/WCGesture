@@ -336,8 +336,6 @@ FOUNDATION_EXPORT NSString *const WCGestureVoiceTranscriptionIgnoreGroupKey;
 FOUNDATION_EXPORT NSString *const WCGestureVoiceTranscriptionIgnorePrivateKey;
 FOUNDATION_EXPORT NSString *const WCGestureVoiceTranscriptionIgnoreSelfKey;
 
-NS_ASSUME_NONNULL_END
-
 // Moments monitoring settings and account-scoped runtime state.
 FOUNDATION_EXPORT NSString *const WCGestureBackgroundKeepAliveEnabledKey;
 FOUNDATION_EXPORT NSString *const WCGestureAdBlockerEnabledKey;
@@ -352,3 +350,5 @@ FOUNDATION_EXPORT NSString *const WCGestureMomentsReminderForwardImagesKey;
 FOUNDATION_EXPORT NSString *const WCGestureMomentsReminderForwardVideosKey;
 FOUNDATION_EXPORT NSString *const WCGestureMomentsReminderSeenItemsKey;
 FOUNDATION_EXPORT NSString *const WCGestureMomentsInteractionStateKey;
+
+NS_ASSUME_NONNULL_END
