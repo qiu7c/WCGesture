@@ -63,7 +63,7 @@ static NSString *WCSendAccountKey(void) {
 }
 
 static NSInteger WCSendPauseSeconds(void) {
-    NSInteger seconds = [NSUserDefaults.standardUserDefaults integerForKey:WCSendPauseSecondsKey];
+    NSInteger seconds = [NSUserDefaults.standardUserDefaults integerForKey:WCGestureSendConfirmationPauseSecondsKey];
     return seconds > 0 ? MIN(3600, MAX(5, seconds)) : 60;
 }
 
@@ -570,7 +570,7 @@ void WCGestureSendConfirmationChatLeaving(UIViewController *controller) {
 }
 void WCGestureSendConfirmationSettingsChanged(NSString *key) {
     if (key && ![@[WCGestureSendConfirmationEnabledKey, WCGestureSendConfirmationUsersKey,
-        WCSendPauseSecondsKey, WCGestureSendConfirmationProfileSwitchEnabledKey] containsObject:key]) return;
+        WCGestureSendConfirmationPauseSecondsKey, WCGestureSendConfirmationProfileSwitchEnabledKey] containsObject:key]) return;
     WCSendGeneration++;
     WCGestureCancelPendingSendConfirmations();
     WCGestureSendConfirmationRefreshProfiles();

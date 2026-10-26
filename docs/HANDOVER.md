@@ -14,6 +14,10 @@
 
 本次提交说明（2026-10-26）：用户已明确授权提交推送，当前指定会话发送前确认、资料页与资料卡快捷开关、会话选择及设置首页隐藏底部标签栏修正统一纳入。下文未提交标签为开发记录；实时状态以 git log/status 为准。版本保持 1.0.0，仅静态检查通过，未编译或真机验证，不查询 CI。
 
+## 2026-10-26 发送确认配置 key 编译修正（本轮提交）
+
+用户贴出 arm64 编译错误：内部辅助函数由 WCGestureSendConfirmationPauseSeconds 重命名为 WCSendPauseSeconds 时，字符串前缀替换误将配置常量的两处引用变成未声明的 WCSendPauseSecondsKey。已将时长读取与设置通知过滤两处恢复为 Core 中真实声明/定义的 WCGestureSendConfirmationPauseSecondsKey，不改配置名称、默认值或行为。复核模块全部配置/关联对象 key 的声明及辅助函数调用，并完成括号、import、git diff --check；无新增 Hook/API/default。未本地编译或真机验证，不查询 CI。用户随后已明确授权提交推送，本修正及交接记录统一纳入本轮提交；实际状态以 git log/status 为准。
+
 ## 2026-10-26 指定会话发送前确认（当前未提交）
 
 用户明确选择仅迁移此项，其余建议暂不实施。保留此前未提交的设置首页隐藏底部标签栏修正。
