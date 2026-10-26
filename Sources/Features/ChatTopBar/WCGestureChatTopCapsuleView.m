@@ -17,6 +17,7 @@ static CGFloat WCTopValue(NSString *key, CGFloat fallback, CGFloat low, CGFloat 
 @property (nonatomic, strong) UIButton *moreButton;
 @property (nonatomic, assign) CGFloat avatarSize;
 @property (nonatomic, assign) CGFloat scale;
+@property (nonatomic, assign) CGFloat shellFactor;
 @property (nonatomic, assign) CGFloat glassHeight;
 @property (nonatomic, assign) CGSize preferredSize;
 @property (nonatomic, copy) NSArray *configuration;
@@ -84,40 +85,44 @@ static CGFloat WCTopValue(NSString *key, CGFloat fallback, CGFloat low, CGFloat 
                  moreImage:(UIImage *)image menu:(UIMenu *)menu maximumWidth:(CGFloat)width {
     WCGestureConfigureChatGlass(self.glass);
     CGFloat scale = WCGestureChatTopBarScale();
-    NSArray *configuration = @[name, @(typing), @(search), @(width), @(scale),
+    CGFloat shell = WCGestureChatTopBarShellFactor();
+    CGFloat iconFactor = WCTopValue(WCGestureChatTopBarIconSizeKey, 18, 12, 26) / 18.0;
+    NSArray *configuration = @[name, @(typing), @(search), @(width), @(scale), @(shell), @(iconFactor),
         @([NSUserDefaults.standardUserDefaults doubleForKey:WCGestureChatTopBarAvatarSizeKey]),
         @([NSUserDefaults.standardUserDefaults doubleForKey:WCGestureChatTopBarNicknameSizeKey]),
         self.traitCollection.preferredContentSizeCategory, image ?: NSNull.null, menu ?: NSNull.null];
     if ([self.configuration isEqualToArray:configuration]) return self.preferredSize;
     self.configuration = configuration;
-    self.scale = scale;
+    self.scale = scale; self.shellFactor = shell;
     CGFloat avatar = WCTopValue(WCGestureChatTopBarAvatarSizeKey, 30, 24, 34);
     self.avatarSize = avatar * scale;
-    self.glassHeight = (self.profile ? MAX(38, avatar + 8) : MAX(36, avatar + 6)) * scale;
+    CGFloat baseHeight = (self.profile ? MAX(38, avatar + 8) : MAX(36, avatar + 6)) * scale;
+    CGFloat contentHeight = self.profile ? self.avatarSize + 4 * scale : (20 * iconFactor + 6) * scale;
+    self.glassHeight = MIN(44, MAX(contentHeight, baseHeight * shell));
     CGFloat fontSize = WCTopValue(WCGestureChatTopBarNicknameSizeKey, 15, 12, 18);
     UIFont *font = [[UIFontMetrics metricsForTextStyle:UIFontTextStyleBody] scaledFontForFont:
         [UIFont systemFontOfSize:fontSize * scale] maximumPointSize:22 * scale];
     self.nameLabel.font = font;
     [self.firstButton setImage:[UIImage systemImageNamed:self.profile ? @"chevron.left" : @"magnifyingglass"
-        withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:(self.profile ? 15 : 18) * scale weight:UIImageSymbolWeightRegular]] forState:UIControlStateNormal];
+        withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:(self.profile ? 15 : 18) * iconFactor * scale weight:UIImageSymbolWeightRegular]] forState:UIControlStateNormal];
     self.typingLabel.font = [UIFont systemFontOfSize:8 * scale weight:UIFontWeightSemibold];
     if (![self.nameLabel.text isEqualToString:name]) self.nameLabel.text = name;
     self.typingLabel.hidden = !typing;
     self.firstButton.hidden = !self.profile && !search;
     UIImage *moreImage = image ?: [UIImage systemImageNamed:@"ellipsis"
-        withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:19 * scale weight:UIImageSymbolWeightRegular]];
+        withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:19 * iconFactor * scale weight:UIImageSymbolWeightRegular]];
     if (image || moreImage.size.width > 22 * scale || moreImage.size.height > 22 * scale) {
-        UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(20 * scale, 20 * scale)];
+        UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(20 * iconFactor * scale, 20 * iconFactor * scale)];
         UIImage *source = moreImage;
         moreImage = [renderer imageWithActions:^(__unused UIGraphicsImageRendererContext *context) {
-            [source drawInRect:CGRectMake(0, 0, 20 * scale, 20 * scale)];
+            [source drawInRect:CGRectMake(0, 0, 20 * iconFactor * scale, 20 * iconFactor * scale)];
         }];
     }
     [self.moreButton setImage:[moreImage imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] forState:UIControlStateNormal];
     self.moreButton.menu = menu;
     self.moreButton.showsMenuAsPrimaryAction = menu != nil;
     CGFloat measured = ceil([name sizeWithAttributes:@{NSFontAttributeName:font}].width);
-    CGFloat desired = self.profile ? (36 + 1 + 8 + 10 + (typing ? 22 : 0)) * scale + self.avatarSize + measured : (search ? 76 : 40) * scale;
+    CGFloat desired = self.profile ? (36 + 1 + 8 + 10) * scale * shell + (typing ? 22 * scale : 0) + self.avatarSize + measured : WCGestureChatTopBarActionsWidth(search);
     CGSize nextSize = CGSizeMake(MIN(MAX(0, width), desired), 44);
     if (!CGSizeEqualToSize(self.preferredSize, nextSize)) {
         self.preferredSize = nextSize;
@@ -133,15 +138,15 @@ static CGFloat WCTopValue(NSString *key, CGFloat fallback, CGFloat low, CGFloat 
     // Compact glass inside a standard-height navigation host; no view transforms.
     CGFloat height = CGRectGetHeight(self.bounds), width = CGRectGetWidth(self.bounds), scale = self.scale;
     self.glass.frame = CGRectMake(0, (height - self.glassHeight) / 2, width, self.glassHeight);
-    self.firstButton.frame = CGRectMake(0, 0, self.profile ? 36 * scale : width / 2, height);
+    self.firstButton.frame = CGRectMake(0, 0, self.profile ? 36 * scale * self.shellFactor : width / 2, height);
     if (self.profile) {
-        self.avatar.frame = CGRectMake(37 * scale, (height - self.avatarSize) / 2, self.avatarSize, self.avatarSize);
+        self.avatar.frame = CGRectMake(37 * scale * self.shellFactor, (height - self.avatarSize) / 2, self.avatarSize, self.avatarSize);
         self.avatar.clipsToBounds = YES;
         self.avatar.layer.cornerRadius = self.avatarSize / 2;
         self.avatar.layer.cornerCurve = kCACornerCurveContinuous;
-        CGFloat x = CGRectGetMaxX(self.avatar.frame) + 8 * scale;
+        CGFloat x = CGRectGetMaxX(self.avatar.frame) + 8 * scale * self.shellFactor;
         CGFloat typingWidth = self.typingLabel.hidden ? 0 : 22 * scale;
-        self.nameLabel.frame = CGRectMake(x, 0, MAX(0, width - x - 10 * scale - typingWidth), height);
+        self.nameLabel.frame = CGRectMake(x, 0, MAX(0, width - x - 10 * scale * self.shellFactor - typingWidth), height);
         self.typingLabel.frame = CGRectMake(width - 30 * scale, 0, 20 * scale, height);
     } else {
         CGFloat buttonWidth = self.firstButton.hidden ? width : width / 2;

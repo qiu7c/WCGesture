@@ -129,6 +129,9 @@ static NSDictionary *WCParameter(NSString *title, NSString *key, double minimum,
     if (self.kind == WCGesturePreviewChatTopBar) {
         [parameters addObject:@{ @"option": @{ @"title": @"胶囊顶栏", @"type": @"bool", @"key": WCGestureChatTopBarCapsuleEnabledKey } }];
         [parameters addObject:@{ @"title": @"玻璃样式", @"segments": @[@"磨砂玻璃", @"伪液态"], @"key": WCGestureChatGlassStyleKey, @"reset": @1 }];
+        [parameters addObject:WCParameter(@"玻璃透明度 (%)", WCGestureChatGlassTransparencyKey, 0, 100, 50)];
+        [parameters addObject:WCParameter(@"胶囊外框大小 (%)", WCGestureChatTopBarShellScaleKey, 80, 140, 100)];
+        [parameters addObject:WCParameter(@"图标大小", WCGestureChatTopBarIconSizeKey, 12, 26, 18)];
         [parameters addObject:WCParameter(@"模糊强度 (%)", WCGestureChatGlassBlurIntensityKey, 20, 100, 20)];
         [parameters addObject:WCParameter(@"头像大小", WCGestureChatTopBarAvatarSizeKey, 24, 34, 30)];
         [parameters addObject:WCParameter(@"昵称字号", WCGestureChatTopBarNicknameSizeKey, 12, 18, 15)];

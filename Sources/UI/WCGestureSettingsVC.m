@@ -836,6 +836,15 @@ static NSDictionary<NSString *, NSString *> *WCConfigShareKeys(void) {
         WCGesturePageScalePercentKey,
         WCGestureChatTopBarCapsuleEnabledKey,
         WCGestureChatGlassStyleKey,
+        WCGestureEmoticonCornerEnabledKey,
+        WCGestureEmoticonCornerRadiusKey,
+        WCGestureChatImageCornerEnabledKey,
+        WCGestureChatImageCornerRadiusKey,
+
+        WCGestureChatGlassTransparencyKey,
+        WCGestureChatTopBarShellScaleKey,
+        WCGestureChatTopBarIconSizeKey,
+
         WCGestureChatGlassBlurIntensityKey,
         WCGestureChatTopBarAvatarSizeKey,
         WCGestureChatTopBarNicknameSizeKey,
@@ -1432,6 +1441,7 @@ static NSString *WCRowDetailText(WCRow *row) {
             NSArray<WCRow *> *rows = detail.sections[section];
             NSString *groupKey = @"";
             for (WCRow *row in rows) {
+                if (row.indentationDepth > 0) continue;
                 if (row.kind == WCRowKindGroupToggle) groupKey = row.defaultsKey;
                 [entries addObject:@{ @"title": row.title, @"category": @(category),
                     @"categoryTitle": detail.title, @"sectionTitle": rows.firstObject.title,
@@ -1630,9 +1640,6 @@ static NSString *WCRowDetailText(WCRow *row) {
         [sections addObject:moments];
         [collapsible addObject:@YES];
         [collapseKeys addObject:[prefix stringByAppendingString:@".other.moments"]];
-        [sections addObject:@[WCSwitchRow(@"朋友圈圆角", WCGestureMomentsImageCornerEnabledKey),
-            WCNumberRow(@"圆角程度", WCGestureMomentsImageCornerRadiusKey)]];
-        [collapsible addObject:@YES]; [collapseKeys addObject:[prefix stringByAppendingString:@".moments.image-corner"]];
         WCRow *timeFormat = WCPlainRow(@"朋友圈日期格式", WCRowKindChatOption);
         timeFormat.chatOption = @{ @"title": timeFormat.title, @"type": @"format", @"key": WCGestureMomentsTimeFormatKey };
         [sections addObject:@[WCSwitchRow(@"朋友圈精确发布时间", WCGestureMomentsTimeEnabledKey), timeFormat]];
@@ -1684,22 +1691,10 @@ static NSString *WCRowDetailText(WCRow *row) {
         [sections addObject:@[WCSwitchRow(@"胶囊顶栏", WCGestureChatTopBarCapsuleEnabledKey), topPreview]];
         [collapsible addObject:@YES];
         [collapseKeys addObject:[prefix stringByAppendingString:@".interface.chat-top-bar"]];
-        NSMutableArray *rounding = [NSMutableArray arrayWithObjects:
-            WCSwitchRow(@"聊天输入栏圆角", WCGestureChatInputRoundingEnabledKey),
-            WCSwitchRow(@"输入框内部圆角", WCGestureChatInputInnerRoundingKey),
-            WCNumberRow(@"内部圆角程度", WCGestureChatInputInnerRadiusKey),
-            WCSwitchRow(@"外部工具栏圆角", WCGestureChatInputOuterRoundingKey),
-            WCNumberRow(@"外部圆角程度", WCGestureChatInputOuterRadiusKey), nil];
-        WCRow *roundingPreview = WCPlainRow(@"整页圆角预览与调节", WCRowKindChatOption);
-        roundingPreview.chatOption = @{ @"title": roundingPreview.title, @"type": @"input-rounding-position", @"key": @"" };
-        [rounding addObject:roundingPreview];
-        [sections addObject:rounding];
-        [collapsible addObject:@YES];
-        [collapseKeys addObject:[prefix stringByAppendingString:@".interface.chat-input-rounding"]];
-        [sections addObject:@[WCSwitchRow(@"全局头像圆角", WCGestureGlobalAvatarRoundingEnabledKey),
-            WCNumberRow(@"头像圆角程度 (%)", WCGestureGlobalAvatarCornerPercentKey)]];
-        [collapsible addObject:@YES];
-        [collapseKeys addObject:[prefix stringByAppendingString:@".interface.avatar-rounding"]];
+        WCRow *corners = WCPlainRow(@"圆角设置", WCRowKindChatOption);
+        corners.chatOption = @{ @"title":corners.title, @"type":@"corner-settings", @"key":@"" };
+        [sections addObject:@[corners]]; [collapsible addObject:@NO];
+        [collapseKeys addObject:[prefix stringByAppendingString:@".interface.corners"]];
     } else if (self.category == WCGestureCategoryDisabled) {
         [sections addObject:@[WCSwitchRow(@"广告精简", WCGestureAdBlockerEnabledKey)]];
         [collapsible addObject:@NO]; [collapseKeys addObject:[prefix stringByAppendingString:@".interface.ad-blocker"]];

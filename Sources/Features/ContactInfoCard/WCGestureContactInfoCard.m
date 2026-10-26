@@ -54,14 +54,6 @@ static NSArray *WCInfoRows(id contact, BOOL group, NSString *roomName) {
     id room = group ? contact : ([roomName hasSuffix:@"@chatroom"] ? WCPrivateContact(roomName) : nil);
     if (!group) {
         WCInfoAdd(rows, @"个性签名", WCInfoText(contact, @[@"m_nsSignature"]));
-        NSMutableArray *region = [NSMutableArray array];
-        for (NSString *key in @[@"m_nsCountry", @"m_nsProvince", @"m_nsCity"]) {
-            NSString *value = WCInfoText(contact, @[key]);
-            if (value.length && ![region containsObject:value]) [region addObject:value];
-        }
-        WCInfoAdd(rows, @"地区", [region componentsJoinedByString:@" · "]);
-        NSInteger sex = [WCTweakSafeValue(contact, @"m_uiSex") integerValue];
-        if (sex == 1 || sex == 2) WCInfoAdd(rows, @"性别", sex == 1 ? @"男" : @"女");
         NSTimeInterval timestamp = [WCTweakSafeValue(contact, @"m_uiAddCreateTime") doubleValue];
         if (timestamp > 0 && timestamp <= NSDate.date.timeIntervalSince1970) {
             NSDate *date = [NSDate dateWithTimeIntervalSince1970:timestamp];

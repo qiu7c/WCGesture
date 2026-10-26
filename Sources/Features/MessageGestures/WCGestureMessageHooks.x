@@ -7,6 +7,7 @@
 %hook CommonMessageCellView
 
 - (void)setViewModel:(id)viewModel {
+    WCGestureMediaCornerReset(self);
     WCGestureMessageTimeHide(self);
     WCGestureAntiRevokeHide(self);
     %orig;
@@ -45,7 +46,7 @@
 
 - (void)viewWillDisappear:(BOOL)animated {
     %orig;
-    WCGestureChatTopBarRestore(self);
+    WCGestureChatTopBarWillDisappear(self);
     WCGestureGroupTitleRestore(self);
     if (WCVisibleChatControllerGet() == self) WCSetVisibleChatController(nil);
 }

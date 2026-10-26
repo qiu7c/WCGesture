@@ -1,5 +1,7 @@
 #import "Sources/API/WCGestureInternal.h"
 
+static void WCGlassApplyTransparency(UIView *glass);
+
 @interface WCGestureGlassCapsuleView : UIView
 @property (nonatomic, strong, readonly) UIVisualEffectView *effectView;
 @property (nonatomic, strong, readonly) UIView *contentView;
@@ -140,6 +142,7 @@
 
 - (void)refreshBackdropAfterForeground {
     if (self.appliedGlassStyle < 0 || !self.window) return;
+    WCGlassApplyTransparency(self);
     [CATransaction begin];
     [CATransaction setDisableActions:YES];
     [self rebuildBlurEffect];
@@ -231,7 +234,23 @@ UIView *WCGestureCreateChatGlassView(void) {
 UIView *WCGestureChatGlassContent(UIView *glass) {
     return ((WCGestureGlassCapsuleView *)glass).contentView;
 }
+static CGFloat WCGlassNumber(NSString *key, CGFloat fallback, CGFloat low, CGFloat high) {
+    id stored = [NSUserDefaults.standardUserDefaults objectForKey:key];
+    double number = [stored respondsToSelector:@selector(doubleValue)] ? [stored doubleValue] : fallback;
+    return isfinite(number) ? MIN(high, MAX(low, number)) : fallback;
+}
+static void WCGlassApplyTransparency(UIView *glass) {
+    CGFloat transparency = WCGlassNumber(WCGestureChatGlassTransparencyKey, 50, 0, 100) / 100.0;
+    glass.alpha = 1 - transparency;
+}
+CGFloat WCGestureChatTopBarShellFactor(void) { return WCGlassNumber(WCGestureChatTopBarShellScaleKey, 100, 80, 140) / 100.0; }
+CGFloat WCGestureChatTopBarActionsWidth(BOOL search) {
+    CGFloat scale = WCGestureChatTopBarScale(), shell = WCGestureChatTopBarShellFactor();
+    CGFloat icon = WCGlassNumber(WCGestureChatTopBarIconSizeKey, 18, 12, 26);
+    return MAX((search ? 76 : 40) * shell, (search ? 2 : 1) * (20 * icon / 18 + 8)) * scale;
+}
 void WCGestureConfigureChatGlass(UIView *glass) {
+    WCGlassApplyTransparency(glass);
     double intensity = [NSUserDefaults.standardUserDefaults doubleForKey:WCGestureChatGlassBlurIntensityKey];
     if (!isfinite(intensity)) intensity = 20;
     WCGestureGlassCapsuleView *view = (WCGestureGlassCapsuleView *)glass;
@@ -244,6 +263,7 @@ CGFloat WCGestureChatTopBarScale(void) {
     return WCGestureLayoutScaleFactor();
 }
 void WCGestureConfigureChatPinnedGlass(UIView *glass) {
+    WCGlassApplyTransparency(glass);
     double intensity = [NSUserDefaults.standardUserDefaults doubleForKey:WCGestureChatGlassBlurIntensityKey];
     if (!isfinite(intensity)) intensity = 20;
     [(WCGestureGlassCapsuleView *)glass configureFrostedGlassWithBlurIntensity:intensity / 100.0];

@@ -65,7 +65,7 @@ void WCGestureChatPinnedGlassApply(UIView *tips, BOOL enabled) {
     tips.layer.shadowOpacity = 0; tips.layer.shadowRadius = 0; tips.layer.shadowOffset = CGSizeZero;
     tips.layer.shadowColor = UIColor.clearColor.CGColor; tips.layer.borderWidth = 0; tips.layer.borderColor = UIColor.clearColor.CGColor;
     CGFloat scale = WCGestureChatTopBarScale();
-    CGFloat height = MIN(CGRectGetHeight(tips.bounds), 40 * scale);
+    CGFloat height = MIN(CGRectGetHeight(tips.bounds), 40.0);
     // Match WCAtlas: frost only the fixed header, not the expanding pinned list.
     WCGestureConfigureChatPinnedGlass(state.glass);
     state.glass.frame = CGRectMake(CGRectGetMinX(tips.bounds) + 8 * scale, CGRectGetMinY(tips.bounds),

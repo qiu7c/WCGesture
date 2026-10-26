@@ -8,6 +8,7 @@
 }
 
 - (void)prepareForReuse {
+    WCGestureMediaCornerReset(self);
     WCGestureMessageTimeHide(self);
     WCGestureAntiRevokeHide(self);
     %orig;

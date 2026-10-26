@@ -81,7 +81,7 @@
     self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
     self.tableView.keyboardDismissMode = UIScrollViewKeyboardDismissModeOnDrag;
     self.searchField = [UITextField new];
-    self.searchField.placeholder = @"搜索功能或设置";
+    self.searchField.placeholder = @"搜索功能入口";
     self.searchField.delegate = self;
     [self.searchField addTarget:self action:@selector(updateSearchResults) forControlEvents:UIControlEventEditingChanged];
     self.tableView.tableHeaderView = WCGestureSettingsSearchHeader(self.searchField, self.view.bounds.size.width);

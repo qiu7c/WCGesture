@@ -15,6 +15,7 @@
 - (void)viewWillAppear:(BOOL)animated {
     %orig;
     WCGestureChatSearchWillAppear(self);
+    WCGestureChatTopBarPrepareAppearance(self);
 }
 - (void)viewDidLayoutSubviews {
     %orig;

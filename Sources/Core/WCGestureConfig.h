@@ -362,4 +362,13 @@ FOUNDATION_EXPORT NSString *const WCGestureCallConfirmEnabledKey;
 FOUNDATION_EXPORT NSString *const WCGestureContactInfoCardEnabledKey;
 FOUNDATION_EXPORT NSString *const WCGestureAutoCombineSendEnabledKey;
 
+FOUNDATION_EXPORT NSString *const WCGestureChatGlassTransparencyKey;
+FOUNDATION_EXPORT NSString *const WCGestureChatTopBarShellScaleKey;
+FOUNDATION_EXPORT NSString *const WCGestureChatTopBarIconSizeKey;
+
+FOUNDATION_EXPORT NSString *const WCGestureEmoticonCornerEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureEmoticonCornerRadiusKey;
+FOUNDATION_EXPORT NSString *const WCGestureChatImageCornerEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureChatImageCornerRadiusKey;
+
 NS_ASSUME_NONNULL_END

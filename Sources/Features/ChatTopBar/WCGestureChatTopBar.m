@@ -237,7 +237,7 @@ void WCGestureChatTopBarRestore(UIViewController *controller) {
     objc_setAssociatedObject(controller, &WCTopBarStateKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
-void WCGestureChatTopBarUpdate(UIViewController *controller) {
+static void WCTopUpdate(UIViewController *controller, BOOL preparing) {
     [WCTopControllers() addObject:controller];
     if (!WCGestureEnabled(WCGestureChatTopBarCapsuleEnabledKey) || WCGestureChatSearchIsActive(controller)) {
         WCGestureChatTopBarRestore(controller); return;
@@ -247,7 +247,9 @@ void WCGestureChatTopBarUpdate(UIViewController *controller) {
     if (multiSelect) {
         WCGestureChatTopBarRestore(controller); return;
     }
-    if (!controller.isViewLoaded || !controller.view.window || controller.navigationController.topViewController != controller) return;
+    if (!controller.isViewLoaded) return;
+    // WCAtlas installs the item before the view enters a window. Only later repairs require visibility.
+    if (!preparing && (!controller.view.window || controller.navigationController.topViewController != controller)) return;
     WCTopBarState *state = objc_getAssociatedObject(controller, &WCTopBarStateKey);
     if (state.updating) return;
     UINavigationItem *item = controller.navigationItem;
@@ -290,7 +292,7 @@ void WCGestureChatTopBarUpdate(UIViewController *controller) {
     NSString *userName = WCPrivateContactUserName(contact) ?: @"";
     if (![state.userName isEqualToString:userName]) {
         state.userName = userName;
-        [state.profile setAvatarView:userName.length ? WCGestureContactAvatarView(userName) : [UIView new]];
+        [state.profile setAvatarView:userName.length ? WCGestureContactUncroppedAvatarView(userName) : [UIView new]];
     }
     NSString *fallback = item.title ?: controller.title ?: @"聊天";
     if ([fallback containsString:@"正在输入"]) fallback = state.stableName ?: @"聊天";
@@ -301,10 +303,11 @@ void WCGestureChatTopBarUpdate(UIViewController *controller) {
     if (totalWidth < 1) totalWidth = CGRectGetWidth(controller.view.bounds);
     NSUInteger extras = (state.left.count > 1 ? state.left.count - 1 : 0) + (state.right.count > 1 ? state.right.count - 1 : 0);
     CGFloat scale = WCGestureChatTopBarScale();
-    CGFloat maxLeft = MAX(90 * scale, MIN(205 * scale, totalWidth - (search ? 76 : 40) * scale - 48 - 44 * extras));
+    CGFloat shell = WCGestureChatTopBarShellFactor();
+    CGFloat maxLeft = MIN(205 * scale * shell, MAX(0, totalWidth - WCGestureChatTopBarActionsWidth(search) - 48 - 44 * extras));
     CGSize leftSize = [state.profile configureWithName:name typing:state.typing search:NO moreImage:nil menu:nil maximumWidth:maxLeft];
     UIBarButtonItem *more = state.right.firstObject;
-    CGSize rightSize = [state.actions configureWithName:@"" typing:NO search:search moreImage:more.image menu:more.menu maximumWidth:76 * scale];
+    CGSize rightSize = [state.actions configureWithName:@"" typing:NO search:search moreImage:more.image menu:more.menu maximumWidth:WCGestureChatTopBarActionsWidth(search)];
     state.profile.frame = (CGRect){CGPointZero, leftSize};
     state.actions.frame = (CGRect){CGPointZero, rightSize};
     if (![item.leftBarButtonItems containsObject:state.profileItem]) {
@@ -329,8 +332,31 @@ void WCGestureChatTopBarUpdate(UIViewController *controller) {
     }
     controller.edgesForExtendedLayout |= UIRectEdgeTop;
     controller.extendedLayoutIncludesOpaqueBars = YES;
-    WCTopApplyBackgrounds(state, controller);
+    // A preloaded chat may prepare its own item, but must not change another screen's shared bar.
+    if (controller.navigationController.topViewController == controller) WCTopApplyBackgrounds(state, controller);
+    [state.profile layoutIfNeeded];
+    [state.actions layoutIfNeeded];
     state.updating = NO;
+}
+
+void WCGestureChatTopBarUpdate(UIViewController *controller) {
+    WCTopUpdate(controller, NO);
+}
+
+void WCGestureChatTopBarPrepareAppearance(UIViewController *controller) {
+    [UIView performWithoutAnimation:^{ WCTopUpdate(controller, YES); }];
+}
+
+void WCGestureChatTopBarWillDisappear(UIViewController *controller) {
+    // Keep the capsule through the outgoing animation, as WCAtlas does. Search restores it before opening.
+    if (!objc_getAssociatedObject(controller, &WCTopBarStateKey)) return;
+    __weak UIViewController *weakController = controller;
+    [controller.transitionCoordinator animateAlongsideTransition:nil completion:^(id<UIViewControllerTransitionCoordinatorContext> context) {
+        UIViewController *target = weakController;
+        if (!target) return;
+        if (context.isCancelled) WCGestureChatTopBarPrepareAppearance(target);
+        else WCGestureChatTopBarRestore(target);
+    }];
 }
 
 void WCGestureChatTopBarTitleChanged(UIViewController *controller, id titleView) {
@@ -345,7 +371,16 @@ void WCGestureChatTopBarTitleChanged(UIViewController *controller, id titleView)
 
 void WCGestureChatTopBarNavigationLayout(UINavigationBar *bar) {
     UIViewController *controller = [WCTopBarOwners() objectForKey:bar];
-    if (!controller || [objc_getAssociatedObject(bar, &WCTopBarPendingKey) boolValue]) return;
+    if (!controller) return;
+    WCTopBarState *state = objc_getAssociatedObject(controller, &WCTopBarStateKey);
+    // Clear native background replacements during this layout, before the frame is rendered.
+    if (state && !state.updating && controller.navigationController.topViewController == controller
+        && WCGestureEnabled(WCGestureChatTopBarCapsuleEnabledKey) && !WCGestureChatSearchIsActive(controller)) {
+        state.updating = YES;
+        WCTopApplyBackgrounds(state, controller);
+        state.updating = NO;
+    }
+    if ([objc_getAssociatedObject(bar, &WCTopBarPendingKey) boolValue]) return;
     objc_setAssociatedObject(bar, &WCTopBarPendingKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     __weak UINavigationBar *weakBar = bar;
     __weak UIViewController *weakController = controller;

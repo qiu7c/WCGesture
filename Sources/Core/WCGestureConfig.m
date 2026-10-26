@@ -1,5 +1,12 @@
 #import "Sources/API/WCGestureInternal.h"
 
+NSString *const WCGestureEmoticonCornerEnabledKey = @"com.qiu7c.onewx.interface.emoticon-corner.enabled";
+NSString *const WCGestureEmoticonCornerRadiusKey = @"com.qiu7c.onewx.interface.emoticon-corner.radius";
+NSString *const WCGestureChatImageCornerEnabledKey = @"com.qiu7c.onewx.interface.chat-image-corner.enabled";
+NSString *const WCGestureChatImageCornerRadiusKey = @"com.qiu7c.onewx.interface.chat-image-corner.radius";
+NSString *const WCGestureChatGlassTransparencyKey = @"com.qiu7c.onewx.chat.top-bar-capsule.glass-transparency";
+NSString *const WCGestureChatTopBarShellScaleKey = @"com.qiu7c.onewx.chat.top-bar-capsule.shell-percent";
+NSString *const WCGestureChatTopBarIconSizeKey = @"com.qiu7c.onewx.chat.top-bar-capsule.icon-size";
 NSString *const WCGestureCallConfirmEnabledKey = @"com.qiu7c.onewx.chat.call-bubble-confirm.enabled";
 NSString *const WCGestureContactInfoCardEnabledKey = @"com.qiu7c.onewx.interface.contact-info-card.enabled";
 NSString *const WCGestureAutoCombineSendEnabledKey = @"com.qiu7c.onewx.chat.auto-combine-send.enabled";
@@ -299,6 +306,15 @@ void WCGestureRegisterDefaults(void) {
             WCGestureAutoOriginalEnabledKey: @NO,
             WCGestureChatTopBarCapsuleEnabledKey: @NO,
             WCGestureChatGlassStyleKey: @1,
+            WCGestureEmoticonCornerEnabledKey: @NO,
+            WCGestureEmoticonCornerRadiusKey: @8.0,
+            WCGestureChatImageCornerEnabledKey: @NO,
+            WCGestureChatImageCornerRadiusKey: @8.0,
+
+            WCGestureChatGlassTransparencyKey: @50.0,
+            WCGestureChatTopBarShellScaleKey: @100.0,
+            WCGestureChatTopBarIconSizeKey: @18.0,
+
             WCGestureChatGlassBlurIntensityKey: @20.0,
             WCGestureChatTopBarAvatarSizeKey: @30.0,
             WCGestureChatTopBarNicknameSizeKey: @15.0,

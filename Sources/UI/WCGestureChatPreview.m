@@ -248,16 +248,16 @@
         BOOL search = WCGestureEnabled(WCGestureChatSearchEnabledKey);
         NSString *userName = WCCurrentUserWXID();
         NSString *name = WCGesturePrivateContactDisplayName(userName.length ? WCPrivateContact(userName) : nil, @"我");
-        CGSize leftSize = [self.topProfile configureWithName:name typing:NO search:NO moreImage:nil menu:nil maximumWidth:MAX(90 * WCGestureChatTopBarScale(), MIN(205 * WCGestureChatTopBarScale(), width - (search ? 76 : 40) * WCGestureChatTopBarScale() - 48))];
-        CGSize rightSize = [self.topActions configureWithName:@"" typing:NO search:search moreImage:nil menu:nil maximumWidth:76 * WCGestureChatTopBarScale()];
+        CGSize leftSize = [self.topProfile configureWithName:name typing:NO search:NO moreImage:nil menu:nil maximumWidth:MIN(205 * WCGestureChatTopBarScale() * WCGestureChatTopBarShellFactor(), MAX(0, width - WCGestureChatTopBarActionsWidth(search) - 48))];
+        CGSize rightSize = [self.topActions configureWithName:@"" typing:NO search:search moreImage:nil menu:nil maximumWidth:WCGestureChatTopBarActionsWidth(search)];
         self.topProfile.frame = (CGRect){CGPointMake(16, top), leftSize};
         self.topActions.frame = (CGRect){CGPointMake(width - 16 - rightSize.width, top), rightSize};
         CGFloat scale = WCGestureChatTopBarScale();
-        self.pinnedHeader.frame = CGRectMake(0, navigationHeight + 4 * scale, width, 40 * scale);
+        self.pinnedHeader.frame = CGRectMake(0, navigationHeight + 4 * scale, width, 40);
         self.pinnedLabel.font = [UIFont systemFontOfSize:13 * scale];
         self.pinnedLabel.frame = CGRectInset(self.pinnedHeader.bounds, 20 * scale, 0);
         WCGestureChatPinnedGlassApply(self.pinnedHeader, YES);
-        navigationHeight += 44 * scale;
+        navigationHeight += 40 + 4 * scale;
         self.navigation.frame = CGRectMake(0, 0, width, navigationHeight);
     }
     BOOL rounding = self.kind == WCGesturePreviewInputRounding;

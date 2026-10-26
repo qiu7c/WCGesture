@@ -81,3 +81,48 @@ static UIView *WCContactAvatarView(NSString *username, BOOL rounded) {
 
 UIView *WCGestureContactAvatarView(NSString *username) { return WCContactAvatarView(username, YES); }
 UIView *WCGestureContactUnroundedAvatarView(NSString *username) { return WCContactAvatarView(username, NO); }
+
+@interface WCUncroppedAvatarView : UIView
+@property (nonatomic, strong) UIView *loader;
+@property (nonatomic, strong) UIImageView *headImageView;
+@end
+@implementation WCUncroppedAvatarView
+- (void)refreshImage {
+    if (self.headImageView.image) { self.loader.hidden = YES; return; }
+    id imageView = [self.loader isKindOfClass:UIImageView.class] ? self.loader
+        : WCTweakValueForSelectorNames(self.loader, @[@"headImageView", @"imageView"]);
+    if ([imageView isKindOfClass:UIImageView.class] && ((UIImageView *)imageView).image) {
+        self.headImageView.image = ((UIImageView *)imageView).image;
+    }
+    self.loader.hidden = self.headImageView.image != nil;
+}
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    self.loader.frame = self.bounds; self.headImageView.frame = self.bounds;
+    [self refreshImage];
+}
+- (void)didMoveToWindow {
+    [super didMoveToWindow];
+    if (!self.window) return;
+    __weak typeof(self) weakSelf = self;
+    for (NSNumber *delay in @[@0, @0.15, @0.5, @1, @2, @5])
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay.doubleValue * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            if (weakSelf.window) [weakSelf setNeedsLayout];
+        });
+}
+@end
+UIView *WCGestureContactUncroppedAvatarView(NSString *username) {
+    WCUncroppedAvatarView *view = [WCUncroppedAvatarView new];
+    view.headImageView = [UIImageView new]; view.headImageView.contentMode = UIViewContentModeScaleAspectFit;
+    id contact = WCPrivateContact(username);
+    for (NSString *selector in @[@"getContactHeadImage", @"contactHeadImage", @"headImage"]) {
+        id image = WCTweakSafeValue(contact, selector);
+        if ([image isKindOfClass:UIImage.class]) { view.headImageView.image = image; break; }
+    }
+    view.loader = WCGestureContactUnroundedAvatarView(username);
+    WCGestureExcludeHeadViewFromGlobalAvatarRounding(view.loader);
+    view.loader.userInteractionEnabled = NO;
+    [view addSubview:view.loader]; [view addSubview:view.headImageView];
+    view.userInteractionEnabled = NO;
+    return view;
+}

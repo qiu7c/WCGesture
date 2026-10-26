@@ -87,33 +87,7 @@ UIView *WCGestureCurrentUserAvatarView(void) {
             userName = WCCurrentUserWXID();
             contact = userName.length ? WCPrivateContact(userName) : nil;
         }
-        NSString *url = nil;
-        for (NSString *key in @[@"m_nsHeadHDImgUrl", @"m_nsHeadImgUrlHD", @"m_nsHeadImgUrl", @"headImgUrl", @"headImageURL"]) {
-            url = WCContactString(contact, key.UTF8String);
-            if (url.length) break;
-        }
-        Class helper = NSClassFromString(@"MMHeadImageHelper");
-        if (userName.length) for (NSString *name in @[
-            @"getContactHeadImageViewWithUsrName:headImgUrl:bAutoUpdate:bRoundCorner:",
-            @"getMainFrameHeadImageViewWithUsrName:headImgUrl:bAutoUpdate:bRoundCorner:",
-            @"getProfileHeadImageViewWithUsrName:headImgUrl:bAutoUpdate:bRoundCorner:"
-        ]) {
-            SEL selector = NSSelectorFromString(name);
-            if (![helper respondsToSelector:selector]) continue;
-            NSMethodSignature *signature = [helper methodSignatureForSelector:selector];
-            if (!signature || signature.numberOfArguments != 6 || signature.methodReturnType[0] != '@' ||
-                [signature getArgumentTypeAtIndex:2][0] != '@' || [signature getArgumentTypeAtIndex:3][0] != '@' ||
-                !strchr("BcCsSiIlLqQ", [signature getArgumentTypeAtIndex:4][0]) ||
-                !strchr("BcCsSiIlLqQ", [signature getArgumentTypeAtIndex:5][0])) continue;
-            @try {
-                id native = ((id (*)(id, SEL, id, id, BOOL, BOOL))objc_msgSend)(helper, selector, userName, url ?: @"", YES, YES);
-                if ([native isKindOfClass:UIView.class]) { view = native; break; }
-            } @catch (__unused NSException *exception) {}
-        }
-        if (!view && contact) {
-            id image = WCTweakValueForSelectorNames(contact, @[@"getContactHeadImage", @"contactHeadImage", @"headImage"]);
-            if ([image isKindOfClass:UIImage.class]) view = [[UIImageView alloc] initWithImage:image];
-        }
+        if (userName.length) view = WCGestureContactUncroppedAvatarView(userName);
     } @catch (NSException *exception) {
         WCLog(@"预览头像暂不可用：%@", exception.name);
     }
@@ -123,7 +97,7 @@ UIView *WCGestureCurrentUserAvatarView(void) {
         view.accessibilityIdentifier = @"com.qiu7c.onewx.preview.avatar-unavailable";
     }
     view.userInteractionEnabled = NO;
-    view.contentMode = UIViewContentModeScaleAspectFill;
+    view.contentMode = UIViewContentModeScaleAspectFit;
     if ([view isKindOfClass:UIImageView.class]) { view.layer.cornerRadius = 6; view.clipsToBounds = YES; }
     return view;
 }

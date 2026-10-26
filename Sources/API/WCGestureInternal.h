@@ -55,3 +55,5 @@
 #import "Sources/API/WCGestureCallConfirmationAPI.h"
 #import "Sources/API/WCGestureAutoCombineSendAPI.h"
 #import "Sources/API/WCGestureContactInfoCardAPI.h"
+
+#import "Sources/API/WCGestureMediaCornerAPI.h"

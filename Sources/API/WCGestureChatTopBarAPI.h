@@ -6,6 +6,8 @@ UIView *WCGestureChatGlassContent(UIView *glass);
 void WCGestureConfigureChatGlass(UIView *glass);
 void WCGestureConfigureChatPinnedGlass(UIView *glass);
 CGFloat WCGestureChatTopBarScale(void);
+CGFloat WCGestureChatTopBarShellFactor(void);
+CGFloat WCGestureChatTopBarActionsWidth(BOOL search);
 void WCGestureChatPinnedGlassApply(UIView *tips, BOOL enabled);
 void WCGestureChatPinnedLayout(UIView *tips);
 void WCGestureChatPinnedRefresh(void);
@@ -22,6 +24,8 @@ void WCGestureChatPinnedRefresh(void);
 @end
 
 void WCGestureChatTopBarUpdate(UIViewController *controller);
+void WCGestureChatTopBarPrepareAppearance(UIViewController *controller);
+void WCGestureChatTopBarWillDisappear(UIViewController *controller);
 void WCGestureChatTopBarNavigationLayout(UINavigationBar *bar);
 void WCGestureChatTopBarRestore(UIViewController *controller);
 void WCGestureChatTopBarTitleChanged(UIViewController *controller, id _Nullable titleView);

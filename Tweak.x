@@ -18,6 +18,7 @@
     %orig;
     WCSeparatorHandleLayoutSubviews(self);
     WCGestureMomentsImageCornerViewDidLayout(self);
+    WCGestureMediaCornerViewDidLayout(self);
 }
 
 %end
@@ -75,6 +76,7 @@
                 WCGestureChatUtilitiesSettingsChanged(note.object);
                 WCGestureChatTopBarSettingsChanged(note.object);
                 WCGestureContactInfoCardSettingsChanged(note.object);
+                WCGestureMediaCornerSettingsChanged(note.object);
                 WCGestureVoiceTranscriptionSettingsChanged(note.object);
                 WCGestureMessageTimeSettingsChanged(note.object);
                 WCGestureAntiRevokeSettingsChanged(note.object);

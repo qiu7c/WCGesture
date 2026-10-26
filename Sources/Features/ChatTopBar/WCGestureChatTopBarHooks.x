@@ -1,6 +1,14 @@
 #import "Sources/API/WCGestureInternal.h"
 
 %hook BaseMsgContentViewController
+- (void)viewDidLoad {
+    %orig;
+    WCGestureChatTopBarPrepareAppearance(self);
+}
+- (void)viewDidDisappear:(BOOL)animated {
+    %orig(animated);
+    WCGestureChatTopBarRestore(self);
+}
 - (void)updateTitleView:(id)titleView {
     %orig(titleView);
     WCGestureChatTopBarTitleChanged(self, titleView);

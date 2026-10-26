@@ -3,7 +3,7 @@
 
 @interface WCInfoAvatarHost : UIView
 @property (nonatomic, strong) UIView *source;
-@property (nonatomic, strong) UIImageView *image;
+
 - (instancetype)initWithUserName:(NSString *)userName;
 @end
 @implementation WCInfoAvatarHost
@@ -11,30 +11,15 @@
     self = [super initWithFrame:CGRectZero];
     if (!self) return nil;
     self.clipsToBounds = YES; self.layer.cornerCurve = kCACornerCurveContinuous;
-    self.source = WCGestureContactUnroundedAvatarView(userName);
+    self.source = WCGestureContactUncroppedAvatarView(userName);
     WCGestureExcludeHeadViewFromGlobalAvatarRounding(self.source);
     self.source.userInteractionEnabled = NO;
-    self.image = [UIImageView new]; self.image.contentMode = UIViewContentModeScaleAspectFit;
-    [self addSubview:self.source]; [self addSubview:self.image];
+    [self addSubview:self.source];
     return self;
-}
-- (void)didMoveToWindow {
-    [super didMoveToWindow];
-    if (!self.window) return;
-    __weak typeof(self) weakSelf = self;
-    for (NSNumber *delay in @[@0, @0.15, @0.5, @1, @2])
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay.doubleValue * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-            if (weakSelf.window) [weakSelf setNeedsLayout];
-        });
 }
 - (void)layoutSubviews {
     [super layoutSubviews];
-    self.source.frame = self.bounds; self.image.frame = self.bounds;
-    id loaded = [self.source isKindOfClass:UIImageView.class] ? self.source
-        : WCTweakValueForSelectorNames(self.source, @[@"headImageView", @"imageView"]);
-    if ([loaded isKindOfClass:UIImageView.class] && ((UIImageView *)loaded).image) {
-        self.image.image = ((UIImageView *)loaded).image; self.source.hidden = YES;
-    }
+    self.source.frame = self.bounds;
     CGFloat side = MIN(CGRectGetWidth(self.bounds), CGRectGetHeight(self.bounds));
     double percent = [NSUserDefaults.standardUserDefaults doubleForKey:WCGestureGlobalAvatarCornerPercentKey];
     CGFloat radius = WCGestureEnabled(WCGestureGlobalAvatarRoundingEnabledKey)
@@ -56,18 +41,19 @@
     self.field.font = [[UIFontMetrics metricsForTextStyle:UIFontTextStyleSubheadline] scaledFontForFont:[UIFont systemFontOfSize:14] maximumPointSize:19];
     self.value.font = [[UIFontMetrics metricsForTextStyle:UIFontTextStyleBody] scaledFontForFont:[UIFont systemFontOfSize:15] maximumPointSize:21];
     self.field.textColor = UIColor.secondaryLabelColor; self.value.textColor = UIColor.labelColor;
-    self.field.numberOfLines = 0; self.value.numberOfLines = 0; self.value.textAlignment = NSTextAlignmentRight;
+    self.field.numberOfLines = 1; self.value.numberOfLines = 1;
+    self.value.lineBreakMode = NSLineBreakByTruncatingMiddle; self.value.textAlignment = NSTextAlignmentRight;
     for (UIView *view in @[self.field, self.value]) { view.translatesAutoresizingMaskIntoConstraints = NO; [self.contentView addSubview:view]; }
     [NSLayoutConstraint activateConstraints:@[
         [self.field.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:20],
         [self.field.widthAnchor constraintEqualToAnchor:self.contentView.widthAnchor multiplier:0.3 constant:-6],
-        [self.field.firstBaselineAnchor constraintEqualToAnchor:self.value.firstBaselineAnchor],
-        [self.field.bottomAnchor constraintLessThanOrEqualToAnchor:self.contentView.bottomAnchor constant:-13],
+        [self.field.centerYAnchor constraintEqualToAnchor:self.contentView.centerYAnchor],
+        [self.field.topAnchor constraintGreaterThanOrEqualToAnchor:self.contentView.topAnchor constant:2],
         [self.value.leadingAnchor constraintEqualToAnchor:self.field.trailingAnchor constant:12],
         [self.value.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-20],
-        [self.value.topAnchor constraintEqualToAnchor:self.contentView.topAnchor constant:14],
-        [self.value.bottomAnchor constraintEqualToAnchor:self.contentView.bottomAnchor constant:-14],
-        [self.contentView.heightAnchor constraintGreaterThanOrEqualToConstant:50],
+        [self.value.centerYAnchor constraintEqualToAnchor:self.contentView.centerYAnchor],
+        [self.value.topAnchor constraintGreaterThanOrEqualToAnchor:self.contentView.topAnchor constant:2],
+
     ]];
     return self;
 }
@@ -89,6 +75,8 @@
 @property (nonatomic, strong) UILabel *heading;
 @property (nonatomic, strong) UIButton *backButton;
 @property (nonatomic, strong) UITableView *table;
+@property (nonatomic, strong) NSLayoutConstraint *panelHeight;
+@property (nonatomic, assign) CGFloat fieldRowHeight;
 @end
 
 @implementation WCContactInfoCardController
@@ -96,7 +84,7 @@
     [super viewDidLoad];
     self.view.backgroundColor = UIColor.clearColor;
     UIButton *dimming = [UIButton buttonWithType:UIButtonTypeCustom];
-    dimming.backgroundColor = [UIColor.blackColor colorWithAlphaComponent:0.22];
+    dimming.backgroundColor = [UIColor.blackColor colorWithAlphaComponent:0.12];
     dimming.accessibilityLabel = @"关闭资料信息";
     [dimming addTarget:self action:@selector(close) forControlEvents:UIControlEventTouchUpInside];
     self.panel = [UIView new]; self.panel.backgroundColor = UIColor.clearColor;
@@ -124,15 +112,15 @@
     self.table.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
     for (UIView *view in @[dimming, self.panel]) { view.translatesAutoresizingMaskIntoConstraints = NO; [self.view addSubview:view]; }
     for (UIView *view in @[self.glass, self.avatar, self.heading, name, close, self.backButton, self.table]) { view.translatesAutoresizingMaskIntoConstraints = NO; [self.panel addSubview:view]; }
-    NSLayoutConstraint *halfHeight = [self.panel.heightAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.heightAnchor multiplier:0.52];
-    halfHeight.priority = UILayoutPriorityDefaultHigh;
+    self.panelHeight = [self.panel.heightAnchor constraintEqualToConstant:560];
+    self.panelHeight.priority = UILayoutPriorityDefaultHigh;
     NSLayoutConstraint *preferredWidth = [self.panel.widthAnchor constraintEqualToAnchor:self.view.widthAnchor multiplier:0.9]; preferredWidth.priority = UILayoutPriorityDefaultHigh;
     [NSLayoutConstraint activateConstraints:@[
         [dimming.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor], [dimming.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
         [dimming.topAnchor constraintEqualToAnchor:self.view.topAnchor], [dimming.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
         [self.panel.centerXAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.centerXAnchor], [self.panel.centerYAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.centerYAnchor],
         preferredWidth, [self.panel.widthAnchor constraintLessThanOrEqualToConstant:440], [self.panel.widthAnchor constraintLessThanOrEqualToAnchor:self.view.safeAreaLayoutGuide.widthAnchor constant:-24],
-        halfHeight, [self.panel.heightAnchor constraintLessThanOrEqualToAnchor:self.view.safeAreaLayoutGuide.heightAnchor constant:-24],
+        self.panelHeight, [self.panel.heightAnchor constraintLessThanOrEqualToAnchor:self.view.safeAreaLayoutGuide.heightAnchor constant:-24],
         [self.glass.leadingAnchor constraintEqualToAnchor:self.panel.leadingAnchor], [self.glass.trailingAnchor constraintEqualToAnchor:self.panel.trailingAnchor],
         [self.glass.topAnchor constraintEqualToAnchor:self.panel.topAnchor], [self.glass.bottomAnchor constraintEqualToAnchor:self.panel.bottomAnchor],
         [self.avatar.leadingAnchor constraintEqualToAnchor:self.panel.leadingAnchor constant:20], [self.avatar.topAnchor constraintEqualToAnchor:self.panel.topAnchor constant:22],
@@ -148,10 +136,25 @@
     [self updateStyle];
     if (![self.userName hasSuffix:@"@chatroom"]) [self loadGroups];
 }
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    CGFloat safeHeight = CGRectGetHeight(self.view.safeAreaLayoutGuide.layoutFrame);
+    if (safeHeight <= 0) return;
+    CGFloat maximum = MAX(100, safeHeight - 24);
+    CGFloat desired = self.showingGroups ? maximum * 0.82 : 100 + self.displayRows.count * 48;
+    CGFloat height = MIN(maximum, MAX(MIN(maximum, safeHeight * 0.72), desired));
+    if (fabs(self.panelHeight.constant - height) > 0.5) self.panelHeight.constant = height;
+    self.table.scrollEnabled = self.showingGroups;
+    if (!self.showingGroups && !CGPointEqualToPoint(self.table.contentOffset, CGPointZero)) self.table.contentOffset = CGPointZero;
+    CGFloat rowHeight = MAX(1, MIN(48, CGRectGetHeight(self.table.bounds) / MAX(1, self.displayRows.count)));
+    if (!self.showingGroups && fabs(self.fieldRowHeight - rowHeight) > 0.5) { self.fieldRowHeight = rowHeight; [self.table reloadData]; }
+}
+- (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)path { return self.showingGroups ? UITableViewAutomaticDimension : (self.fieldRowHeight > 0 ? self.fieldRowHeight : 40); }
 - (void)dealloc { [NSNotificationCenter.defaultCenter removeObserver:self]; }
 - (void)updateStyle {
     BOOL reduced = UIAccessibilityIsReduceTransparencyEnabled();
-    self.glass.effect = reduced ? nil : [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemMaterial];
+    self.glass.effect = reduced ? nil : [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemThinMaterial];
+    self.glass.alpha = reduced ? 1 : 0.72;
     self.panel.backgroundColor = reduced ? UIColor.secondarySystemGroupedBackgroundColor : UIColor.clearColor;
     BOOL dark = self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark;
     self.panel.layer.borderColor = [UIColor.whiteColor colorWithAlphaComponent:dark ? 0.16 : 0.45].CGColor;
@@ -167,7 +170,7 @@
 }
 - (void)close { self.groupRequest = nil; [self dismissViewControllerAnimated:YES completion:nil]; }
 - (BOOL)accessibilityPerformEscape { if (self.showingGroups) [self back]; else [self close]; return YES; }
-- (void)back { self.showingGroups = NO; self.heading.text = self.cardTitle; self.backButton.hidden = YES; self.avatar.hidden = NO; [self updateGroupStatus]; [self.table reloadData]; }
+- (void)back { self.showingGroups = NO; self.heading.text = self.cardTitle; self.backButton.hidden = YES; self.avatar.hidden = NO; [self.view setNeedsLayout]; [self updateGroupStatus]; [self.table reloadData]; }
 - (void)loadGroups {
     self.groupRequest = nil; self.groupsFinished = NO; self.groupsAvailable = NO; self.groups = @[];
     __weak typeof(self) weakSelf = self;
@@ -176,7 +179,7 @@
         if (!card) return;
         card.groupsFinished = finished;
         if (groups) { card.groups = groups; card.groupsAvailable = YES; }
-        [card updateGroupStatus]; [card.table reloadData];
+        [card updateGroupStatus]; [card.table reloadData]; [card.view setNeedsLayout];
     });
     [self updateGroupStatus];
 }
@@ -213,6 +216,11 @@
     WCInfoFieldCell *cell = [tableView dequeueReusableCellWithIdentifier:@"OneWxInfoField"];
     if (!cell) cell = [[WCInfoFieldCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:@"OneWxInfoField"];
     cell.field.text = row[@"title"]; cell.value.text = row[@"value"];
+    cell.value.adjustsFontSizeToFitWidth = YES; cell.value.minimumScaleFactor = 0.7;
+    BOOL longValue = [row[@"title"] isEqualToString:@"个性签名"] || [row[@"title"] isEqualToString:@"管理员"] || [row[@"title"] isEqualToString:@"群简介"];
+    cell.value.numberOfLines = longValue && self.fieldRowHeight >= 42 ? 2 : 1;
+    CGFloat size = MIN(14, MAX(8, self.fieldRowHeight - 6));
+    cell.field.font = [UIFont systemFontOfSize:size]; cell.value.font = [UIFont systemFontOfSize:size];
     cell.accessoryType = row[@"action"] ? UITableViewCellAccessoryDisclosureIndicator : UITableViewCellAccessoryNone;
     cell.accessibilityHint = row[@"action"] ? @"查看共同群聊" : @"复制内容";
     return cell;
@@ -226,7 +234,7 @@
         [self dismissViewControllerAnimated:YES completion:^{ if (!WCGesturePushPrivateChat(userName)) WCShowToast(@"暂时无法打开该群聊"); }];
     } else if ([row[@"action"] isEqualToString:@"groups"]) {
         self.showingGroups = YES; self.heading.text = @"共同群聊"; self.backButton.hidden = NO; self.avatar.hidden = YES;
-        [self updateGroupStatus]; [self.table reloadData];
+        [self.view setNeedsLayout]; [self updateGroupStatus]; [self.table reloadData];
     } else { UIPasteboard.generalPasteboard.string = row[@"value"]; UIAccessibilityPostNotification(UIAccessibilityAnnouncementNotification, @"已复制"); }
 }
 @end

@@ -54,4 +54,5 @@ void WCGesturePresentSettings(UIViewController *presenter);
 /// API. Falls back silently when the API is unavailable.
 void WCGestureRegisterEntry(void);
 
+UIViewController *WCGestureCreateCornerSettingsController(void);
 NS_ASSUME_NONNULL_END
