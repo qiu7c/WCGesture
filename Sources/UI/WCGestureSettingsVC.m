@@ -835,6 +835,7 @@ static NSDictionary<NSString *, NSString *> *WCConfigShareKeys(void) {
         WCGestureMessageTimePositionKey,
         WCGesturePageScalePercentKey,
         WCGestureAutoDeviceLoginEnabledKey,
+        WCGestureNotificationDirectChatEnabledKey,
         WCGestureBackgroundKeepAliveEnabledKey,
         WCGestureAdBlockerEnabledKey,
         WCGestureMomentsInteractionReminderEnabledKey,
@@ -1488,6 +1489,9 @@ static NSString *WCRowDetailText(WCRow *row) {
             [collapsible addObject:@YES];
             [collapseKeys addObject:[prefix stringByAppendingString:suffixes[i]]];
         }
+        [sections addObject:@[WCSwitchRow(@"通知直达聊天", WCGestureNotificationDirectChatEnabledKey)]];
+        [collapsible addObject:@NO];
+        [collapseKeys addObject:[prefix stringByAppendingString:@".chat.notification-direct-chat"]];
         [sections addObject:@[WCSwitchRow(@"语音转发", WCGestureVoiceForwardEnabledKey)]];
         [collapsible addObject:@NO];
         [collapseKeys addObject:[prefix stringByAppendingString:@".chat.voice-forward"]];

@@ -28,6 +28,7 @@ NSString *const WCGestureMomentsReminderForwardImagesKey = @"com.qiu7c.onewx.mom
 NSString *const WCGestureMomentsReminderForwardVideosKey = @"com.qiu7c.onewx.moments.reminder.forward-videos";
 NSString *const WCGestureMomentsReminderSeenItemsKey = @"com.qiu7c.onewx.moments.reminder.seen-items";
 NSString *const WCGestureMomentsInteractionStateKey = @"com.qiu7c.onewx.moments.interaction-reminder.state";
+NSString *const WCGestureNotificationDirectChatEnabledKey = @"com.qiu7c.onewx.chat.notification-direct-chat.enabled";
 NSString *const WCGestureAutoDeviceLoginEnabledKey = @"com.qiu7c.onewx.automation.device-login.enabled";
 NSString *const WCGestureVoiceTranscriptionEnabledKey = @"com.qiu7c.onewx.chat.voice-transcription.enabled";
 NSString *const WCGestureVoiceTranscriptionIgnoreGroupKey = @"com.qiu7c.onewx.chat.voice-transcription.ignore-group";
@@ -289,6 +290,7 @@ void WCGestureRegisterDefaults(void) {
             WCGestureMomentsTimeFormatKey: @"yyyy-MM-dd HH:mm:ss",
             WCGestureAutoOriginalEnabledKey: @NO,
             WCGestureAutoDeviceLoginEnabledKey: @NO,
+            WCGestureNotificationDirectChatEnabledKey: @NO,
             WCGestureBackgroundKeepAliveEnabledKey: @NO,
             WCGestureAdBlockerEnabledKey: @NO,
             WCGestureMomentsInteractionReminderEnabledKey: @NO,

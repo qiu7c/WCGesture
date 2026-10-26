@@ -21,7 +21,7 @@ void WCGestureSettingsConfigureNavigation(UIViewController *controller) {
     for (UINavigationBarAppearance *source in sources) {
         UINavigationBarAppearance *appearance = [source copy];
         NSMutableDictionary *titleAttributes = [appearance.titleTextAttributes mutableCopy] ?: [NSMutableDictionary dictionary];
-        titleAttributes[NSFontAttributeName] = [UIFont systemFontOfSize:17 * WCGestureSettingsScaleFactor() weight:UIFontWeightRegular];
+        titleAttributes[NSFontAttributeName] = [UIFont systemFontOfSize:17 * WCGestureSettingsScaleFactor() weight:transparentHome ? UIFontWeightSemibold : UIFontWeightRegular];
         appearance.titleTextAttributes = titleAttributes;
         if (transparentHome) {
             [appearance configureWithTransparentBackground];

@@ -53,3 +53,39 @@ NSString *WCPrivateContactUserName(id contact) {
     return WCNonemptyString(WCObjectField(contact,
         @[@"m_nsUsrName", @"m_nsUserName", @"getUsrName", @"userName", @"username"]));
 }
+
+BOOL WCGesturePushPrivateChat(NSString *userName) {
+    if (!NSThread.isMainThread || !userName.length) return NO;
+    @try {
+        Class managerClass = NSClassFromString(@"CAppViewControllerManager");
+        SEL currentNavigation = NSSelectorFromString(@"getCurrentNavigationController");
+        NSMethodSignature *navigationSignature = [managerClass methodSignatureForSelector:currentNavigation];
+        id candidate = nil;
+        if (navigationSignature.numberOfArguments == 2 && navigationSignature.methodReturnType[0] == '@') {
+            candidate = ((id (*)(id, SEL))objc_msgSend)(managerClass, currentNavigation);
+        }
+        UINavigationController *navigation = [candidate isKindOfClass:UINavigationController.class] ? candidate : WCPushNavigation();
+        if (!navigation || !navigation.view.window || navigation.isBeingDismissed || navigation.presentedViewController
+            || navigation.transitionCoordinator) return NO;
+
+        UIViewController *visible = navigation.visibleViewController;
+        Class chatClass = NSClassFromString(@"BaseMsgContentViewController");
+        if (chatClass && [visible isKindOfClass:chatClass]) {
+            id currentContact = WCTweakSafeValue(visible, @"GetCContact");
+            if ([WCPrivateContactUserName(currentContact) isEqualToString:userName]) return YES;
+        }
+        id logic = WCServiceForClass(NSClassFromString(@"MMMsgLogicManager"));
+        id contact = WCPrivateContact(userName);
+        SEL push = NSSelectorFromString(@"PushOtherBaseMsgControllerByContact:navigationController:animated:");
+        NSMethodSignature *signature = [logic methodSignatureForSelector:push];
+        if (!contact || signature.numberOfArguments != 5 || signature.methodReturnType[0] != 'v'
+            || [signature getArgumentTypeAtIndex:2][0] != '@'
+            || [signature getArgumentTypeAtIndex:3][0] != '@'
+            || strcmp([signature getArgumentTypeAtIndex:4], @encode(BOOL)) != 0) return NO;
+        ((void (*)(id, SEL, id, id, BOOL))objc_msgSend)(logic, push, contact, navigation, YES);
+        return YES;
+    } @catch (NSException *exception) {
+        NSLog(@"[One Wx] 通知聊天页跳转失败：%@", exception.reason);
+        return NO;
+    }
+}

@@ -65,9 +65,13 @@ The search bar finds settings even when their feature is disabled and opens the 
 - 插件类配置 → 后台保活: native background tasks plus on-demand looping silent audio, with cleanup on foreground entry or disable. This remains an independent switch; enabling reminders does not enable keep-alive.
 - All three main switches and forwarding switches default to off. Runtime state is excluded from share codes. Background execution depends on iOS and cannot survive process termination; detection, notifications, media sending and audio coexistence require device testing.
 
+## Notification direct chat (device validation pending)
+
+“聊天类功能 → 通知直达聊天” ports WCAtlas's notification tap routing; off by default. A normal message-notification tap uses the native conversation navigation with the notification's `u` username. Quick replies and other notification actions retain native handling. Startup/unlock retries are bounded, newer taps replace pending navigation, and account changes cancel it.
+
 ## Ad cleanup (device validation pending)
 
-“禁用类功能 → 广告精简” is off by default. It covers the ported Moments ad-list, public-account ad insertion/push, mini-app splash and known ad-resource URL paths. Private signatures are adapted to 8.0.79. This does not establish complete coverage of video-channel ads; refresh/reopen affected pages when testing.
+“禁用类功能 → 广告精简” is off by default. It covers the ported Moments ad-list, public-account ad insertion/push, mini-app splash and known ad-resource URL paths. Private signatures are adapted to 8.0.79. Following a reported Moments crash, native ad-update inputs and model metadata are preserved; list reads return separate mutable empty lists when enabled. The crash fix still needs device verification. This does not establish complete coverage of video-channel ads; refresh/reopen affected pages when testing.
 
 ## Code layout
 

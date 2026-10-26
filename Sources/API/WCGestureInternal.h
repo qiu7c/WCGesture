@@ -48,3 +48,4 @@
 #import "Sources/API/WCGestureMomentsInteractionReminderAPI.h"
 #import "Sources/API/WCGestureBackgroundKeeperAPI.h"
 #import "Sources/API/WCGestureAdBlockerAPI.h"
+#import "Sources/API/WCGestureNotificationDirectChatAPI.h"

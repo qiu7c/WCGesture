@@ -331,6 +331,7 @@ FOUNDATION_EXPORT NSString *const WCGestureMomentsTimeEnabledKey;
 FOUNDATION_EXPORT NSString *const WCGestureMomentsTimeFormatKey;
 FOUNDATION_EXPORT NSString *const WCGestureAutoOriginalEnabledKey;
 FOUNDATION_EXPORT NSString *const WCGestureAutoDeviceLoginEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureNotificationDirectChatEnabledKey;
 FOUNDATION_EXPORT NSString *const WCGestureVoiceTranscriptionEnabledKey;
 FOUNDATION_EXPORT NSString *const WCGestureVoiceTranscriptionIgnoreGroupKey;
 FOUNDATION_EXPORT NSString *const WCGestureVoiceTranscriptionIgnorePrivateKey;

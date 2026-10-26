@@ -11,11 +11,6 @@
 
 %hook WCAdvertiseStatMgr
 
-- (id)getAdvertiseInfoForItem:(id)item {
-    if (WCGestureAdBlockerEnabled()) return nil;
-    return %orig(item);
-}
-
 - (void)logSphereViewWithSphereReportInfo:(id)reportInfo dataItem:(id)dataItem scene:(unsigned int)scene {
     if (WCGestureAdBlockerEnabled()) return;
     %orig(reportInfo, dataItem, scene);
@@ -204,7 +199,7 @@
 %hook BrandTimelineMsgMgr
 
 - (id)getInsertedAdCardListWithLimit:(unsigned int)limit {
-    if (WCGestureAdBlockerEnabled()) return @[];
+    if (WCGestureAdBlockerEnabled()) return [NSMutableArray array];
     return %orig(limit);
 }
 
@@ -223,7 +218,7 @@
 %hook BoxBrandTimelineMsgMgr
 
 - (id)getInsertedAdCardListWithLimit:(unsigned int)limit {
-    if (WCGestureAdBlockerEnabled()) return @[];
+    if (WCGestureAdBlockerEnabled()) return [NSMutableArray array];
     return %orig(limit);
 }
 
@@ -244,49 +239,6 @@
 - (void)handleJSEvent:(id)event {
     if (WCGestureAdBlockerEnabled()) return;
     %orig(event);
-}
-
-%end
-
-%hook WCUserComment
-
-- (BOOL)isAdvertiserComment {
-    if (WCGestureAdBlockerEnabled()) return NO;
-    return %orig;
-}
-
-- (BOOL)isRefAdvertiserComment {
-    if (WCGestureAdBlockerEnabled()) return NO;
-    return %orig;
-}
-
-- (BOOL)isAdPreferInfo {
-    if (WCGestureAdBlockerEnabled()) return NO;
-    return %orig;
-}
-
-- (BOOL)isAtedAdvertiserComment {
-    if (WCGestureAdBlockerEnabled()) return NO;
-    return %orig;
-}
-
-- (BOOL)isAdBossFirstComment {
-    if (WCGestureAdBlockerEnabled()) return NO;
-    return %orig;
-}
-
-- (BOOL)isAdBossFirstLike {
-    if (WCGestureAdBlockerEnabled()) return NO;
-    return %orig;
-}
-
-- (id)adExtInfo {
-    if (WCGestureAdBlockerEnabled()) return nil;
-    return %orig;
-}
-
-- (void)setAdExtInfo:(id)info {
-    %orig(WCGestureAdBlockerEnabled() ? nil : info);
 }
 
 %end
@@ -313,21 +265,11 @@
 
 
 %hook WCTimelineMgr
-- (void)updateAdvertiseDataList:(id)items {
-    id filtered = WCGestureAdBlockerEnabled() ? @[] : items;
-    %orig(filtered);
-}
-- (void)setAdvertiseDataList:(id)items {
-    id filtered = WCGestureAdBlockerEnabled() ? @[] : items;
-    %orig(filtered);
-}
+// Keep native storage/update bookkeeping intact. Consumers may mutate this list.
 - (id)getAdvertiseDataByCurMinTime:(unsigned int)minimum MaxTime:(unsigned int)maximum {
-    if (WCGestureAdBlockerEnabled()) return @[];
-    return %orig;
-}
-- (void)tryToProcessWithNewAdList:(id)items {
-    id filtered = WCGestureAdBlockerEnabled() ? @[] : items;
-    %orig(filtered);
+    id items = %orig(minimum, maximum);
+    if (WCGestureAdBlockerEnabled()) return [NSMutableArray array];
+    return items;
 }
 %end
 
