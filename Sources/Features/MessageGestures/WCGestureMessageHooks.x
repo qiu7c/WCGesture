@@ -40,10 +40,12 @@
 - (void)viewDidAppear:(BOOL)animated {
     %orig;
     WCSetVisibleChatController(self);
+    WCGestureChatTopBarUpdate(self);
 }
 
 - (void)viewWillDisappear:(BOOL)animated {
     %orig;
+    WCGestureChatTopBarRestore(self);
     if (WCVisibleChatControllerGet() == self) WCSetVisibleChatController(nil);
 }
 

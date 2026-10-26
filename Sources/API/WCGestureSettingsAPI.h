@@ -15,6 +15,7 @@ typedef NS_ENUM(NSInteger, WCGesturePreviewKind) {
     WCGesturePreviewMessageTime,
     WCGesturePreviewAntiRevoke,
     WCGesturePreviewInputRounding,
+    WCGesturePreviewChatTopBar,
 };
 
 UIView *WCGestureCreateChatPreview(WCGesturePreviewKind kind);

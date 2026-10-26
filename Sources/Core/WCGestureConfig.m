@@ -1,5 +1,13 @@
 #import "Sources/API/WCGestureInternal.h"
 
+NSString *const WCGestureCallConfirmEnabledKey = @"com.qiu7c.onewx.chat.call-bubble-confirm.enabled";
+NSString *const WCGestureContactInfoCardEnabledKey = @"com.qiu7c.onewx.interface.contact-info-card.enabled";
+NSString *const WCGestureAutoCombineSendEnabledKey = @"com.qiu7c.onewx.chat.auto-combine-send.enabled";
+NSString *const WCGestureChatTopBarCapsuleEnabledKey = @"com.qiu7c.onewx.chat.top-bar-capsule.enabled";
+NSString *const WCGestureChatGlassStyleKey = @"com.qiu7c.onewx.chat.top-bar-capsule.glass-style";
+NSString *const WCGestureChatGlassBlurIntensityKey = @"com.qiu7c.onewx.chat.top-bar-capsule.blur-intensity";
+NSString *const WCGestureChatTopBarAvatarSizeKey = @"com.qiu7c.onewx.chat.top-bar-capsule.avatar-size";
+NSString *const WCGestureChatTopBarNicknameSizeKey = @"com.qiu7c.onewx.chat.top-bar-capsule.nickname-size";
 NSString *const WCGestureHideGroupTitleTailKey = @"com.qiu7c.onewx.interface.hide-group-title-tail";
 NSString *const WCGestureHideScreenshotForwardKey = @"com.qiu7c.onewx.interface.hide-screenshot-forward";
 NSString *const WCGestureHideMeFinderKey = @"com.qiu7c.onewx.interface.me.hide-finder";
@@ -289,6 +297,14 @@ void WCGestureRegisterDefaults(void) {
             WCGestureMomentsTimeEnabledKey: @NO,
             WCGestureMomentsTimeFormatKey: @"yyyy-MM-dd HH:mm:ss",
             WCGestureAutoOriginalEnabledKey: @NO,
+            WCGestureChatTopBarCapsuleEnabledKey: @NO,
+            WCGestureChatGlassStyleKey: @1,
+            WCGestureChatGlassBlurIntensityKey: @20.0,
+            WCGestureChatTopBarAvatarSizeKey: @30.0,
+            WCGestureChatTopBarNicknameSizeKey: @15.0,
+            WCGestureCallConfirmEnabledKey: @NO,
+            WCGestureContactInfoCardEnabledKey: @NO,
+            WCGestureAutoCombineSendEnabledKey: @NO,
             WCGestureAutoDeviceLoginEnabledKey: @NO,
             WCGestureNotificationDirectChatEnabledKey: @NO,
             WCGestureBackgroundKeepAliveEnabledKey: @NO,

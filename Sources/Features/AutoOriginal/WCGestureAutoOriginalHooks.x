@@ -4,14 +4,17 @@
 - (void)viewDidLoad {
     %orig;
     WCGestureAutoOriginalApply(self, @"m_originImageCheck");
+    WCGestureAutoCombineSendApply(self);
 }
 - (void)initCombineSendViewIfNeeded {
     %orig;
     WCGestureAutoOriginalApply(self, @"m_originImageCheck");
+    WCGestureAutoCombineSendApply(self);
 }
 - (void)reloadBottomBar {
     %orig;
     WCGestureAutoOriginalApply(self, @"m_originImageCheck");
+    WCGestureAutoCombineSendApply(self);
 }
 %end
 
@@ -19,14 +22,17 @@
 - (void)viewDidLoad {
     %orig;
     WCGestureAutoOriginalApply(self, @"_originImageCheck");
+    WCGestureAutoCombineSendApply(self);
 }
 - (void)initCombineSendViewIfNeeded {
     %orig;
     WCGestureAutoOriginalApply(self, @"_originImageCheck");
+    WCGestureAutoCombineSendApply(self);
 }
 - (void)reloadSelectedCollectionView {
     %orig;
     WCGestureAutoOriginalApply(self, @"_originImageCheck");
+    WCGestureAutoCombineSendApply(self);
 }
 %end
 

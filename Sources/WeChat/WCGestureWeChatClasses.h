@@ -43,6 +43,14 @@ NS_ASSUME_NONNULL_BEGIN
 - (NSArray *)operationMenuItems;
 @end
 
+@interface VoIPBubbleMessageCellView : CommonMessageCellView
+- (void)startVoiceVoip;
+- (void)startVideoVoip;
+@end
+
+@interface ChatRoomInfoViewController : UIViewController
+@end
+
 @interface BaseMsgContentViewController : UIViewController
 @end
 

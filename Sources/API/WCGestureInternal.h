@@ -49,3 +49,9 @@
 #import "Sources/API/WCGestureBackgroundKeeperAPI.h"
 #import "Sources/API/WCGestureAdBlockerAPI.h"
 #import "Sources/API/WCGestureNotificationDirectChatAPI.h"
+
+#import "Sources/API/WCGestureChatTopBarAPI.h"
+
+#import "Sources/API/WCGestureCallConfirmationAPI.h"
+#import "Sources/API/WCGestureAutoCombineSendAPI.h"
+#import "Sources/API/WCGestureContactInfoCardAPI.h"

@@ -130,6 +130,8 @@
 @property (nonatomic, copy) void (^controlsHandler)(void);
 @property (nonatomic, strong) UIView *navigation;
 @property (nonatomic, strong) UILabel *heading;
+@property (nonatomic, strong) WCGestureChatTopCapsuleView *topProfile;
+@property (nonatomic, strong) WCGestureChatTopCapsuleView *topActions;
 @property (nonatomic, strong) UIButton *backButton;
 @property (nonatomic, strong) UIButton *controlsButton;
 @property (nonatomic, strong) UIScrollView *messages;
@@ -198,6 +200,17 @@
     }
     return self;
 }
+- (void)ensureTopCapsules {
+    if (self.topProfile) return;
+    _topProfile = [[WCGestureChatTopCapsuleView alloc] initWithProfile:YES];
+    _topActions = [[WCGestureChatTopCapsuleView alloc] initWithProfile:NO];
+    [_topProfile setAvatarView:WCGestureCurrentUserAvatarView()];
+    __weak typeof(self) weakSelf = self;
+    _topProfile.backAction = ^{ [weakSelf back]; };
+    _topActions.moreAction = ^{ [weakSelf controls]; };
+    _topActions.searchAction = ^{ [weakSelf controls]; };
+        [_navigation addSubview:_topProfile]; [_navigation addSubview:_topActions];
+}
 - (void)back { if (self.backHandler) self.backHandler(); }
 - (void)controls { if (self.controlsHandler) self.controlsHandler(); }
 - (void)layoutSubviews {
@@ -218,7 +231,22 @@
     self.backButton.frame = CGRectMake(4, top, 44, 44);
     self.controlsButton.frame = CGRectMake(width - 60, top, 56, 44);
     self.heading.frame = CGRectMake(52, top, MAX(0, width - 116), 44);
-    self.heading.text = @[@"聊天预览 · 消息时间", @"聊天预览 · 防撤回", @"聊天预览 · 输入圆角"][self.kind];
+    self.heading.text = @[@"聊天预览 · 消息时间", @"聊天预览 · 防撤回", @"聊天预览 · 输入圆角", @"聊天预览 · 胶囊顶栏"][self.kind];
+    BOOL capsule = self.kind == WCGesturePreviewChatTopBar || WCGestureEnabled(WCGestureChatTopBarCapsuleEnabledKey);
+    self.heading.hidden = capsule; self.backButton.hidden = capsule; self.controlsButton.hidden = capsule;
+    self.topProfile.hidden = !capsule; self.topActions.hidden = !capsule;
+    if (capsule) {
+        [self ensureTopCapsules];
+        self.topProfile.hidden = NO; self.topActions.hidden = NO;
+        self.navigation.backgroundColor = UIColor.clearColor;
+        BOOL search = WCGestureEnabled(WCGestureChatSearchEnabledKey);
+        NSString *userName = WCCurrentUserWXID();
+        NSString *name = WCGesturePrivateContactDisplayName(userName.length ? WCPrivateContact(userName) : nil, @"我");
+        CGSize leftSize = [self.topProfile configureWithName:name typing:NO search:NO moreImage:nil menu:nil maximumWidth:MAX(90, MIN(260, width - (search ? 88 : 44) - 48))];
+        CGSize rightSize = [self.topActions configureWithName:@"" typing:NO search:search moreImage:nil menu:nil maximumWidth:88];
+        self.topProfile.frame = (CGRect){CGPointMake(16, top), leftSize};
+        self.topActions.frame = (CGRect){CGPointMake(width - 16 - rightSize.width, top), rightSize};
+    }
     BOOL rounding = self.kind == WCGesturePreviewInputRounding;
     CGFloat fieldHeight = 33 + 18 * (MAX(1, self.inputLines) - 1);
     CGFloat inputHeight = fieldHeight + 12 + self.safeAreaInsets.bottom;
@@ -233,7 +261,8 @@
     self.placeholder.text = self.inputLines > 1 ? @"多行输入预览\n观察圆角随高度变化\n不会发送消息" : @"示例聊天 · 右上角调节";
     self.placeholder.frame = CGRectInset(self.inputField.bounds, 8, 0);
     WCGestureChatInputRoundingApplyToViews(self.inputField, self.inputBar, rounding);
-    self.messages.frame = CGRectMake(0, navigationHeight, width, MAX(0, CGRectGetMinY(self.inputBar.frame) - navigationHeight));
+    CGFloat messagesTop = capsule ? 0 : navigationHeight;
+    self.messages.frame = CGRectMake(0, messagesTop, width, MAX(0, CGRectGetMinY(self.inputBar.frame) - messagesTop));
     self.separatorTime.frame = CGRectMake(0, 0, width, 41);
     NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
     BOOL local = [defaults integerForKey:WCGestureAntiRevokePromptStyleKey] == 0 &&
@@ -256,7 +285,7 @@
     }
     CGFloat visibleHeight = CGRectGetHeight(self.messages.bounds);
     self.messages.contentSize = CGSizeMake(width, y + 12);
-    self.messages.contentInset = UIEdgeInsetsMake(MAX(0, visibleHeight - y - 12), 0, 0, 0);
+    self.messages.contentInset = UIEdgeInsetsMake(MAX(capsule ? navigationHeight : 0, visibleHeight - y - 12), 0, 0, 0);
     self.messages.scrollIndicatorInsets = UIEdgeInsetsZero;
     if ((!CGSizeEqualToSize(self.lastViewport, self.messages.bounds.size) || self.lastContentHeight != y) && !self.messages.dragging) {
         self.messages.contentOffset = CGPointMake(0, MAX(-self.messages.contentInset.top, y + 12 - CGRectGetHeight(self.messages.bounds)));

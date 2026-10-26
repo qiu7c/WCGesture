@@ -65,6 +65,17 @@ The search bar finds settings even when their feature is disabled and opens the 
 - 插件类配置 → 后台保活: native background tasks plus on-demand looping silent audio, with cleanup on foreground entry or disable. This remains an independent switch; enabling reminders does not enable keep-alive.
 - All three main switches and forwarding switches default to off. Runtime state is excluded from share codes. Background execution depends on iOS and cannot survive process termination; detection, notifications, media sending and audio coexistence require device testing.
 
+## Small chat tools and contact information (device validation pending)
+
+- 聊天类功能 → 通话气泡二次确认: asks before redialing from a voice/video call-record bubble. Checks the original message again when confirming to avoid acting on a reused cell. Other call entry points are outside this feature.
+- 界面类功能 → 资料信息卡片: adds a 资料信息 row to friend/group/member profiles. Opens a centered rounded popup, about half the safe-area height, with internal scrolling and tap-to-copy rows. Reads locally available account/profile/group fields, including cached common-group counts; unavailable fields are omitted. It does not include WCAtlas's unrelated payment-name lookup, message-block/send-confirmation controls or group-member removal actions.
+- 聊天类功能 → 自动勾选合并发送: requires 自动勾选原图 and the native eligible/visible combine option. Sets the native control center and selection view together, once per eligible control-view period, so ordinary refreshes respect manual deselection. Turning it off stops automatic selection without clearing the user's native choice.
+- All three switches default to off and are included in configuration share codes.
+
+## Chat top capsules (device validation pending)
+
+“界面类功能 → 胶囊顶栏” ports WCAtlas's avatar/name/back capsule and more/search capsule; off by default. The existing full-page message-time preview adds a “顶栏” target, sharing the native capsule renderer and your current-account avatar. It supports frosted/pseudo-liquid glass, 20–100% blur, 24–34pt avatars and 12–18pt names. Long names truncate within the available navigation width; controls retain 44pt touch targets. Search and multi-select restore the native bar, and leaving/turning off restores saved navigation state. No separate preview page or explanatory small-print rows are introduced. Private navigation backgrounds, transitions, dark mode and search coexistence require device verification.
+
 ## Notification direct chat (device validation pending)
 
 “聊天类功能 → 通知直达聊天” ports WCAtlas's notification tap routing; off by default. A normal message-notification tap uses the native conversation navigation with the notification's `u` username. Quick replies and other notification actions retain native handling. Startup/unlock retries are bounded, newer taps replace pending navigation, and account changes cancel it.

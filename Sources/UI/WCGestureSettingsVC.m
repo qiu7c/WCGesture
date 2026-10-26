@@ -834,6 +834,14 @@ static NSDictionary<NSString *, NSString *> *WCConfigShareKeys(void) {
         WCGestureMessageTimeBoldKey,
         WCGestureMessageTimePositionKey,
         WCGesturePageScalePercentKey,
+        WCGestureChatTopBarCapsuleEnabledKey,
+        WCGestureChatGlassStyleKey,
+        WCGestureChatGlassBlurIntensityKey,
+        WCGestureChatTopBarAvatarSizeKey,
+        WCGestureChatTopBarNicknameSizeKey,
+        WCGestureCallConfirmEnabledKey,
+        WCGestureContactInfoCardEnabledKey,
+        WCGestureAutoCombineSendEnabledKey,
         WCGestureAutoDeviceLoginEnabledKey,
         WCGestureNotificationDirectChatEnabledKey,
         WCGestureBackgroundKeepAliveEnabledKey,
@@ -1502,6 +1510,10 @@ static NSString *WCRowDetailText(WCRow *row) {
         [collapsible addObject:@YES]; [collapseKeys addObject:[prefix stringByAppendingString:@".chat.quote-jump"]];
         [sections addObject:@[WCSwitchRow(@"长按菜单消息 +1", WCGestureMessageRepeatMenuEnabledKey)]];
         [collapsible addObject:@NO]; [collapseKeys addObject:[prefix stringByAppendingString:@".chat.repeat-menu"]];
+        [sections addObject:@[WCSwitchRow(@"通话气泡二次确认", WCGestureCallConfirmEnabledKey)]];
+        [collapsible addObject:@NO]; [collapseKeys addObject:[prefix stringByAppendingString:@".chat.call-confirm"]];
+        [sections addObject:@[WCSwitchRow(@"自动勾选合并发送", WCGestureAutoCombineSendEnabledKey)]];
+        [collapsible addObject:@NO]; [collapseKeys addObject:[prefix stringByAppendingString:@".chat.auto-combine-send"]];
         [sections addObject:@[WCSwitchRow(@"自动勾选原图", WCGestureAutoOriginalEnabledKey)]];
         [collapsible addObject:@NO]; [collapseKeys addObject:[prefix stringByAppendingString:@".chat.auto-original"]];
         [sections addObject:@[WCSwitchRow(@"语音自动转文字", WCGestureVoiceTranscriptionEnabledKey),
@@ -1665,6 +1677,13 @@ static NSString *WCRowDetailText(WCRow *row) {
         [sections addObject:enhance];
         [collapsible addObject:@YES];
         [collapseKeys addObject:[prefix stringByAppendingString:@".enhance.layout"]];
+        [sections addObject:@[WCSwitchRow(@"资料信息卡片", WCGestureContactInfoCardEnabledKey)]];
+        [collapsible addObject:@NO]; [collapseKeys addObject:[prefix stringByAppendingString:@".interface.contact-info-card"]];
+        WCRow *topPreview = WCPlainRow(@"整页顶栏预览与调节", WCRowKindChatOption);
+        topPreview.chatOption = @{ @"title": topPreview.title, @"type": @"top-bar-position", @"key": @"" };
+        [sections addObject:@[WCSwitchRow(@"胶囊顶栏", WCGestureChatTopBarCapsuleEnabledKey), topPreview]];
+        [collapsible addObject:@YES];
+        [collapseKeys addObject:[prefix stringByAppendingString:@".interface.chat-top-bar"]];
         NSMutableArray *rounding = [NSMutableArray arrayWithObjects:
             WCSwitchRow(@"聊天输入栏圆角", WCGestureChatInputRoundingEnabledKey),
             WCSwitchRow(@"输入框内部圆角", WCGestureChatInputInnerRoundingKey),

@@ -1,10 +1,30 @@
 # One Wx 开发交接
 
-最后更新：2026-10-25。本文描述当前工作区；已替换旧版本交接中的重复历史和过期状态。
+最后更新：2026-10-26。本文描述当前工作区；已替换旧版本交接中的重复历史和过期状态。
 
 本次提交说明（2026-10-25）：用户已明确授权提交推送。本轮透明顶栏、自动确认登录、设置样式清理、聊天搜索纠正、朋友圈提醒/保活、视频及预览圆角修正、广告精简和交接文档统一纳入本次提交。下文各节“未提交”保留的是开发时记录，不代表该提交之后的实时工作区状态；最新提交与推送状态以实际 git log / git status / origin/main 为准。编译、真机验证和资料页/相册缩略图补充层级仍未完成，不主动查询 CI。
 
-## 2026-10-26 当前修正（未提交）
+## 2026-10-26 三项小功能（纳入本次提交）
+
+用户选择通话气泡二次确认、资料信息卡片、自动勾选合并发送，并指定资料卡居中、约半屏。均独立 Features 目录，三个新 key 在 Core 声明/定义/默认关闭并加入配置别名；此前未提交的胶囊顶栏全部保留。用户已于 2026-10-26 授权本轮提交推送，胶囊及这三项功能一并纳入本次提交；版本核对为 1.0.0。
+
+- CallConfirmation：拦截 VoIPBubbleMessageCellView 的 startVoiceVoip/startVideoVoip，标准确认弹窗；弱引用气泡并保存消息身份及服务器/本地 ID，确认前检查仍在窗口且同一消息，单次旁路令牌重入原生调用并 finally 清除。开启后无法弹窗不会悄悄直拨。只覆盖聊天通话记录气泡，不声称覆盖所有拨号入口。
+- ContactInfoCard：WeixinContactInfoAssist 的 initData/reloadTableView/viewDidAppear 以及 ChatRoomInfoViewController 的 initData/reloadTableData/reloadProfileTableData，新增带专属标记的资料信息行，去重/关闭时只移除自己的行，合并延期刷新表格。8.0.79 插入索引 unsigned int、移除索引 unsigned long long，工厂首参 SEL，运行时核对签名。资料卡 UI 在 Sources/UI/WCGestureContactInfoCardController.m，OverFullScreen 遮罩＋安全区居中卡片，优先 52% 安全区高度、90% 宽度且最大 440pt，内容内部滚动；点击遮罩/关闭按钮退出，点字段复制。好友显示本机已有 ID/昵称/备注/微信号/签名/地区/性别/添加时间天数；群聊增加成员数/群主/管理员/简介/链接，群成员附可用群昵称/身份；共同群聊只读取原生已完成的缓存，不伪造缺失值。不迁移上游支付查询脱敏姓名、未接入的屏蔽/发送确认开关、踢群等无关操作。
+- AutoCombineSend：复用 AutoOriginal 六个现有 Hook 转发，补独立两个 picker/preview viewDidAppear（不重复 Hook）。异步合并请求，弱持有页面；需自动原图＋本功能同时开启且原生 isCombineSendHidden 为 NO、控件在窗口，运行时核对 BOOL getter/setter/updateSelected。通过原生 controlCenter setIsCombineSend:YES 和视图 updateSelected:YES 同步；每个符合条件的控件/控制中心组合只自动选择一次，隐藏后解除标记，普通刷新不强制勾回用户已取消的选项；关闭不清除用户原生勾选。
+
+本机只有静态检查条件；尚未编译、真机验收。待验证：语音/视频取消确认、连续点击、气泡复用/离窗；好友/自己/群聊/群成员入口、重复刷新及关闭移除、长字段与横屏/深浅色/大字体；单张/多张/混合视频、切换预览、手动取消、减少选择后再次满足条件、关闭自动原图/合并开关。
+
+## 2026-10-26 胶囊顶栏迁移（纳入本次提交）
+
+用户要求迁移并优化 WCAtlas 顶部胶囊，预览必须使用消息时间的同一个页面。新增 Features/ChatTopBar（玻璃、共用胶囊绘制、原生状态管理、独立标题/多选 Hook）。界面类功能下“胶囊顶栏”默认关闭，展开提供“整页顶栏预览与调节”；原有整页聊天预览增加第四个“顶栏”调节项目，继续保留消息时间、防撤回、输入圆角、本人头像和 12pt 面板间距，没有新增另一套模拟页面。
+
+- 五个新 key 均在 Core 声明/定义/defaults 并加入配置口令：主开关、玻璃样式（默认伪液态）、模糊强度 20–100（默认 20）、头像大小 24–34（默认 30）、昵称字号 12–18（默认 15）。数值滑块、输入、样式切换和重置位于同一预览面板。
+- 原生与预览共享 WCGestureChatTopCapsuleView/玻璃绘制：左返回＋头像＋昵称，右原生更多＋可选搜索。长昵称按导航可用宽度截断，保留额外原生按钮，44pt 点击区域；字号响应动态字体并封顶。输入状态保留绿色点提示。
+- 优化采用按控制器保存/恢复状态、复用已有胶囊、配置不变不重建排版/图标，尺寸变化才失效固有尺寸；玻璃只在配置、重新入窗、前台和外观变化时刷新，几何更新关闭隐式动画，系统降低透明度时用实色背景。未修改共享导航栏 appearance，只作用于当前 navigationItem，并针对已知导航背景视图保存/恢复 hidden。
+- 复用 ChatUtilities 的 viewWillAppear/viewDidLayout 和 MessageGestures 的 viewDidAppear/viewWillDisappear 转发，避免同类同方法重复 Hook；搜索启用/取消后恢复胶囊，搜索过程中和消息多选使用原生顶栏，页面离开/关闭功能恢复状态，侧滑取消由 didAppear 重建。Tweak.x 仅新增设置变更分发，不添加 UIView Hook。
+- 8.0.79 头文件核对 updateTitleView:、updateTitleView:ignoreAnimation:、enterMultiSelectMode/exitMultiSelectMode、GetCContact/getRightBarButton 和多选状态 getter。只做源码/静态检查，尚未编译、真机验收或提交。待验证：单聊/群聊/公众号，长昵称/大字体/窄屏横屏，头像加载、正在输入、深浅色/降低透明度、前后台、返回/取消侧滑、原生更多菜单/附加按钮、多选、搜索开关/取消/重开、预览切换/滑块及关闭恢复。WCAtlas 的置顶消息条玻璃装饰及发送确认长按依赖未纳入本次顶部导航胶囊范围。
+
+## 2026-10-26 上轮修正（已提交 bbf8672）
 
 - 用户反馈广告精简开启后进入朋友圈闪退。移除 WCTimelineMgr 三处改写原生广告更新输入的 Hook；广告读取保留原调用后返回独立可变空数组，避免原生后续增删遇到不可变 NSArray。公众号广告列表同样返回可变数组。移除 WCAdvertiseStatMgr 元数据置空及 WCUserComment 广告身份/扩展数据改写，保留原生模型一致性。没有崩溃日志，以上是修复已识别风险，实际闪退根因与修复效果仍需设备复测；未宣称问题已经验证解决。
 - 迁移 WCAtlas“通知直达聊天”：聊天类功能单开关，默认关闭，新增 key `com.qiu7c.onewx.chat.notification-direct-chat.enabled` 并纳入配置口令。独立 NotificationDirectChat 模块复用现有两个通知响应 Hook，朋友圈自有通知优先，普通通知只接默认点击动作和 `u` 会话字段，其他动作交回原生。延迟 0.3 秒打开、启动/解锁等待最多再尝试 8 次；关闭、换号或更新通知任务取消旧跳转。WeChat 层使用 8.0.79 的 MMMsgLogicManager 按联系人跳转接口，运行时检查签名和导航状态，同会话不重复入栈。仍需单聊/群聊、冷启动、解锁、快速连续点击与通知快捷回复真机验证。

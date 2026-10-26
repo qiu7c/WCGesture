@@ -73,6 +73,8 @@
                 WCGestureMomentsTimeSettingsChanged(note.object);
                 WCGestureMomentsMonitoringSettingsChanged(note.object);
                 WCGestureChatUtilitiesSettingsChanged(note.object);
+                WCGestureChatTopBarSettingsChanged(note.object);
+                WCGestureContactInfoCardSettingsChanged(note.object);
                 WCGestureVoiceTranscriptionSettingsChanged(note.object);
                 WCGestureMessageTimeSettingsChanged(note.object);
                 WCGestureAntiRevokeSettingsChanged(note.object);

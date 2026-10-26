@@ -150,7 +150,8 @@ void WCGestureEditChatOption(UIViewController *presenter, NSDictionary *option) 
     NSString *type = option[@"type"], *key = option[@"key"], *title = option[@"title"];
     NSDictionary *previewKinds = @{ @"time-position": @(WCGesturePreviewMessageTime),
         @"revoke-position": @(WCGesturePreviewAntiRevoke),
-        @"input-rounding-position": @(WCGesturePreviewInputRounding) };
+        @"input-rounding-position": @(WCGesturePreviewInputRounding),
+        @"top-bar-position": @(WCGesturePreviewChatTopBar) };
     NSNumber *previewKind = previewKinds[type];
     if (previewKind) {
         [presenter.navigationController pushViewController:WCGestureCreatePositionEditor(previewKind.integerValue) animated:YES];

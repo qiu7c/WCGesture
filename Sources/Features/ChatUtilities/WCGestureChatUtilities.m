@@ -308,11 +308,27 @@ static UIBarButtonItem *WCChatSearchOfficialBarButton(BaseMsgContentViewControll
                                            action:NSSelectorFromString(@"wc_openChatSearch:")];
 }
 
+BOOL WCGestureChatSearchIsActive(UIViewController *controller) {
+    return [objc_getAssociatedObject(controller, &WCChatSearchActiveKey) boolValue];
+}
+
 void WCGestureChatSearchUpdate(UIViewController *controller) {
     [WCChatSearchControllers() addObject:controller];
+    if (WCGestureEnabled(WCGestureChatTopBarCapsuleEnabledKey)) {
+        UIBarButtonItem *standalone = objc_getAssociatedObject(controller, &WCChatSearchItemKey);
+        if (standalone) {
+            NSMutableArray *native = [controller.navigationItem.rightBarButtonItems mutableCopy];
+            [native removeObjectIdenticalTo:standalone];
+            controller.navigationItem.rightBarButtonItems = native;
+            objc_setAssociatedObject(controller, &WCChatSearchItemKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+        WCGestureChatTopBarUpdate(controller);
+        return;
+    }
+    WCGestureChatTopBarRestore(controller);
     UIBarButtonItem *installed = objc_getAssociatedObject(controller, &WCChatSearchItemKey);
     NSMutableArray *items = [controller.navigationItem.rightBarButtonItems mutableCopy] ?: [NSMutableArray array];
-    BOOL enabled = WCGestureEnabled(WCGestureChatSearchEnabledKey);
+    BOOL enabled = WCGestureEnabled(WCGestureChatSearchEnabledKey) && !WCGestureChatSearchIsActive(controller);
     if (!enabled) {
         if (!installed) return;
         [items removeObjectIdenticalTo:installed];
@@ -338,7 +354,9 @@ void WCGestureChatSearchUpdate(UIViewController *controller) {
 
 void WCGestureChatSearchOpen(UIViewController *controller, id sender) {
     if (!WCGestureEnabled(WCGestureChatSearchEnabledKey)) return;
+    WCGestureChatTopBarRestore(controller);
     if (!WCChatSearchOpenNative((BaseMsgContentViewController *)controller, sender)) {
+        WCGestureChatSearchUpdate(controller);
         WCShowToast(@"当前微信版本暂不支持聊天记录搜索");
     }
 }
@@ -367,6 +385,7 @@ void WCGestureChatSearchDidDismiss(id helper) {
             BaseMsgContentViewController *target = weakController;
             if (target && objc_getAssociatedObject(target, &WCChatSearchSessionKey) == session) {
                 WCChatSearchCleanup(target);
+                WCGestureChatSearchUpdate(target);
             }
         });
     }

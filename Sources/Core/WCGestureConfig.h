@@ -352,4 +352,14 @@ FOUNDATION_EXPORT NSString *const WCGestureMomentsReminderForwardVideosKey;
 FOUNDATION_EXPORT NSString *const WCGestureMomentsReminderSeenItemsKey;
 FOUNDATION_EXPORT NSString *const WCGestureMomentsInteractionStateKey;
 
+FOUNDATION_EXPORT NSString *const WCGestureChatTopBarCapsuleEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureChatGlassStyleKey;
+FOUNDATION_EXPORT NSString *const WCGestureChatGlassBlurIntensityKey;
+FOUNDATION_EXPORT NSString *const WCGestureChatTopBarAvatarSizeKey;
+FOUNDATION_EXPORT NSString *const WCGestureChatTopBarNicknameSizeKey;
+
+FOUNDATION_EXPORT NSString *const WCGestureCallConfirmEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureContactInfoCardEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureAutoCombineSendEnabledKey;
+
 NS_ASSUME_NONNULL_END

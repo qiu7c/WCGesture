@@ -124,8 +124,17 @@ static NSDictionary *WCParameter(NSString *title, NSString *key, double minimum,
     BOOL revoke = self.kind == WCGesturePreviewAntiRevoke;
     BOOL side = [NSUserDefaults.standardUserDefaults boolForKey:WCGestureMessageTimeBubbleSideKey];
     NSMutableArray *parameters = [NSMutableArray arrayWithObjects:
-        @{ @"title": @"调节项目", @"targets": @[@"时间", @"防撤回", @"圆角"] },
+        @{ @"title": @"调节项目", @"targets": @[@"时间", @"防撤回", @"圆角", @"顶栏"] },
         @{ @"title": @"预览外观", @"themes": @[@"系统", @"浅色", @"深色"] }, nil];
+    if (self.kind == WCGesturePreviewChatTopBar) {
+        [parameters addObject:@{ @"option": @{ @"title": @"胶囊顶栏", @"type": @"bool", @"key": WCGestureChatTopBarCapsuleEnabledKey } }];
+        [parameters addObject:@{ @"title": @"玻璃样式", @"segments": @[@"磨砂玻璃", @"伪液态"], @"key": WCGestureChatGlassStyleKey, @"reset": @1 }];
+        [parameters addObject:WCParameter(@"模糊强度 (%)", WCGestureChatGlassBlurIntensityKey, 20, 100, 20)];
+        [parameters addObject:WCParameter(@"头像大小", WCGestureChatTopBarAvatarSizeKey, 24, 34, 30)];
+        [parameters addObject:WCParameter(@"昵称字号", WCGestureChatTopBarNicknameSizeKey, 12, 18, 15)];
+        [parameters addObject:@{ @"option": @{ @"title": @"聊天搜索按钮", @"type": @"bool", @"key": WCGestureChatSearchEnabledKey } }];
+        self.parameters = parameters; [self.table reloadData]; [self.preview setNeedsLayout]; return;
+    }
     if (self.kind == WCGesturePreviewInputRounding) {
         [parameters addObject:@{ @"title": @"输入框高度", @"inputLines": @[@"单行", @"三行", @"五行"] }];
         [parameters addObject:@{ @"option": @{ @"title": @"聊天输入栏圆角", @"type": @"bool", @"key": WCGestureChatInputRoundingEnabledKey } }];
@@ -205,7 +214,7 @@ static NSDictionary *WCParameter(NSString *title, NSString *key, double minimum,
     } else if (parameter[@"segments"]) {
         cell.textLabel.text = parameter[@"title"];
         UISegmentedControl *segments = [[UISegmentedControl alloc] initWithItems:parameter[@"segments"]];
-        segments.selectedSegmentIndex = MIN(2, MAX(0, [NSUserDefaults.standardUserDefaults integerForKey:parameter[@"key"]]));
+        segments.selectedSegmentIndex = MIN((NSInteger)[parameter[@"segments"] count] - 1, MAX(0, [NSUserDefaults.standardUserDefaults integerForKey:parameter[@"key"]]));
         segments.tag = path.row; [segments addTarget:self action:@selector(segmented:) forControlEvents:UIControlEventValueChanged]; cell.accessoryView = segments;
     } else if (parameter[@"textKey"]) {
         cell.textLabel.text = parameter[@"title"];
