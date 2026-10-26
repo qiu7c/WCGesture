@@ -1,3 +1,4 @@
+#import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 #import "Sources/API/WCGestureInternal.h"
 
 @interface WCAutoStatusSettingsController : UITableViewController <UIDocumentPickerDelegate>
@@ -99,7 +100,7 @@ static NSDictionary *WCAutoStatusRow(NSString *title, NSString *key, NSString *k
     }
     if ([kind isEqualToString:@"image"] || [kind isEqualToString:@"video"]) {
         self.importingVideo = [kind isEqualToString:@"video"];
-        UIDocumentPickerViewController *picker = [[UIDocumentPickerViewController alloc] initWithDocumentTypes:@[self.importingVideo ? @"public.movie" : @"public.image"] inMode:UIDocumentPickerModeImport];
+        UIDocumentPickerViewController *picker = [[UIDocumentPickerViewController alloc] initForOpeningContentTypes:@[self.importingVideo ? UTTypeMovie : UTTypeImage] asCopy:YES];
         picker.delegate = self; picker.allowsMultipleSelection = NO;
         [self presentViewController:picker animated:YES completion:nil]; return;
     }
