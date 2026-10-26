@@ -63,6 +63,7 @@
 @property (nonatomic, copy) NSString *cardTitle;
 @property (nonatomic, copy) NSString *displayName;
 @property (nonatomic, copy) NSString *userName;
+@property (nonatomic, copy) NSString *account;
 @property (nonatomic, copy) NSArray<NSDictionary<NSString *, NSString *> *> *rows;
 @property (nonatomic, copy) NSArray<NSDictionary<NSString *, NSString *> *> *groups;
 @property (nonatomic, assign) BOOL showingGroups;
@@ -167,6 +168,7 @@
 - (void)styleChanged:(NSNotification *)note {
     if (!WCGestureEnabled(WCGestureContactInfoCardEnabledKey)) { [self close]; return; }
     [self updateStyle];
+    [self.table reloadData]; [self.view setNeedsLayout];
 }
 - (void)traitCollectionDidChange:(UITraitCollection *)previous {
     [super traitCollectionDidChange:previous];
@@ -207,7 +209,18 @@
         NSString *value = self.groupsAvailable ? [NSString stringWithFormat:@"%lu 个", (unsigned long)self.groups.count] : (self.groupsFinished ? @"暂不可用" : @"读取中");
         [rows addObject:@{@"title":@"共同群聊", @"value":value, @"action":@"groups"}];
     }
+    if (WCGestureEnabled(WCGestureSendConfirmationEnabledKey) &&
+        WCGestureEnabled(WCGestureSendConfirmationProfileSwitchEnabledKey) &&
+        [self.account isEqualToString:WCCurrentUserWXID()]) {
+        [rows addObject:@{@"title":@"发送前确认", @"value":@"", @"action":@"send-confirmation"}];
+    }
     return rows;
+}
+- (void)toggleSendConfirmation:(UISwitch *)sender {
+    if (!WCRefreshCachedCurrentUser() || ![self.account isEqualToString:WCCurrentUserWXID()]) {
+        [sender setOn:!sender.on animated:YES]; WCShowToast(@"账号已切换，请重新打开资料卡"); return;
+    }
+    WCGestureSendConfirmationSetProtected(self.userName, sender.on);
 }
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section { return self.displayRows.count; }
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)path {
@@ -216,6 +229,18 @@
         UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"OneWxRelatedGroup"];
         if (!cell) { cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:@"OneWxRelatedGroup"]; cell.backgroundColor = UIColor.clearColor; cell.textLabel.font = [UIFont systemFontOfSize:16]; cell.textLabel.numberOfLines = 0; }
         cell.textLabel.text = row[@"title"]; cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator; return cell;
+    }
+    if ([row[@"action"] isEqualToString:@"send-confirmation"]) {
+        UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"OneWxInfoSendConfirmation"];
+        if (!cell) cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:@"OneWxInfoSendConfirmation"];
+        cell.backgroundColor = UIColor.clearColor; cell.textLabel.text = @"发送前确认";
+        cell.textLabel.textColor = UIColor.labelColor; cell.textLabel.font = [UIFont systemFontOfSize:14];
+        cell.selectionStyle = UITableViewCellSelectionStyleNone;
+        UISwitch *toggle = [UISwitch new]; toggle.onTintColor = UIColor.systemBlueColor;
+        toggle.on = [WCGestureSendConfirmationProtectedConversations() containsObject:self.userName];
+        [toggle addTarget:self action:@selector(toggleSendConfirmation:) forControlEvents:UIControlEventValueChanged];
+        cell.accessoryView = toggle;
+        return cell;
     }
     WCInfoFieldCell *cell = [tableView dequeueReusableCellWithIdentifier:@"OneWxInfoField"];
     if (!cell) cell = [[WCInfoFieldCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:@"OneWxInfoField"];
@@ -239,12 +264,15 @@
     } else if ([row[@"action"] isEqualToString:@"groups"]) {
         self.showingGroups = YES; self.heading.text = @"共同群聊"; self.backButton.hidden = NO; self.avatar.hidden = YES;
         [self.view setNeedsLayout]; [self updateGroupStatus]; [self.table reloadData];
+    } else if ([row[@"action"] isEqualToString:@"send-confirmation"]) {
+        return;
     } else { UIPasteboard.generalPasteboard.string = row[@"value"]; UIAccessibilityPostNotification(UIAccessibilityAnnouncementNotification, @"已复制"); }
 }
 @end
 
 UIViewController *WCGestureCreateContactInfoCard(NSString *title, NSString *name, NSString *userName, NSArray<NSDictionary<NSString *,NSString *> *> *rows) {
     WCContactInfoCardController *card = [WCContactInfoCardController new]; card.cardTitle = title; card.displayName = name; card.userName = userName; card.rows = rows;
+    if (WCRefreshCachedCurrentUser()) card.account = WCCurrentUserWXID();
     card.modalPresentationStyle = UIModalPresentationOverFullScreen; card.modalTransitionStyle = UIModalTransitionStyleCrossDissolve;
     return card;
 }

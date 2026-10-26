@@ -1,5 +1,10 @@
 #import "Sources/API/WCGestureInternal.h"
 
+NSString *const WCGestureSendConfirmationEnabledKey = @"com.qiu7c.onewx.chat.send-confirmation.enabled";
+NSString *const WCGestureSendConfirmationUsersKey = @"com.qiu7c.onewx.chat.send-confirmation.users";
+NSString *const WCGestureSendConfirmationPauseSecondsKey = @"com.qiu7c.onewx.chat.send-confirmation.pause-seconds";
+NSString *const WCGestureSendConfirmationProfileSwitchEnabledKey = @"com.qiu7c.onewx.chat.send-confirmation.profile-switch";
+
 NSString *const WCGestureImageEditQuickSendEnabledKey = @"com.qiu7c.onewx.chat.image-edit-quick-send.enabled";
 NSString *const WCGestureAutoSpeakerphoneEnabledKey = @"com.qiu7c.onewx.chat.auto-speakerphone.enabled";
 
@@ -338,6 +343,10 @@ void WCGestureRegisterDefaults(void) {
             WCGestureCallConfirmEnabledKey: @NO,
             WCGestureContactInfoCardEnabledKey: @NO,
             WCGestureAutoCombineSendEnabledKey: @NO,
+            WCGestureSendConfirmationEnabledKey: @NO,
+            WCGestureSendConfirmationUsersKey: @{},
+            WCGestureSendConfirmationPauseSecondsKey: @60,
+            WCGestureSendConfirmationProfileSwitchEnabledKey: @YES,
             WCGestureImageEditQuickSendEnabledKey: @NO,
             WCGestureAutoSpeakerphoneEnabledKey: @NO,
             WCGestureSettingsEntryLocationKey: @-1, // Automatic: manager if available, otherwise Me.

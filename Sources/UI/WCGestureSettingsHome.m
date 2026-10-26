@@ -72,7 +72,12 @@ static NSArray<NSNumber *> *WCHomeCategoryOrder(void) {
 
 @implementation WCGestureSettingsController
 - (instancetype)init {
-    return [super initWithStyle:UITableViewStylePlain];
+    return [self initWithStyle:UITableViewStylePlain];
+}
+- (instancetype)initWithStyle:(UITableViewStyle)style {
+    self = [super initWithStyle:UITableViewStylePlain];
+    if (self) self.hidesBottomBarWhenPushed = YES;
+    return self;
 }
 - (void)viewDidLoad {
     [super viewDidLoad];

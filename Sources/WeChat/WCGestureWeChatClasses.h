@@ -208,4 +208,9 @@ NS_ASSUME_NONNULL_BEGIN
 @interface SharePreConfirmSheetView : NSObject
 @end
 
+@interface BaseMsgContentLogicController : NSObject
+@end
+@interface WeixinContentLogicController : BaseMsgContentLogicController
+@end
+
 NS_ASSUME_NONNULL_END

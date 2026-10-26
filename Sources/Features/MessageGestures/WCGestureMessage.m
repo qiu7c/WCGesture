@@ -563,7 +563,7 @@ static BOOL WCRepeatPlainTextMessageFallback(CommonMessageCellView *cell) {
     return YES;
 }
 
-static BOOL WCRepeatMessage(CommonMessageCellView *cell) {
+static BOOL WCRepeatMessageNow(CommonMessageCellView *cell) {
     id source = WCMessageWrapForCell(cell);
     NSString *chatName = WCSessionForMessage(source);
     NSInteger messageType = [WCTweakSafeValue(source, @"m_uiMessageType") integerValue];
@@ -605,6 +605,15 @@ static BOOL WCRepeatMessage(CommonMessageCellView *cell) {
         }
     }
     return WCRepeatPlainTextMessageFallback(cell);
+}
+
+static BOOL WCRepeatMessage(CommonMessageCellView *cell) {
+    __weak CommonMessageCellView *weakCell = cell;
+    if (WCGestureSendConfirmationRepeatIfNeeded(cell, WCSessionForMessage(WCMessageWrapForCell(cell)), ^{
+        CommonMessageCellView *source = weakCell;
+        if (source && !WCRepeatMessageNow(source)) WCShowToast(@"这条消息暂时无法复读");
+    })) return YES;
+    return WCRepeatMessageNow(cell);
 }
 
 BOOL WCGestureRepeatMessage(CommonMessageCellView *cell) { return WCRepeatMessage(cell); }
@@ -797,6 +806,7 @@ BaseMsgContentViewController *WCVisibleChatControllerGet(void) {
 
 void WCSetVisibleChatController(BaseMsgContentViewController *controller) {
     WCVisibleChatControllerStorage = controller;
+    if (controller) WCGestureSendConfirmationTrackChat(controller);
 }
 
 #pragma mark - Gesture handlers (called from the Logos hooks)

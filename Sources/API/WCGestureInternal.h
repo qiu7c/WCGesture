@@ -65,3 +65,5 @@
 
 #import "Sources/API/WCGestureImageQuickSendAPI.h"
 #import "Sources/API/WCGestureAutoSpeakerphoneAPI.h"
+
+#import "Sources/API/WCGestureSendConfirmationAPI.h"

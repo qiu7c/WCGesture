@@ -76,6 +76,7 @@
                 WCGestureAutoStatusSettingsChanged(note.object);
                 WCGestureSettingsEntrySettingsChanged(note.object);
                 WCGestureImageQuickSendSettingsChanged(note.object);
+                WCGestureSendConfirmationSettingsChanged(note.object);
                 WCGestureChatUtilitiesSettingsChanged(note.object);
                 WCGestureChatTopBarSettingsChanged(note.object);
                 WCGestureContactInfoCardSettingsChanged(note.object);

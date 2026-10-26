@@ -390,4 +390,9 @@ FOUNDATION_EXPORT NSString *const WCGestureSettingsEntryLocationKey;
 FOUNDATION_EXPORT NSString *const WCGestureImageEditQuickSendEnabledKey;
 FOUNDATION_EXPORT NSString *const WCGestureAutoSpeakerphoneEnabledKey;
 
+FOUNDATION_EXPORT NSString *const WCGestureSendConfirmationEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureSendConfirmationUsersKey;
+FOUNDATION_EXPORT NSString *const WCGestureSendConfirmationPauseSecondsKey;
+FOUNDATION_EXPORT NSString *const WCGestureSendConfirmationProfileSwitchEnabledKey;
+
 NS_ASSUME_NONNULL_END
