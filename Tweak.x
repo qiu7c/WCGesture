@@ -73,6 +73,8 @@
                 WCGestureMomentsImageCornerSettingsChanged(note.object);
                 WCGestureMomentsTimeSettingsChanged(note.object);
                 WCGestureMomentsMonitoringSettingsChanged(note.object);
+                WCGestureAutoStatusSettingsChanged(note.object);
+                WCGestureSettingsEntrySettingsChanged(note.object);
                 WCGestureChatUtilitiesSettingsChanged(note.object);
                 WCGestureChatTopBarSettingsChanged(note.object);
                 WCGestureContactInfoCardSettingsChanged(note.object);

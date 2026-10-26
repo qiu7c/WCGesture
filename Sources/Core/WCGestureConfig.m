@@ -1,5 +1,7 @@
 #import "Sources/API/WCGestureInternal.h"
 
+NSString *const WCGestureSettingsEntryLocationKey = @"com.qiu7c.onewx.plugin.entry-location";
+
 NSString *const WCGestureEmoticonCornerEnabledKey = @"com.qiu7c.onewx.interface.emoticon-corner.enabled";
 NSString *const WCGestureEmoticonCornerRadiusKey = @"com.qiu7c.onewx.interface.emoticon-corner.radius";
 NSString *const WCGestureChatImageCornerEnabledKey = @"com.qiu7c.onewx.interface.chat-image-corner.enabled";
@@ -44,6 +46,18 @@ NSString *const WCGestureMomentsReminderForwardVideosKey = @"com.qiu7c.onewx.mom
 NSString *const WCGestureMomentsReminderSeenItemsKey = @"com.qiu7c.onewx.moments.reminder.seen-items";
 NSString *const WCGestureMomentsInteractionStateKey = @"com.qiu7c.onewx.moments.interaction-reminder.state";
 NSString *const WCGestureNotificationDirectChatEnabledKey = @"com.qiu7c.onewx.chat.notification-direct-chat.enabled";
+NSString *const WCGestureAutoStatusEnabledKey = @"com.qiu7c.onewx.automation.auto-status.enabled";
+NSString *const WCGestureAutoStatusHourKey = @"com.qiu7c.onewx.automation.auto-status.hour";
+NSString *const WCGestureAutoStatusIconTypeKey = @"com.qiu7c.onewx.automation.auto-status.icon-type";
+NSString *const WCGestureAutoStatusIconIDKey = @"com.qiu7c.onewx.automation.auto-status.icon-id";
+NSString *const WCGestureAutoStatusIconDescriptionKey = @"com.qiu7c.onewx.automation.auto-status.icon-description";
+NSString *const WCGestureAutoStatusTextModeKey = @"com.qiu7c.onewx.automation.auto-status.text-mode";
+NSString *const WCGestureAutoStatusTextKey = @"com.qiu7c.onewx.automation.auto-status.text";
+NSString *const WCGestureAutoStatusTextURLKey = @"com.qiu7c.onewx.automation.auto-status.text-url";
+NSString *const WCGestureAutoStatusMediaModeKey = @"com.qiu7c.onewx.automation.auto-status.media-mode";
+NSString *const WCGestureAutoStatusImageURLKey = @"com.qiu7c.onewx.automation.auto-status.image-url";
+NSString *const WCGestureAutoStatusVideoURLKey = @"com.qiu7c.onewx.automation.auto-status.video-url";
+NSString *const WCGestureAutoStatusLastAttemptKey = @"com.qiu7c.onewx.automation.auto-status.last-attempt";
 NSString *const WCGestureAutoDeviceLoginEnabledKey = @"com.qiu7c.onewx.automation.device-login.enabled";
 NSString *const WCGestureVoiceTranscriptionEnabledKey = @"com.qiu7c.onewx.chat.voice-transcription.enabled";
 NSString *const WCGestureVoiceTranscriptionIgnoreGroupKey = @"com.qiu7c.onewx.chat.voice-transcription.ignore-group";
@@ -305,7 +319,7 @@ void WCGestureRegisterDefaults(void) {
             WCGestureMomentsTimeFormatKey: @"yyyy-MM-dd HH:mm:ss",
             WCGestureAutoOriginalEnabledKey: @NO,
             WCGestureChatTopBarCapsuleEnabledKey: @NO,
-            WCGestureChatGlassStyleKey: @1,
+            WCGestureChatGlassStyleKey: @0, // Legacy share-code compatibility; renderer is frosted only.
             WCGestureEmoticonCornerEnabledKey: @NO,
             WCGestureEmoticonCornerRadiusKey: @8.0,
             WCGestureChatImageCornerEnabledKey: @NO,
@@ -321,6 +335,19 @@ void WCGestureRegisterDefaults(void) {
             WCGestureCallConfirmEnabledKey: @NO,
             WCGestureContactInfoCardEnabledKey: @NO,
             WCGestureAutoCombineSendEnabledKey: @NO,
+            WCGestureSettingsEntryLocationKey: @-1, // Automatic: manager if available, otherwise Me.
+            WCGestureAutoStatusEnabledKey: @NO,
+            WCGestureAutoStatusHourKey: @8,
+            WCGestureAutoStatusIconTypeKey: @"做好事",
+            WCGestureAutoStatusIconIDKey: @"1074",
+            WCGestureAutoStatusIconDescriptionKey: @"",
+            WCGestureAutoStatusTextModeKey: @0,
+            WCGestureAutoStatusTextKey: @"",
+            WCGestureAutoStatusTextURLKey: @"",
+            WCGestureAutoStatusMediaModeKey: @0,
+            WCGestureAutoStatusImageURLKey: @"",
+            WCGestureAutoStatusVideoURLKey: @"",
+            WCGestureAutoStatusLastAttemptKey: @{},
             WCGestureAutoDeviceLoginEnabledKey: @NO,
             WCGestureNotificationDirectChatEnabledKey: @NO,
             WCGestureBackgroundKeepAliveEnabledKey: @NO,

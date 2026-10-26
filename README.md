@@ -6,7 +6,7 @@ One Wx is a WeChat enhancement plugin that grew out of WCGesture (originally ext
 
 ## Features
 
-The home page has six categories: 聊天类功能 / 手势类功能 / 朋友圈功能 / 界面类功能 / 禁用类功能 / 插件类配置.
+The home page has seven categories: 聊天类功能 / 手势类功能 / 朋友圈功能 / 界面类功能 / 禁用类功能 / 增强类功能 / 插件类配置.
 The search bar lists first-level feature entries only, including disabled features, and opens their group without enabling them. Nested settings stay inside their feature pages.
 
 **聊天工具 (Chat tools)**:
@@ -49,20 +49,20 @@ The search bar lists first-level feature entries only, including disabled featur
 ## Latest WCAtlas migrations (device validation pending)
 
 - Interface cleanup: hide group title tails, screenshot sharing overlays, and selected Me-page entries. Reopen the affected page after changing title/entry visibility.
-- Moments: image rounding (0–40pt, default 8) and precise publication dates with a custom format. Rounding now covers the native inline video container, native grid media and the contact-profile album entrance. It preserves each target’s original layers with one owner, reapplies after private layout, and excludes avatars/text/fullscreen players; the supplied album hierarchy now permits media inside the photo/video cells’ UIButton wrappers and clips puzzle/grid thumbnails as an outer frame. The contact-profile video-channel entrance also rounds direct cover thumbnails from its native coverStackView, preserving sibling identity/authentication content. Device verification remains pending.
+- Moments: image rounding (0–40pt, default 8) and precise publication dates with a custom format. Rounding now covers the native inline video container, native grid media and the contact-profile album entrance. It preserves each target’s original layers with one owner, reapplies after private layout, and excludes avatars/text/fullscreen players; the supplied album hierarchy now permits media inside the photo/video cells’ UIButton wrappers and rounds each grid thumbnail separately, including three-thumbnail album rows, while keeping each individual puzzle thumbnail clipped as one tile. The contact-profile video-channel entrance also rounds direct cover thumbnails from its native coverStackView, preserving sibling identity/authentication content. Device verification remains pending.
 - Chat: native search button through MMUICommonUtil and the current chat’s MsgSearchHelper/WCSearcher, with cancel/return cleanup (latest correction awaits device validation); quote location with image/video filters; a +1 menu item sharing the existing repeat pipeline and menu management.
 - Native original-quality selection in asset picker/preview; auto transcription for visible voice cells, with private/group/self filters and reuse-safe deferred requests.
 - New feature switches default to off. Auto transcription ignores self-sent voices by default. Configuration share codes preserve old aliases and add 64 setting aliases; runtime records are excluded.
 
 ## Automatic device login confirmation (device validation pending)
 
-“插件类配置 → 自动确认登录” confirms computer/tablet device-login cards through WeChat’s native confirm action. Off by default; enabling skips manual confirmation. Detached cards, disabled/error states and replaced login info are checked again before confirmation. Each login-info object is attempted once per card; a failure remains available for manual handling. The setting is included in configuration share codes.
+“增强类功能 → 自动确认登录” confirms computer/tablet device-login cards through WeChat’s native confirm action. Off by default; enabling skips manual confirmation. Detached cards, disabled/error states and replaced login info are checked again before confirmation. Each login-info object is attempted once per card; a failure remains available for manual handling. The setting is included in configuration share codes.
 
 ## Moments monitoring and background keep-alive (device validation pending)
 
 - 朋友圈功能 → 朋友圈特别关心: searchable friend selection with native avatars, 30–3600 second checks (default 60), an initial baseline and per-account deduplication. Optional text forwarding to yourself or File Transfer Assistant; images and videos are separate opt-ins, including the Live Photo video branch.
 - 朋友圈功能 → 朋友圈互动通知: native unread-count/message observation for likes and comments, optional details and native Moments initialization. Foreground banner queue and background local notifications open Moments when tapped.
-- 插件类配置 → 后台保活: native background tasks plus on-demand looping silent audio, with cleanup on foreground entry or disable. This remains an independent switch; enabling reminders does not enable keep-alive.
+- 增强类功能 → 后台保活: native background tasks plus on-demand looping silent audio, with cleanup on foreground entry or disable. This remains an independent switch; enabling reminders does not enable keep-alive.
 - All three main switches and forwarding switches default to off. Runtime state is excluded from share codes. Background execution depends on iOS and cannot survive process termination; detection, notifications, media sending and audio coexistence require device testing.
 
 ## Small chat tools and contact information (device validation pending)
@@ -201,3 +201,27 @@ WCAtlas setting-by-setting coverage, runtime behavior and device-validation chec
 [`docs/WCATLAS_PARITY.md`](docs/WCATLAS_PARITY.md).
 
 See WCAtlas for upstream attribution. This extraction is derivative of WCAtlas by qiu7c.
+
+## Automatic personal status updates (device validation pending)
+
+- 增强类功能 → 自动更新微信状态: daily hour (0–23, default 08:00), native status icon or a custom icon ID/description, optional custom text or a plain-text API, and local/image-API/video-API backgrounds. Off by default; the “立即更新” action bypasses the schedule.
+- Reconstructed from static analysis of the user-provided PKC 0.9-9-Beta2 package, using WeChat's native TextStatePublishViewController, image callback and SightDraft video path. Only the requested feature is recreated; no package executable, licensing code or bundled private network service is included.
+- The existing careEnoughForTheLiving callback checks the local calendar day and hour. Each account records an attempt before publishing, so an automatic failure does not retry that day; manual update remains available. This follows the original attempt timing, with per-account isolation.
+- Background imports run outside the UI thread, are copied into managed local storage and are excluded from share codes. Importing an image/video replaces the other local background type. API fields accept user-supplied HTTP/HTTPS URLs; text APIs return UTF-8 plain text, media APIs return image/video bytes.
+- Native compatibility, server acceptance, media processing and daily execution require device verification. Static checks do not confirm successful publication or guaranteed background execution. See [static analysis notes](docs/PKC_AUTO_STATUS_ANALYSIS.md).
+
+Chat image/video rounding now clips the dedicated message media container, including native backgrounds, video duration overlays and playback controls, using the existing chat-image radius setting. It resolves the native image/thumb slot and excludes the full message row, avatars and timestamps; device verification is pending.
+
+The existing 朋友圈圆角 setting also rounds the individual 发表 / 私密发表 album entry buttons. 聊天媒体圆角 is the image/video rounding setting label; existing keys and saved values remain compatible.
+
+The shared full-page preview now includes avatar rounding. Its editing toolbar remains visible with or without capsule navigation, opens the matching panel on entry and uses named adjustment targets. Preview message avatars follow the layout percentage (42pt × scale); actual chat avatar dimensions are unchanged. Glass rendering is frosted only; the old style setting is retained solely for config compatibility. Blur intensity is 0–100%, with opacity controlled separately; device verification remains pending.
+
+## Settings entry locations and profile clearing (device validation pending)
+
+- 插件类配置 → 设置入口 uses a three-way segmented control: 我的页面 / 插件管理 / 微信设置. The initial automatic choice prefers a compatible WCPluginsMgr; when unavailable, the Me-page option is selected. Explicit settings-page selection remains available without the manager. Entries follow the configured plugin name and only one location is maintained.
+- Manager registration passes the settings controller's class-name string, with deduplication/removal limited to One Wx models. Native page rows are individually marked and rebuilt as needed. The settings-page technique was checked against [Mieing/WCTestHook](https://github.com/Mieing/WCTestHook); its MIT notice is retained in docs/THIRD_PARTY.
+- 清空地区与性别信息 is a confirmed action, not a switch: it clears the native profile's country/province/city, attempts sex=0 and calls WeChat's native Save. The source plugin itself states sex clearing may be unsupported. One Wx reports that the save was invoked, without claiming a server-acknowledged result. No action runs merely from installing the plugin or opening settings.
+
+增强类功能 contains 自动确认登录, 自动更新微信状态, 后台保活 and 清空地区与性别信息. 插件类配置 retains entry location, plugin name, haptics, AI 配置, 翻译配置 and configuration import/export. Existing settings and collapsed states are preserved.
+
+Payment/receive-code shortcuts are currently removed. The retired global-action value 11 is reserved and old two-/three-finger assignments are cleared to 不设置 during gesture synchronization. Personal contact QR and scanning remain available.

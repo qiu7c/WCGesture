@@ -851,6 +851,18 @@ static NSDictionary<NSString *, NSString *> *WCConfigShareKeys(void) {
         WCGestureCallConfirmEnabledKey,
         WCGestureContactInfoCardEnabledKey,
         WCGestureAutoCombineSendEnabledKey,
+        WCGestureSettingsEntryLocationKey,
+        WCGestureAutoStatusEnabledKey,
+        WCGestureAutoStatusHourKey,
+        WCGestureAutoStatusIconTypeKey,
+        WCGestureAutoStatusIconIDKey,
+        WCGestureAutoStatusIconDescriptionKey,
+        WCGestureAutoStatusTextModeKey,
+        WCGestureAutoStatusTextKey,
+        WCGestureAutoStatusTextURLKey,
+        WCGestureAutoStatusMediaModeKey,
+        WCGestureAutoStatusImageURLKey,
+        WCGestureAutoStatusVideoURLKey,
         WCGestureAutoDeviceLoginEnabledKey,
         WCGestureNotificationDirectChatEnabledKey,
         WCGestureBackgroundKeepAliveEnabledKey,
@@ -1009,6 +1021,7 @@ typedef NS_ENUM(NSInteger, WCRowKind) {
     WCRowKindAIPolishPreset,  // tap → pick the preset used by AI 润色
     WCRowKindAIReset,       // tap → clear AI endpoint/model/key/presets
     WCRowKindAITest,        // tap → test the AI endpoint
+    WCRowKindEntryLocation, // three-way entry location selector
     WCRowKindPluginName,    // tap → plugin name editor
     WCRowKindHapticStyle,   // tap → haptic style picker
     WCRowKindCustomPages, // tap → custom page class name editor
@@ -1109,7 +1122,6 @@ static NSArray<NSDictionary *> *WCGlobalActionOptions(void) {
         @{ @"title": @"朋友圈", @"value": @(WCGlobalActionMoments) },
         @{ @"title": @"添加朋友", @"value": @(WCGlobalActionAddFriend) },
         @{ @"title": @"我的二维码", @"value": @(WCGlobalActionMyQRCode) },
-        @{ @"title": @"付款码", @"value": @(WCGlobalActionPayCode) },
         @{ @"title": @"自定义页面", @"value": @(WCGlobalActionCustomPage) },
         @{ @"title": @"截图", @"value": @(WCGlobalActionScreenshot) },
         @{ @"title": @"返回上一页", @"value": @(WCGlobalActionBack) },
@@ -1145,6 +1157,7 @@ static void WCPresentGlobalActionPicker(__unused UIViewController *presenter, NS
 static NSString *WCRowDetailText(WCRow *row) {
     NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
     switch (row.kind) {
+        case WCRowKindEntryLocation: return @"";
         case WCRowKindChatOption: return WCGestureChatOptionDetail(row.chatOption);
         case WCRowKindSwitch:
             return [d boolForKey:row.defaultsKey] ? @"开" : @"关";
@@ -1408,6 +1421,7 @@ static NSString *WCRowDetailText(WCRow *row) {
             case WCGestureCategoryMoments: self.title = @"朋友圈功能"; break;
             case WCGestureCategoryInterface: self.title = @"界面类功能"; break;
             case WCGestureCategoryDisabled: self.title = @"禁用类功能"; break;
+            case WCGestureCategoryEnhancements: self.title = @"增强类功能"; break;
             default: self.title = @"插件类配置"; break;
         }
         [self rebuildRows];
@@ -1433,7 +1447,7 @@ static NSString *WCRowDetailText(WCRow *row) {
 
 + (NSArray<NSDictionary *> *)searchEntries {
     NSMutableArray *entries = [NSMutableArray array];
-    for (NSInteger category = WCGestureCategoryChat; category <= WCGestureCategoryPlugin; category++) {
+    for (NSInteger category = WCGestureCategoryChat; category < WCGestureCategoryCount; category++) {
         WCGestureDetailController *detail = [[self alloc] initWithCategory:category];
         detail.searchIndexMode = YES;
         [detail rebuildRows];
@@ -1715,20 +1729,31 @@ static NSString *WCRowDetailText(WCRow *row) {
         [sections addObject:@[WCSwitchRow(@"去除所有分割线", WCHideSeparatorLinesKey)]];
         [collapsible addObject:@NO];
         [collapseKeys addObject:[prefix stringByAppendingString:@".enhance.separators"]];
+    } else if (self.category == WCGestureCategoryEnhancements) {
+        [sections addObject:@[WCSwitchRow(@"自动确认登录", WCGestureAutoDeviceLoginEnabledKey)]];
+        [collapsible addObject:@NO];
+        [collapseKeys addObject:[prefix stringByAppendingString:@".automation.device-login"]];
+        WCRow *autoStatus = WCPlainRow(@"自动更新微信状态", WCRowKindChatOption);
+        autoStatus.chatOption = @{@"title":autoStatus.title, @"type":@"auto-status", @"key":@""};
+        [sections addObject:@[autoStatus]];
+        [collapsible addObject:@NO];
+        [collapseKeys addObject:[prefix stringByAppendingString:@".automation.auto-status"]];
+        [sections addObject:@[WCSwitchRow(@"后台保活", WCGestureBackgroundKeepAliveEnabledKey)]];
+        [collapsible addObject:@NO];
+        [collapseKeys addObject:[prefix stringByAppendingString:@".background.keep-alive"]];
+        WCRow *clearProfile = WCPlainRow(@"清空地区与性别信息", WCRowKindChatOption);
+        clearProfile.chatOption = @{@"title":clearProfile.title, @"type":@"clear-profile", @"key":@""};
+        [sections addObject:@[clearProfile]]; [collapsible addObject:@NO];
+        [collapseKeys addObject:[prefix stringByAppendingString:@".profile.clear-region-gender"]];
     } else {
-        // 插件设置
+        // Plugin configuration only; functional enhancements have their own category.
         NSMutableArray *plugin = [NSMutableArray array];
+        [plugin addObject:WCPlainRow(@"设置入口", WCRowKindEntryLocation)];
         [plugin addObject:WCPlainRow(@"插件名称", WCRowKindPluginName)];
         [plugin addObject:WCPlainRow(@"震感强度", WCRowKindHapticStyle)];
         [sections addObject:plugin];
         [collapsible addObject:@NO];
         [collapseKeys addObject:[prefix stringByAppendingString:@".plugin"]];
-        [sections addObject:@[WCSwitchRow(@"自动确认登录", WCGestureAutoDeviceLoginEnabledKey)]];
-        [collapsible addObject:@NO];
-        [collapseKeys addObject:[prefix stringByAppendingString:@".automation.device-login"]];
-        [sections addObject:@[WCSwitchRow(@"后台保活", WCGestureBackgroundKeepAliveEnabledKey)]];
-        [collapsible addObject:@NO];
-        [collapseKeys addObject:[prefix stringByAppendingString:@".background.keep-alive"]];
         NSMutableArray *ai = [NSMutableArray array];
         [ai addObject:WCSwitchRow(@"AI 配置", WCGestureAIEnabledKey)];
         if ((self.searchIndexMode || [d boolForKey:WCGestureAIEnabledKey])) {
@@ -1757,7 +1782,7 @@ static NSString *WCRowDetailText(WCRow *row) {
         [collapsible addObject:@YES];
         [collapseKeys addObject:[prefix stringByAppendingString:@".ai"]];
         NSMutableArray *translate = [NSMutableArray array];
-        [translate addObject:WCSwitchRow(@"翻译", WCTranslateEnabledKey)];
+        [translate addObject:WCSwitchRow(@"翻译配置", WCTranslateEnabledKey)];
         if ((self.searchIndexMode || [d boolForKey:WCTranslateEnabledKey])) {
             [translate addObject:WCPlainRow(@"翻译引擎", WCRowKindTranslateEngine)];
             [translate addObject:WCPlainRow(@"互译语言", WCRowKindTranslatePair)];
@@ -1878,7 +1903,15 @@ static NSString *WCRowDetailText(WCRow *row) {
         foldArrow.contentMode = UIViewContentModeScaleAspectFit;
         foldArrow.frame = CGRectMake(0, 0, 12 * scale, 16 * scale);
     }
-    if (row.kind == WCRowKindSwitch) {
+    if (row.kind == WCRowKindEntryLocation) {
+        UISegmentedControl *segments = [[UISegmentedControl alloc] initWithItems:@[@"我的页面", @"插件管理", @"微信设置"]];
+        segments.frame = CGRectMake(0,0,240 * scale,32 * scale);
+        [segments setTitleTextAttributes:@{NSFontAttributeName:[UIFont systemFontOfSize:12 * scale]} forState:UIControlStateNormal];
+        [segments setEnabled:WCGestureSettingsEntryManagerAvailable() forSegmentAtIndex:1];
+        segments.selectedSegmentIndex = WCGestureSettingsEntryResolvedLocation();
+        [segments addTarget:self action:@selector(entryLocationChanged:) forControlEvents:UIControlEventValueChanged];
+        cell.accessoryView = segments;
+    } else if (row.kind == WCRowKindSwitch) {
         UISwitch *sw = [[UISwitch alloc] init];
         sw.onTintColor = UIColor.systemBlueColor;
         [sw addTarget:self action:@selector(handleSwitch:) forControlEvents:UIControlEventValueChanged];
@@ -1903,6 +1936,15 @@ static NSString *WCRowDetailText(WCRow *row) {
     return cell;
 }
 
+- (void)entryLocationChanged:(UISegmentedControl *)segments {
+    NSInteger location = segments.selectedSegmentIndex;
+    if (location < 0 || location > 2) return;
+    if (location == WCGestureSettingsEntryManager && !WCGestureSettingsEntryManagerAvailable()) {
+        location = WCGestureSettingsEntryMe; segments.selectedSegmentIndex = location;
+    }
+    WCSetInteger(location, WCGestureSettingsEntryLocationKey);
+}
+
 - (void)handleSwitch:(UISwitch *)sw {
     NSInteger section = sw.tag / 10000;
     NSInteger rowIdx = sw.tag % 10000;
@@ -1923,6 +1965,7 @@ static NSString *WCRowDetailText(WCRow *row) {
     }
     WCRow *row = self.sections[section][indexPath.row];
     switch (row.kind) {
+        case WCRowKindEntryLocation: break;
         case WCRowKindMomentsReminderUsers:
             [self.navigationController pushViewController:WCGestureCreateMomentsFriendPicker() animated:YES];
             break;
@@ -2079,33 +2122,5 @@ void WCGesturePresentSettings(UIViewController *presenter) {
     } else {
         UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:vc];
         [presenter presentViewController:nav animated:YES completion:nil];
-    }
-}
-
-#pragma mark - WCPluginsMgr registration
-
-void WCGestureRegisterEntry(void) {
-    Class mgrClass = NSClassFromString(@"WCPluginsMgr");
-    if (!mgrClass) return;
-    SEL sharedSelector = sel_registerName("sharedInstance");
-    if (![mgrClass respondsToSelector:sharedSelector]) return;
-    id mgr = ((id (*)(id, SEL))objc_msgSend)(mgrClass, sharedSelector);
-    if (!mgr) return;
-
-    // Register a controller-based entry. WeChat instantiates the controller
-    // by the class name string we pass here. Title is user-customizable.
-    NSString *pluginName = [[NSUserDefaults standardUserDefaults] stringForKey:WCPluginNameKey] ?: @"One Wx";
-    SEL registerController = sel_registerName("registerControllerWithTitle:version:controller:");
-    if ([mgr respondsToSelector:registerController]) {
-        ((void (*)(id, SEL, id, id, id))objc_msgSend)(mgr, registerController,
-            pluginName, @"1.0.0", NSStringFromClass([WCGestureSettingsController class]));
-        return;
-    }
-
-    // Older API: a single switch row controlling message gestures.
-    SEL registerSwitch = sel_registerName("registerSwitchWithTitle:key:");
-    if ([mgr respondsToSelector:registerSwitch]) {
-        ((void (*)(id, SEL, id, id))objc_msgSend)(mgr, registerSwitch,
-            pluginName, WCReplySwipeEnabledKey);
     }
 }

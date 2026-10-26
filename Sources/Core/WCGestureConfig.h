@@ -297,7 +297,7 @@ typedef NS_ENUM(NSInteger, WCGlobalAction) {
     WCGlobalActionAddFriend = 8,    // 添加朋友
     WCGlobalActionCustomPage = 9,   // 前往自定义页面
     WCGlobalActionMyQRCode = 10,    // 我的二维码
-    WCGlobalActionPayCode = 11,     // 付款码
+    WCGlobalActionReserved11 = 11, // Retired payment-code action. Keep this value unused.
 };
 
 /// Copies settings stored under the legacy WCGesture key namespace into the
@@ -370,5 +370,21 @@ FOUNDATION_EXPORT NSString *const WCGestureEmoticonCornerEnabledKey;
 FOUNDATION_EXPORT NSString *const WCGestureEmoticonCornerRadiusKey;
 FOUNDATION_EXPORT NSString *const WCGestureChatImageCornerEnabledKey;
 FOUNDATION_EXPORT NSString *const WCGestureChatImageCornerRadiusKey;
+
+// Automatic personal status publishing. LastAttempt is runtime state, excluded from share codes.
+FOUNDATION_EXPORT NSString *const WCGestureAutoStatusEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureAutoStatusHourKey;
+FOUNDATION_EXPORT NSString *const WCGestureAutoStatusIconTypeKey;
+FOUNDATION_EXPORT NSString *const WCGestureAutoStatusIconIDKey;
+FOUNDATION_EXPORT NSString *const WCGestureAutoStatusIconDescriptionKey;
+FOUNDATION_EXPORT NSString *const WCGestureAutoStatusTextModeKey;
+FOUNDATION_EXPORT NSString *const WCGestureAutoStatusTextKey;
+FOUNDATION_EXPORT NSString *const WCGestureAutoStatusTextURLKey;
+FOUNDATION_EXPORT NSString *const WCGestureAutoStatusMediaModeKey;
+FOUNDATION_EXPORT NSString *const WCGestureAutoStatusImageURLKey;
+FOUNDATION_EXPORT NSString *const WCGestureAutoStatusVideoURLKey;
+FOUNDATION_EXPORT NSString *const WCGestureAutoStatusLastAttemptKey;
+
+FOUNDATION_EXPORT NSString *const WCGestureSettingsEntryLocationKey;
 
 NS_ASSUME_NONNULL_END

@@ -1,5 +1,11 @@
 #import "Sources/API/WCGestureInternal.h"
 
+// Keep stored category identifiers stable; enhancements precede plugin config visually.
+static NSArray<NSNumber *> *WCHomeCategoryOrder(void) {
+    return @[@(WCGestureCategoryChat), @(WCGestureCategoryGestures), @(WCGestureCategoryMoments),
+        @(WCGestureCategoryInterface), @(WCGestureCategoryDisabled), @(WCGestureCategoryEnhancements), @(WCGestureCategoryPlugin)];
+}
+
 @interface WCSettingsHomeCard : UITableViewCell
 @property (nonatomic, strong) UIView *card;
 @property (nonatomic, strong) UIView *iconBackground;
@@ -126,7 +132,7 @@
     [self.tableView reloadData];
 }
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
-    return self.isSearching ? 1 : 6;
+    return self.isSearching ? 1 : WCHomeCategoryOrder().count;
 }
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
     return self.isSearching ? self.results.count : 1;
@@ -134,10 +140,10 @@
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     WCSettingsHomeCard *cell = [tableView dequeueReusableCellWithIdentifier:@"OneWxHome"];
     if (!cell) cell = [[WCSettingsHomeCard alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:@"OneWxHome"];
-    NSArray *titles = @[@"聊天类功能", @"手势类功能", @"朋友圈功能", @"界面类功能", @"禁用类功能", @"插件类配置"];
-    NSArray *symbols = @[@"bubble.left.and.bubble.right", @"hand.tap", @"heart", @"rectangle.3.offgrid", @"nosign", @"gearshape"];
-    NSArray *colors = @[UIColor.systemBlueColor, UIColor.systemGreenColor, UIColor.systemPinkColor, UIColor.systemPurpleColor, UIColor.systemRedColor, UIColor.systemOrangeColor];
-    NSInteger category = self.isSearching ? [self.results[indexPath.row][@"category"] integerValue] : indexPath.section;
+    NSArray *titles = @[@"聊天类功能", @"手势类功能", @"朋友圈功能", @"界面类功能", @"禁用类功能", @"插件类配置", @"增强类功能"];
+    NSArray *symbols = @[@"bubble.left.and.bubble.right", @"hand.tap", @"heart", @"rectangle.3.offgrid", @"nosign", @"gearshape", @"sparkles"];
+    NSArray *colors = @[UIColor.systemBlueColor, UIColor.systemGreenColor, UIColor.systemPinkColor, UIColor.systemPurpleColor, UIColor.systemRedColor, UIColor.systemOrangeColor, UIColor.systemTealColor];
+    NSInteger category = self.isSearching ? [self.results[indexPath.row][@"category"] integerValue] : [WCHomeCategoryOrder()[indexPath.section] integerValue];
     cell.heading.text = self.isSearching ? self.results[indexPath.row][@"title"] : titles[category];
     cell.subtitle.text = self.isSearching ? [NSString stringWithFormat:@"%@ · %@", titles[category], self.results[indexPath.row][@"sectionTitle"]] : nil;
     cell.symbol.image = [UIImage systemImageNamed:symbols[category]];
@@ -148,7 +154,7 @@
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
     NSDictionary *result = self.isSearching ? self.results[indexPath.row] : nil;
-    NSInteger category = result ? [result[@"category"] integerValue] : indexPath.section;
+    NSInteger category = result ? [result[@"category"] integerValue] : [WCHomeCategoryOrder()[indexPath.section] integerValue];
     WCGestureDetailController *detail = [[WCGestureDetailController alloc] initWithCategory:category];
     if (result) [detail focusSearchResult:result];
     [self.searchField resignFirstResponder];

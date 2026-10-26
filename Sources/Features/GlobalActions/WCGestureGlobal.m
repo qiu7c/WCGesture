@@ -135,46 +135,6 @@ static void WCOpenMyQRCode(void) {
     @try { WCPresentGlobalSheet([[cls alloc] init]); } @catch (__unused NSException *e) {}
 }
 
-// UIApplication treats our own weixin:// scheme as a no-op inside WeChat, but
-// the system application workspace still routes it to the app's URL handler,
-// which is what opens the payment code.
-static BOOL WCOpenURLViaWorkspace(NSString *string) {
-    NSURL *url = [NSURL URLWithString:string];
-    if (!url) return NO;
-    Class workspaceClass = NSClassFromString(@"LSApplicationWorkspace");
-    SEL defaultSelector = NSSelectorFromString(@"defaultWorkspace");
-    id workspace = nil;
-    if (workspaceClass && [workspaceClass respondsToSelector:defaultSelector]) {
-        workspace = ((id (*)(id, SEL))objc_msgSend)(workspaceClass, defaultSelector);
-    }
-    for (NSString *name in @[@"openSensitiveURL:withOptions:", @"openURL:withOptions:"]) {
-        SEL selector = NSSelectorFromString(name);
-        if (!workspace || ![workspace respondsToSelector:selector]) continue;
-        @try {
-            BOOL opened = ((BOOL (*)(id, SEL, id, id))objc_msgSend)(workspace, selector, url, nil);
-            if (opened) return YES;
-        } @catch (__unused NSException *e) {}
-    }
-    UIApplication *app = [UIApplication sharedApplication];
-    if ([app canOpenURL:url]) {
-        [app openURL:url options:@{} completionHandler:nil];
-        return YES;
-    }
-    return NO;
-}
-
-static void WCOpenPayCode(void) {
-    Class cls = NSClassFromString(@"KindaViewController");
-    if (cls) {
-        @try {
-            WCPresentGlobalSheet([[cls alloc] init]);
-            return;
-        } @catch (__unused NSException *e) {}
-    }
-    if (WCOpenURLViaWorkspace(@"weixin://widget/pay")) return;
-    WCShowToast(@"付款码：当前微信版本不支持");
-}
-
 static void WCPushCustomPageEntry(NSDictionary *entry) {
     NSString *className = [entry[@"class"] isKindOfClass:[NSString class]] ? entry[@"class"] : nil;
     Class cls = className.length > 0 ? NSClassFromString(className) : nil;
@@ -223,7 +183,6 @@ static void WCPerformGlobalMenu(UIViewController *presenter) {
     [opts addObject:[WCPopupOption optionWithTitle:@"朋友圈" value:@(WCGlobalActionMoments)]];
     [opts addObject:[WCPopupOption optionWithTitle:@"添加朋友" value:@(WCGlobalActionAddFriend)]];
     [opts addObject:[WCPopupOption optionWithTitle:@"我的二维码" value:@(WCGlobalActionMyQRCode)]];
-    [opts addObject:[WCPopupOption optionWithTitle:@"付款码" value:@(WCGlobalActionPayCode)]];
     [opts addObject:[WCPopupOption optionWithTitle:@"自定义页面" value:@(WCGlobalActionCustomPage)]];
     [opts addObject:[WCPopupOption optionWithTitle:@"截图" value:@(WCGlobalActionScreenshot)]];
     [opts addObject:[WCPopupOption optionWithTitle:@"回到首页" value:@(WCGlobalActionLockScreen)]];
@@ -251,7 +210,7 @@ void WCPerformGlobalAction(UIViewController *presenter, WCGlobalAction action) {
         case WCGlobalActionMoments: WCOpenMoments(); break;
         case WCGlobalActionAddFriend: WCOpenAddFriend(); break;
         case WCGlobalActionMyQRCode: WCOpenMyQRCode(); break;
-        case WCGlobalActionPayCode: WCOpenPayCode(); break;
+        case WCGlobalActionReserved11: break; // Removed action; never reinterpret old saved values.
         case WCGlobalActionCustomPage: WCOpenCustomPage(); break;
         case WCGlobalActionMenu: WCPerformGlobalMenu(presenter); break;
         case WCGlobalActionJump: WCPerformGlobalJump(presenter); break;
@@ -263,6 +222,12 @@ void WCPerformGlobalAction(UIViewController *presenter, WCGlobalAction action) {
 void WCSynchronizeGlobalGesturesOnWindow(UIWindow *window) {
     if (!window) return;
     BOOL enabled = WCGestureEnabled(WCGlobalGestureEnabledKey);
+    // Clear retired payment-code assignments on startup and after config import.
+    NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
+    for (NSString *key in @[WCGlobalTwoFingerActionKey, WCGlobalThreeFingerActionKey]) {
+        if ([defaults integerForKey:key] == WCGlobalActionReserved11)
+            [defaults setInteger:WCGlobalActionNone forKey:key];
+    }
     NSInteger twoAction = [[NSUserDefaults standardUserDefaults] integerForKey:WCGlobalTwoFingerActionKey];
     NSInteger threeAction = [[NSUserDefaults standardUserDefaults] integerForKey:WCGlobalThreeFingerActionKey];
 

@@ -109,6 +109,17 @@ static BOOL WCMomentsCornerSkipBranch(UIView *view, UIView *root) {
         || ([view isKindOfClass:UIButton.class] && !WCMomentsCornerAlbumMediaRoot(root));
 }
 
+static BOOL WCMomentsCornerPublishEntryTile(UIView *view, UIView *root) {
+    // The supplied WCListPhotoCellView tree has two independent UIButton tiles
+    // containing a UIStackView (icon + title), inside m_imageGridView.
+    if (!WCMomentsCornerClass(root, @"WCListPhotoCellView") || ![view isKindOfClass:UIButton.class]) return NO;
+    id grid = WCTweakSafeValue(root, @"m_imageGridView");
+    if (![grid isKindOfClass:UIView.class] || grid == root || view == grid
+        || ![(UIView *)grid isDescendantOfView:root] || ![view isDescendantOfView:grid]) return NO;
+    for (UIView *child in view.subviews) if ([child isKindOfClass:UIStackView.class]) return YES;
+    return NO;
+}
+
 static void WCMomentsCornerWalk(UIView *view, UIView *root, CGFloat radius, NSUInteger depth,
                                NSUInteger *remaining, NSHashTable *targets, BOOL nativeTile) {
     if (depth > 14 || !*remaining) return;
@@ -116,19 +127,23 @@ static void WCMomentsCornerWalk(UIView *view, UIView *root, CGFloat radius, NSUI
     // Native grid items are explicit media tiles, including UIButton-backed thumbnails.
     if (nativeTile) { WCMomentsCornerApply(view, root, radius, targets); return; }
     if (view != root && WCMomentsCornerSkipBranch(view, root)) return;
-    if (WCMomentsCornerClass(view, @"WCSNSNodeVideoView")
+    if (WCMomentsCornerPublishEntryTile(view, root)) {
+        WCMomentsCornerApply(view, root, radius, targets);
+        return;
+    }
+    // A registered profile strip is a row of separate previews even if its
+    // native class also matches a media view. Never clip the whole strip.
+    BOOL profileStrip = view == root && [objc_getAssociatedObject(root, &WCMomentsCornerProfileKey) boolValue];
+    if (!profileStrip && (WCMomentsCornerClass(view, @"WCSNSNodeVideoView")
         || WCMomentsCornerClass(view, @"WCPuzzleImageView")
         || WCMomentsCornerClass(view, @"WCImageView")
-        || WCMomentsCornerClass(view, @"MMWebImageView")) {
+        || WCMomentsCornerClass(view, @"MMWebImageView"))) {
         WCMomentsCornerApply(view, root, radius, targets);
         return;
     }
     if (WCMomentsCornerClass(view, @"MMImageGridView")) {
-        if (WCMomentsCornerAlbumMediaRoot(root)) {
-            // Album/hybrid rows use one outer media frame; don't round its inner tiles again.
-            WCMomentsCornerApply(view, root, radius, targets);
-            return;
-        }
+        // Round each native thumbnail separately, including the three-item
+        // album row. Rounding this grid would merge them into one clipped strip.
         id tiles = WCTweakSafeValue(view, @"m_arrOfViews");
         if ([tiles isKindOfClass:NSArray.class]) {
             for (id tile in tiles) {
@@ -141,7 +156,6 @@ static void WCMomentsCornerWalk(UIView *view, UIView *root, CGFloat radius, NSUI
         }
     }
     // getAlbumView is the dedicated thumbnail strip, not the whole contact/profile cell.
-    BOOL profileStrip = view == root && [objc_getAssociatedObject(root, &WCMomentsCornerProfileKey) boolValue];
     for (UIView *child in view.subviews) {
         BOOL previewImage = profileStrip && [child isKindOfClass:UIImageView.class];
         WCMomentsCornerWalk(child, root, radius, depth + 1, remaining, targets, previewImage);

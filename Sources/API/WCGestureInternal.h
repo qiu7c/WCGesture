@@ -57,3 +57,8 @@
 #import "Sources/API/WCGestureContactInfoCardAPI.h"
 
 #import "Sources/API/WCGestureMediaCornerAPI.h"
+
+#import "Sources/API/WCGestureAutoStatusAPI.h"
+
+#import "Sources/API/WCGestureSettingsEntryAPI.h"
+#import "Sources/API/WCGestureProfilePrivacyAPI.h"

@@ -14,6 +14,7 @@
 @property (nonatomic, strong) UIView *customPreview;
 @property (nonatomic, assign) NSInteger previewTheme;
 @property (nonatomic, strong) UIView *controlsPanel;
+@property (nonatomic, strong) UILabel *panelTitle;
 @property (nonatomic, strong) NSLayoutConstraint *panelHeight;
 @property (nonatomic, strong) NSLayoutConstraint *previewBottom;
 @property (nonatomic, assign) BOOL capturedNavigationState;
@@ -29,7 +30,7 @@ static NSDictionary *WCParameter(NSString *title, NSString *key, double minimum,
 - (void)viewDidLoad {
     [super viewDidLoad];
     WCGestureSettingsConfigureNavigation(self);
-    self.title = self.customTitle ?: (self.kind == WCGesturePreviewAntiRevoke ? @"提示外观预览" : @"消息时间位置预览");
+    self.title = self.customTitle ?: @"聊天外观预览";
     self.view.backgroundColor = UIColor.systemGroupedBackgroundColor;
     self.preview = self.customPreview ?: WCGestureCreateChatPreview(self.kind);
     WCGestureSetPreviewEditing(self.preview, YES);
@@ -42,8 +43,8 @@ static NSDictionary *WCParameter(NSString *title, NSString *key, double minimum,
     self.controlsPanel.layer.cornerRadius = 20;
     self.controlsPanel.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
     self.controlsPanel.clipsToBounds = YES;
-    self.controlsPanel.hidden = YES;
-    UILabel *title = [UILabel new]; title.text = @"预览调节"; title.textColor = UIColor.labelColor;
+    self.controlsPanel.hidden = self.customPreview != nil;
+    UILabel *title = [UILabel new]; self.panelTitle = title; title.text = @"预览调节"; title.textColor = UIColor.labelColor;
     title.font = [UIFont systemFontOfSize:16 weight:UIFontWeightRegular];
     UIButton *reset = [UIButton buttonWithType:UIButtonTypeSystem]; [reset setTitle:@"重置" forState:UIControlStateNormal];
     [reset addTarget:self action:@selector(reset) forControlEvents:UIControlEventTouchUpInside];
@@ -53,6 +54,7 @@ static NSDictionary *WCParameter(NSString *title, NSString *key, double minimum,
     for (UIView *view in @[title, reset, done, self.table]) { view.translatesAutoresizingMaskIntoConstraints = NO; [self.controlsPanel addSubview:view]; }
     self.panelHeight = [self.controlsPanel.heightAnchor constraintEqualToConstant:360];
     self.previewBottom = [self.preview.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor];
+    self.previewBottom.constant = self.controlsPanel.hidden ? 0 : -372;
     self.preview.clipsToBounds = YES;
     NSLayoutYAxisAnchor *previewTop = self.customPreview ? self.view.safeAreaLayoutGuide.topAnchor : self.view.topAnchor;
     [NSLayoutConstraint activateConstraints:@[
@@ -76,7 +78,8 @@ static NSDictionary *WCParameter(NSString *title, NSString *key, double minimum,
     ]];
     __weak typeof(self) weakSelf = self;
     WCGestureSetPreviewNavigation(self.preview, ^{ [weakSelf.navigationController popViewControllerAnimated:YES]; }, ^{ [weakSelf togglePanel]; });
-    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"调节" style:UIBarButtonItemStylePlain target:self action:@selector(togglePanel)];
+    WCGestureSetPreviewControlsExpanded(self.preview, !self.controlsPanel.hidden);
+    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"外观调节" style:UIBarButtonItemStylePlain target:self action:@selector(togglePanel)];
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(changed:) name:WCGestureDidChangeNotification object:nil];
     [self rebuildParameters];
 }
@@ -96,6 +99,11 @@ static NSDictionary *WCParameter(NSString *title, NSString *key, double minimum,
     [super viewDidLayoutSubviews];
     CGFloat available = CGRectGetHeight(self.view.bounds) - self.view.safeAreaInsets.top - 60;
     CGFloat height = MIN(MAX(180, available), MIN(420, CGRectGetHeight(self.view.bounds) * 0.55));
+    if (!self.customPreview) {
+        BOOL capsule = self.kind == WCGesturePreviewChatTopBar || WCGestureEnabled(WCGestureChatTopBarCapsuleEnabledKey);
+        CGFloat minimumPreview = self.view.safeAreaInsets.top + 44 + (capsule ? 44 : 0) + 52 + 55 + 70;
+        height = MIN(height, MAX(100, CGRectGetHeight(self.view.bounds) - minimumPreview - 12));
+    }
     if (fabs(self.panelHeight.constant - height) > 0.5) self.panelHeight.constant = height;
     self.table.contentInset = UIEdgeInsetsMake(0, 0, self.view.safeAreaInsets.bottom, 0);
     self.previewBottom.constant = self.controlsPanel.hidden ? 0 : -(self.panelHeight.constant + 12);
@@ -104,6 +112,7 @@ static NSDictionary *WCParameter(NSString *title, NSString *key, double minimum,
 }
 - (void)togglePanel {
     self.controlsPanel.hidden = !self.controlsPanel.hidden;
+    WCGestureSetPreviewControlsExpanded(self.preview, !self.controlsPanel.hidden);
     self.previewBottom.constant = self.controlsPanel.hidden ? 0 : -(self.panelHeight.constant + 12);
     self.preview.layer.cornerRadius = self.controlsPanel.hidden ? 0 : 20;
     self.preview.layer.maskedCorners = kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner;
@@ -121,18 +130,25 @@ static NSDictionary *WCParameter(NSString *title, NSString *key, double minimum,
         [self.table reloadData]; [self.preview setNeedsLayout];
         return;
     }
+    NSArray *targetTitles = @[@"消息时间", @"防撤回提示", @"输入圆角", @"胶囊顶栏", @"头像圆角"];
+    self.panelTitle.text = targetTitles[self.kind];
+    [self.view setNeedsLayout];
     BOOL revoke = self.kind == WCGesturePreviewAntiRevoke;
     BOOL side = [NSUserDefaults.standardUserDefaults boolForKey:WCGestureMessageTimeBubbleSideKey];
     NSMutableArray *parameters = [NSMutableArray arrayWithObjects:
-        @{ @"title": @"调节项目", @"targets": @[@"时间", @"防撤回", @"圆角", @"顶栏"] },
+        @{ @"title": @"调节项目", @"targets": targetTitles },
         @{ @"title": @"预览外观", @"themes": @[@"系统", @"浅色", @"深色"] }, nil];
+    if (self.kind == WCGesturePreviewAvatarRounding) {
+        [parameters addObject:@{ @"option": @{ @"title": @"全局头像圆角", @"type": @"bool", @"key": WCGestureGlobalAvatarRoundingEnabledKey } }];
+        [parameters addObject:WCParameter(@"头像圆角程度 (%)", WCGestureGlobalAvatarCornerPercentKey, 0, 100, 100)];
+        self.parameters = parameters; [self.table reloadData]; [self.preview setNeedsLayout]; return;
+    }
     if (self.kind == WCGesturePreviewChatTopBar) {
         [parameters addObject:@{ @"option": @{ @"title": @"胶囊顶栏", @"type": @"bool", @"key": WCGestureChatTopBarCapsuleEnabledKey } }];
-        [parameters addObject:@{ @"title": @"玻璃样式", @"segments": @[@"磨砂玻璃", @"伪液态"], @"key": WCGestureChatGlassStyleKey, @"reset": @1 }];
         [parameters addObject:WCParameter(@"玻璃透明度 (%)", WCGestureChatGlassTransparencyKey, 0, 100, 50)];
         [parameters addObject:WCParameter(@"胶囊外框大小 (%)", WCGestureChatTopBarShellScaleKey, 80, 140, 100)];
         [parameters addObject:WCParameter(@"图标大小", WCGestureChatTopBarIconSizeKey, 12, 26, 18)];
-        [parameters addObject:WCParameter(@"模糊强度 (%)", WCGestureChatGlassBlurIntensityKey, 20, 100, 20)];
+        [parameters addObject:WCParameter(@"模糊强度 (%)", WCGestureChatGlassBlurIntensityKey, 0, 100, 20)];
         [parameters addObject:WCParameter(@"头像大小", WCGestureChatTopBarAvatarSizeKey, 24, 34, 30)];
         [parameters addObject:WCParameter(@"昵称字号", WCGestureChatTopBarNicknameSizeKey, 12, 18, 15)];
         [parameters addObject:@{ @"option": @{ @"title": @"聊天搜索按钮", @"type": @"bool", @"key": WCGestureChatSearchEnabledKey } }];
@@ -193,9 +209,9 @@ static NSDictionary *WCParameter(NSString *title, NSString *key, double minimum,
     NSDictionary *option = parameter[@"option"];
     if (parameter[@"targets"]) {
         cell.textLabel.text = parameter[@"title"];
-        UISegmentedControl *segments = [[UISegmentedControl alloc] initWithItems:parameter[@"targets"]];
-        segments.selectedSegmentIndex = self.kind;
-        [segments addTarget:self action:@selector(targetChanged:) forControlEvents:UIControlEventValueChanged]; cell.accessoryView = segments;
+        cell.detailTextLabel.text = parameter[@"targets"][self.kind];
+        cell.detailTextLabel.font = [UIFont systemFontOfSize:14 * WCGestureSettingsScaleFactor()];
+        cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
     } else if (parameter[@"inputLines"]) {
         cell.textLabel.text = parameter[@"title"];
         UISegmentedControl *segments = [[UISegmentedControl alloc] initWithItems:parameter[@"inputLines"]];
@@ -270,11 +286,6 @@ static NSDictionary *WCParameter(NSString *title, NSString *key, double minimum,
     [self.preview setNeedsLayout];
     [self setNeedsStatusBarAppearanceUpdate];
 }
-- (void)targetChanged:(UISegmentedControl *)segments {
-    self.kind = segments.selectedSegmentIndex;
-    WCGestureSetChatPreviewKind(self.preview, self.kind);
-    [self rebuildParameters];
-}
 - (void)inputLinesChanged:(UISegmentedControl *)segments {
     self.inputLineSelection = segments.selectedSegmentIndex;
     WCGestureSetPreviewInputLines(self.preview, 1 + 2 * self.inputLineSelection);
@@ -282,6 +293,18 @@ static NSDictionary *WCParameter(NSString *title, NSString *key, double minimum,
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)path {
     [tableView deselectRowAtIndexPath:path animated:YES];
     NSDictionary *parameter = self.parameters[path.row];
+    if (parameter[@"targets"]) {
+        NSMutableArray *options = [NSMutableArray array];
+        NSArray *titles = parameter[@"targets"];
+        for (NSUInteger i = 0; i < titles.count; i++) [options addObject:[WCPopupOption optionWithTitle:titles[i] value:@(i)]];
+        __weak WCAdjustmentController *weakSelf = self;
+        [WCPopup showOptionsWithTitle:@"选择调节项目" message:nil options:options selected:@(self.kind) completion:^(id value) {
+            WCAdjustmentController *controller = weakSelf;
+            NSInteger index = [value integerValue];
+            if (!controller || !value || index < 0 || index >= (NSInteger)titles.count) return;
+            controller.kind = index; WCGestureSetChatPreviewKind(controller.preview, controller.kind); [controller rebuildParameters];
+        }]; return;
+    }
     if (parameter[@"option"]) { WCGestureEditChatOption(self, parameter[@"option"]); return; }
     if (parameter[@"textKey"]) {
         NSString *key = parameter[@"textKey"];

@@ -13,11 +13,11 @@ static NSDictionary *WCCornerNumber(NSString *title, NSString *key, double maxim
     [super viewDidLoad]; self.title = @"圆角设置"; WCGestureSettingsConfigureNavigation(self);
     self.tableView.backgroundColor = UIColor.systemGroupedBackgroundColor; self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
     self.sections = @[
-        @[WCCornerSwitch(@"全局头像圆角",WCGestureGlobalAvatarRoundingEnabledKey),WCCornerNumber(@"头像圆角程度 (%)",WCGestureGlobalAvatarCornerPercentKey,100)],
-        @[WCCornerSwitch(@"聊天输入栏圆角",WCGestureChatInputRoundingEnabledKey),WCCornerSwitch(@"输入框内部圆角",WCGestureChatInputInnerRoundingKey),WCCornerNumber(@"内部圆角程度",WCGestureChatInputInnerRadiusKey,40),WCCornerSwitch(@"外部工具栏圆角",WCGestureChatInputOuterRoundingKey),WCCornerNumber(@"外部圆角程度",WCGestureChatInputOuterRadiusKey,40),@{@"title":@"整页圆角预览与调节",@"preview":@YES}],
+        @[WCCornerSwitch(@"全局头像圆角",WCGestureGlobalAvatarRoundingEnabledKey),WCCornerNumber(@"头像圆角程度 (%)",WCGestureGlobalAvatarCornerPercentKey,100),@{@"title":@"整页头像预览与调节",@"previewKind":@(WCGesturePreviewAvatarRounding)}],
+        @[WCCornerSwitch(@"聊天输入栏圆角",WCGestureChatInputRoundingEnabledKey),WCCornerSwitch(@"输入框内部圆角",WCGestureChatInputInnerRoundingKey),WCCornerNumber(@"内部圆角程度",WCGestureChatInputInnerRadiusKey,40),WCCornerSwitch(@"外部工具栏圆角",WCGestureChatInputOuterRoundingKey),WCCornerNumber(@"外部圆角程度",WCGestureChatInputOuterRadiusKey,40),@{@"title":@"整页圆角预览与调节",@"previewKind":@(WCGesturePreviewInputRounding)}],
         @[WCCornerSwitch(@"朋友圈圆角",WCGestureMomentsImageCornerEnabledKey),WCCornerNumber(@"圆角程度",WCGestureMomentsImageCornerRadiusKey,40)],
         @[WCCornerSwitch(@"表情圆角",WCGestureEmoticonCornerEnabledKey),WCCornerNumber(@"圆角程度",WCGestureEmoticonCornerRadiusKey,40)],
-        @[WCCornerSwitch(@"聊天图片圆角",WCGestureChatImageCornerEnabledKey),WCCornerNumber(@"圆角程度",WCGestureChatImageCornerRadiusKey,40)]
+        @[WCCornerSwitch(@"聊天媒体圆角",WCGestureChatImageCornerEnabledKey),WCCornerNumber(@"圆角程度",WCGestureChatImageCornerRadiusKey,40)]
     ];
     self.collapsed = [NSMutableIndexSet indexSet];
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(changed:) name:WCGestureDidChangeNotification object:nil];
@@ -71,7 +71,7 @@ static NSDictionary *WCCornerNumber(NSString *title, NSString *key, double maxim
         if ([self.collapsed containsIndex:path.section]) [self.collapsed removeIndex:path.section]; else [self.collapsed addIndex:path.section];
         [tableView reloadSections:[NSIndexSet indexSetWithIndex:path.section] withRowAnimation:UITableViewRowAnimationAutomatic]; return;
     }
-    if (row[@"preview"]) { [self.navigationController pushViewController:WCGestureCreatePositionEditor(WCGesturePreviewInputRounding) animated:YES]; return; }
+    if (row[@"previewKind"]) { [self.navigationController pushViewController:WCGestureCreatePositionEditor([row[@"previewKind"] integerValue]) animated:YES]; return; }
     if (!row[@"maximum"]) return;
     [WCPopup showInputWithTitle:row[@"title"] message:nil text:[NSString stringWithFormat:@"%.0f",[NSUserDefaults.standardUserDefaults doubleForKey:row[@"key"]]] placeholder:[NSString stringWithFormat:@"0 - %@",row[@"maximum"]] keyboard:UIKeyboardTypeDecimalPad completion:^(NSString *text) {
         double value; NSScanner *scanner = [NSScanner scannerWithString:text];

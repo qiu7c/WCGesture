@@ -16,6 +16,7 @@
 - (void)careEnoughForTheLiving {
     %orig;
     WCGestureMomentsMonitoringTick();
+    WCGestureAutoStatusCheck();
 }
 %end
 

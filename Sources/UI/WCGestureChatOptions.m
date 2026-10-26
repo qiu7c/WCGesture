@@ -155,6 +155,10 @@ void WCGestureEditChatOption(UIViewController *presenter, NSDictionary *option) 
     NSNumber *previewKind = previewKinds[type];
     if (previewKind) {
         [presenter.navigationController pushViewController:WCGestureCreatePositionEditor(previewKind.integerValue) animated:YES];
+    } else if ([type isEqualToString:@"clear-profile"]) {
+        WCGesturePresentClearProfileInformation();
+    } else if ([type isEqualToString:@"auto-status"]) {
+        [presenter.navigationController pushViewController:WCGestureCreateAutoStatusSettingsController() animated:YES];
     } else if ([type isEqualToString:@"corner-settings"]) {
         [presenter.navigationController pushViewController:WCGestureCreateCornerSettingsController() animated:YES];
     } else if ([type isEqualToString:@"long-press-menu"]) {

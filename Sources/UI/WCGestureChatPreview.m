@@ -61,8 +61,10 @@
 - (void)layoutSubviews {
     [super layoutSubviews];
     CGFloat width = CGRectGetWidth(self.bounds);
-    // 42pt avatars are native control geometry, not the text-size percentage.
-    self.avatar.frame = CGRectMake(self.sender ? width - 51 : 9, 2, 42, 42);
+    // Match the user's layout percentage in this self-drawn preview. Keep the
+    // outside margin fixed; the avatar loader lays out the original image to fit.
+    CGFloat avatarSide = 42 * WCGestureLayoutScaleFactor();
+    self.avatar.frame = CGRectMake(self.sender ? width - 9 - avatarSide : 9, 2, avatarSide, avatarSide);
     [self.avatar layoutIfNeeded];
     WCGestureApplyGlobalAvatarRoundingToHeadView(self.avatar);
     CGSize text = [self textSizeForWidth:width];
@@ -136,6 +138,9 @@
 @property (nonatomic, strong) UILabel *pinnedLabel;
 @property (nonatomic, strong) UIButton *backButton;
 @property (nonatomic, strong) UIButton *controlsButton;
+@property (nonatomic, strong) UIView *adjustmentToolbar;
+@property (nonatomic, strong) UILabel *adjustmentTitle;
+@property (nonatomic, assign) BOOL controlsExpanded;
 @property (nonatomic, strong) UIScrollView *messages;
 @property (nonatomic, strong) UILabel *separatorTime;
 @property (nonatomic, strong) UILabel *localPrompt;
@@ -161,9 +166,18 @@
         [_backButton setImage:WCGestureSettingsBackImage() forState:UIControlStateNormal];
         [_backButton addTarget:self action:@selector(back) forControlEvents:UIControlEventTouchUpInside];
         _backButton.accessibilityLabel = @"返回设置";
-        _controlsButton = [UIButton buttonWithType:UIButtonTypeSystem]; [_controlsButton setTitle:@"调节" forState:UIControlStateNormal];
+        _adjustmentToolbar = [UIView new]; _adjustmentToolbar.backgroundColor = UIColor.secondarySystemGroupedBackgroundColor;
+        _adjustmentTitle = [UILabel new]; _adjustmentTitle.textColor = UIColor.labelColor;
+        _adjustmentTitle.adjustsFontSizeToFitWidth = YES; _adjustmentTitle.minimumScaleFactor = 0.8;
+        _controlsButton = [UIButton buttonWithType:UIButtonTypeSystem];
+        [_controlsButton setImage:[UIImage systemImageNamed:@"slider.horizontal.3" withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:12 weight:UIImageSymbolWeightRegular]] forState:UIControlStateNormal];
+        _controlsButton.tintColor = UIColor.systemBlueColor;
+        _controlsButton.backgroundColor = [UIColor.systemBlueColor colorWithAlphaComponent:0.10];
+        _controlsButton.layer.cornerRadius = 12; _controlsButton.layer.cornerCurve = kCACornerCurveContinuous;
+        _controlsButton.titleEdgeInsets = UIEdgeInsetsMake(0, 5, 0, -5);
         [_controlsButton addTarget:self action:@selector(controls) forControlEvents:UIControlEventTouchUpInside];
-        for (UIView *view in @[_heading, _backButton, _controlsButton]) [_navigation addSubview:view];
+        for (UIView *view in @[_adjustmentTitle, _controlsButton]) [_adjustmentToolbar addSubview:view];
+        for (UIView *view in @[_heading, _backButton]) [_navigation addSubview:view];
         _messages = [UIScrollView new]; _messages.alwaysBounceVertical = YES;
         _messages.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
         _separatorTime = [UILabel new]; _separatorTime.text = @"16:32";
@@ -198,7 +212,7 @@
             [_inputBar addSubview:icon]; [icons addObject:icon];
         }
         _inputIcons = icons;
-        for (UIView *view in @[_messages, _navigation, _inputBar]) [self addSubview:view];
+        for (UIView *view in @[_messages, _navigation, _inputBar, _adjustmentToolbar]) [self addSubview:view];
     }
     return self;
 }
@@ -234,11 +248,10 @@
     CGFloat navigationHeight = top + 44;
     self.navigation.frame = CGRectMake(0, 0, width, navigationHeight);
     self.backButton.frame = CGRectMake(4, top, 44, 44);
-    self.controlsButton.frame = CGRectMake(width - 60, top, 56, 44);
-    self.heading.frame = CGRectMake(52, top, MAX(0, width - 116), 44);
-    self.heading.text = @[@"聊天预览 · 消息时间", @"聊天预览 · 防撤回", @"聊天预览 · 输入圆角", @"聊天预览 · 胶囊顶栏"][self.kind];
+    self.heading.frame = CGRectMake(52, top, MAX(0, width - 104), 44);
+    self.heading.text = @"聊天预览";
     BOOL capsule = self.kind == WCGesturePreviewChatTopBar || WCGestureEnabled(WCGestureChatTopBarCapsuleEnabledKey);
-    self.heading.hidden = capsule; self.backButton.hidden = capsule; self.controlsButton.hidden = capsule;
+    self.heading.hidden = capsule; self.backButton.hidden = capsule;
     self.topProfile.hidden = !capsule; self.topActions.hidden = !capsule;
     self.pinnedHeader.hidden = !capsule;
     if (capsule) {
@@ -260,6 +273,18 @@
         navigationHeight += 40 + 4 * scale;
         self.navigation.frame = CGRectMake(0, 0, width, navigationHeight);
     }
+    // Editing tools are outside the simulated native navigation, so enabling
+    // capsules never replaces the named control with a more/search icon.
+    CGFloat toolbarHeight = 52;
+    self.adjustmentToolbar.frame = CGRectMake(0, navigationHeight, width, toolbarHeight);
+    self.adjustmentTitle.frame = CGRectMake(16, 4, MAX(0, width - 152), 44);
+    self.adjustmentTitle.font = [UIFont systemFontOfSize:14 * WCGestureSettingsScaleFactor()];
+    self.adjustmentTitle.text = @[@"消息时间", @"防撤回提示", @"输入圆角", @"胶囊顶栏", @"头像圆角"][self.kind];
+    self.controlsButton.frame = CGRectMake(MAX(0, width - 124), 4, 108, 44);
+    self.controlsButton.titleLabel.font = [UIFont systemFontOfSize:14 * WCGestureSettingsScaleFactor()];
+    [self.controlsButton setTitle:self.controlsExpanded ? @"收起调节" : @"外观调节" forState:UIControlStateNormal];
+    self.controlsButton.accessibilityLabel = self.controlsExpanded ? @"收起外观调节面板" : @"打开外观调节面板";
+    self.controlsButton.accessibilityValue = self.adjustmentTitle.text;
     BOOL rounding = self.kind == WCGesturePreviewInputRounding;
     CGFloat fieldHeight = 33 + 18 * (MAX(1, self.inputLines) - 1);
     CGFloat inputHeight = fieldHeight + 12 + self.safeAreaInsets.bottom;
@@ -274,7 +299,7 @@
     self.placeholder.text = self.inputLines > 1 ? @"多行输入预览\n观察圆角随高度变化\n不会发送消息" : @"示例聊天 · 右上角调节";
     self.placeholder.frame = CGRectInset(self.inputField.bounds, 8, 0);
     WCGestureChatInputRoundingApplyToViews(self.inputField, self.inputBar, rounding);
-    CGFloat messagesTop = capsule ? 0 : navigationHeight;
+    CGFloat messagesTop = capsule ? 0 : navigationHeight + toolbarHeight;
     self.messages.frame = CGRectMake(0, messagesTop, width, MAX(0, CGRectGetMinY(self.inputBar.frame) - messagesTop));
     self.separatorTime.frame = CGRectMake(0, 0, width, 41);
     NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
@@ -298,7 +323,7 @@
     }
     CGFloat visibleHeight = CGRectGetHeight(self.messages.bounds);
     self.messages.contentSize = CGSizeMake(width, y + 12);
-    self.messages.contentInset = UIEdgeInsetsMake(MAX(capsule ? navigationHeight : 0, visibleHeight - y - 12), 0, 0, 0);
+    self.messages.contentInset = UIEdgeInsetsMake(MAX(capsule ? navigationHeight + toolbarHeight : 0, visibleHeight - y - 12), 0, 0, 0);
     self.messages.scrollIndicatorInsets = UIEdgeInsetsZero;
     if ((!CGSizeEqualToSize(self.lastViewport, self.messages.bounds.size) || self.lastContentHeight != y) && !self.messages.dragging) {
         self.messages.contentOffset = CGPointMake(0, MAX(-self.messages.contentInset.top, y + 12 - CGRectGetHeight(self.messages.bounds)));
@@ -324,5 +349,11 @@ void WCGestureSetPreviewNavigation(UIView *preview, void (^back)(void), void (^c
 void WCGestureSetPreviewInputLines(UIView *preview, NSUInteger lines) {
     if ([preview isKindOfClass:WCChatPreview.class]) {
         ((WCChatPreview *)preview).inputLines = MIN(5, MAX(1, lines)); [preview setNeedsLayout];
+    }
+}
+
+void WCGestureSetPreviewControlsExpanded(UIView *preview, BOOL expanded) {
+    if ([preview isKindOfClass:WCChatPreview.class]) {
+        ((WCChatPreview *)preview).controlsExpanded = expanded; [preview setNeedsLayout];
     }
 }

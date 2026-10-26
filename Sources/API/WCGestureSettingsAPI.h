@@ -9,6 +9,8 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
     WCGestureCategoryInterface,
     WCGestureCategoryDisabled,
     WCGestureCategoryPlugin,
+    WCGestureCategoryEnhancements,
+    WCGestureCategoryCount,
 };
 
 typedef NS_ENUM(NSInteger, WCGesturePreviewKind) {
@@ -16,6 +18,7 @@ typedef NS_ENUM(NSInteger, WCGesturePreviewKind) {
     WCGesturePreviewAntiRevoke,
     WCGesturePreviewInputRounding,
     WCGesturePreviewChatTopBar,
+    WCGesturePreviewAvatarRounding,
 };
 
 UIView *WCGestureCreateChatPreview(WCGesturePreviewKind kind);
@@ -23,6 +26,7 @@ void WCGestureSetPreviewEditing(UIView *preview, BOOL editing);
 void WCGestureSetChatPreviewKind(UIView *preview, WCGesturePreviewKind kind);
 void WCGestureSetPreviewNavigation(UIView *preview, void (^back)(void), void (^controls)(void));
 void WCGestureSetPreviewInputLines(UIView *preview, NSUInteger lines);
+void WCGestureSetPreviewControlsExpanded(UIView *preview, BOOL expanded);
 UIViewController *WCGestureCreatePositionEditor(WCGesturePreviewKind kind);
 /// Reusable editor. Numeric descriptors use title/key/minimum/maximum/reset;
 /// option descriptors use the same option dictionaries as ChatOptions.
@@ -33,8 +37,8 @@ NSArray<NSDictionary *> *WCGestureChatOptions(BOOL antiRevoke, BOOL includeHidde
 NSString *WCGestureChatOptionDetail(NSDictionary *option);
 void WCGestureEditChatOption(UIViewController *presenter, NSDictionary *option);
 
-/// Searchable home with six feature categories.
-/// Registered with WeChat's WCPluginsMgr; instantiated by class name.
+/// Searchable home with seven feature categories.
+/// Used by all entry locations; plugin managers instantiate it by class name.
 @interface WCGestureSettingsController : UITableViewController
 @end
 
@@ -49,10 +53,6 @@ void WCGestureEditChatOption(UIViewController *presenter, NSDictionary *option);
 /// view controller. Used by the Me-page fallback entry.
 void WCGesturePresentSettings(UIViewController *presenter);
 
-/// Registers WCGestureSettingsController with WeChat's plugin manager
-/// (WCPluginsMgr) using the real registerControllerWithTitle:version:controller:
-/// API. Falls back silently when the API is unavailable.
-void WCGestureRegisterEntry(void);
-
 UIViewController *WCGestureCreateCornerSettingsController(void);
+UIViewController *WCGestureCreateAutoStatusSettingsController(void);
 NS_ASSUME_NONNULL_END
