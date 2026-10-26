@@ -18,6 +18,7 @@
 }
 - (void)viewDidLayoutSubviews {
     %orig;
+    WCGestureGroupTitleLayout(self);
     WCGestureChatSearchUpdate(self);
 }
 %new

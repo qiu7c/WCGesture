@@ -19,6 +19,24 @@
 }
 %end
 
+%hook MMMsgCommonTipsView
+- (void)layoutSubviews {
+    %orig;
+    WCGestureChatPinnedLayout((UIView *)self);
+}
+- (void)didMoveToWindow {
+    %orig;
+    WCGestureChatPinnedLayout((UIView *)self);
+}
+%end
+
+%hook UINavigationBar
+- (void)layoutSubviews {
+    %orig;
+    WCGestureChatTopBarNavigationLayout(self);
+}
+%end
+
 %ctor {
     %init;
 }

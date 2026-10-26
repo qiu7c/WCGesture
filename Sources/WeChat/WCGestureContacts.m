@@ -56,7 +56,7 @@ NSString *WCGesturePrivateNotificationDisplayName(NSString *username, NSString *
     return name.length ? name : (fallback.length ? fallback : (username ?: @""));
 }
 
-UIView *WCGestureContactAvatarView(NSString *username) {
+static UIView *WCContactAvatarView(NSString *username, BOOL rounded) {
     id contact = WCPrivateContact(username);
     NSString *url = WCContactsName(contact, @[@"m_nsHeadHDImgUrl", @"m_nsHeadImgUrlHD", @"m_nsHeadImgUrl"]) ?: @"";
     Class helper = NSClassFromString(@"MMHeadImageHelper");
@@ -70,7 +70,7 @@ UIView *WCGestureContactAvatarView(NSString *username) {
             || !strchr("BcCsSiIlLqQ", [signature getArgumentTypeAtIndex:4][0])
             || !strchr("BcCsSiIlLqQ", [signature getArgumentTypeAtIndex:5][0])) continue;
         @try {
-            id view = ((id (*)(id, SEL, id, id, BOOL, BOOL))objc_msgSend)(helper, selector, username, url, YES, YES);
+            id view = ((id (*)(id, SEL, id, id, BOOL, BOOL))objc_msgSend)(helper, selector, username, url, YES, rounded);
             if ([view isKindOfClass:UIView.class]) return view;
         } @catch (__unused NSException *exception) {}
     }
@@ -78,3 +78,6 @@ UIView *WCGestureContactAvatarView(NSString *username) {
     view.backgroundColor = UIColor.tertiarySystemGroupedBackgroundColor;
     return view;
 }
+
+UIView *WCGestureContactAvatarView(NSString *username) { return WCContactAvatarView(username, YES); }
+UIView *WCGestureContactUnroundedAvatarView(NSString *username) { return WCContactAvatarView(username, NO); }

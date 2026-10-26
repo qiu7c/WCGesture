@@ -140,21 +140,27 @@ void WCGestureContactInfoCardApply(id owner, BOOL group) {
     NSArray *sections = WCInfoArray(table, @"getAllSections");
     BOOL enabled = WCGestureEnabled(WCGestureContactInfoCardEnabledKey);
     BOOL found = NO, changed = NO;
-    id preferred = sections.firstObject;
+    id memberSection = group ? WCTweakSafeValue(owner, @"memListSection") : nil;
+    id preferred = nil;
+    for (id section in sections) if (section != memberSection && (!group || section != sections.firstObject || sections.count == 1)) { preferred = section; break; }
+    if (!preferred) preferred = sections.firstObject;
     unsigned int insertIndex = 0;
     for (id section in sections) {
         NSArray *cells = [WCInfoArray(section, @"getAllCells") copy];
         for (NSUInteger i = cells.count; i > 0; i--) {
             id cell = cells[i - 1];
             if ([objc_getAssociatedObject(cell, &WCInfoCardCellKey) boolValue]) {
-                if (enabled && !found) { found = YES; continue; }
+                BOOL visibleSection = !group || sections.count == 1 || (section != memberSection && section != sections.firstObject);
+                if (enabled && !found && visibleSection) { found = YES; continue; }
                 SEL remove = NSSelectorFromString(@"removeCellAt:");
                 if (WCInfoCompatible(section, remove, 'v', "Q")) {
                     ((void (*)(id, SEL, unsigned long long))objc_msgSend)(section, remove, (unsigned long long)(i - 1)); changed = YES;
                 }
             } else {
                 NSString *title = WCInfoText(cell, @[@"title", @"m_title"]);
-                if ([title containsString:@"微信号"] || [title containsString:@"群聊名称"]) { preferred = section; insertIndex = (unsigned int)i; }
+                if (!title.length) title = WCInfoText(WCInfoValue(WCInfoValue(cell, @[@"cellConfig", @"m_cellConfig"]), @[@"leftConfig", @"m_leftConfig"]), @[@"title", @"text"]);
+                if ((!group || sections.count == 1 || (section != memberSection && section != sections.firstObject))
+                    && ([title containsString:@"微信号"] || [title containsString:@"群聊名称"] || [title containsString:@"群聊备注"])) { preferred = section; insertIndex = (unsigned int)i; }
             }
         }
     }
@@ -206,4 +212,60 @@ void WCGestureContactInfoCardSettingsChanged(NSString *key) {
     if (key && ![key isEqualToString:WCGestureEnabledKey] && ![key isEqualToString:WCGestureContactInfoCardEnabledKey]) return;
     for (id owner in WCInfoOwners().allObjects)
         WCGestureContactInfoCardApply(owner, [objc_getAssociatedObject(owner, &WCInfoCardGroupKey) boolValue]);
+}
+
+@interface WCInfoGroupRequest : NSObject
+@property (nonatomic, strong) id logic;
+@property (nonatomic, copy) NSString *account;
+@property (nonatomic, copy) void (^update)(NSArray *groups, BOOL finished);
+@end
+@implementation WCInfoGroupRequest
+@end
+
+static void WCInfoPollGroups(WCInfoGroupRequest *request, NSUInteger remaining) {
+    if (!WCGestureEnabled(WCGestureContactInfoCardEnabledKey)
+        || (request.account.length && ![request.account isEqualToString:WCCurrentUserWXID()])) return;
+    @try {
+        SEL getter = NSSelectorFromString(@"getContactRelatedGroup");
+        SEL doneSelector = NSSelectorFromString(@"isSearchDone");
+        if (!WCInfoCompatible(request.logic, getter, '@', "") || !WCInfoCompatible(request.logic, doneSelector, @encode(BOOL)[0], "")) {
+            request.update(nil, YES); return;
+        }
+        id raw = ((id (*)(id, SEL))objc_msgSend)(request.logic, getter);
+        BOOL done = ((BOOL (*)(id, SEL))objc_msgSend)(request.logic, doneSelector);
+        NSMutableArray *rows = [NSMutableArray array]; NSMutableSet *seen = [NSMutableSet set];
+        if ([raw isKindOfClass:NSArray.class]) for (id item in raw) {
+            id contact = [item isKindOfClass:NSString.class] ? WCPrivateContact(item) : item;
+            NSString *name = [item isKindOfClass:NSString.class] ? item : WCPrivateContactUserName(contact);
+            if (![name hasSuffix:@"@chatroom"] || [seen containsObject:name]) continue;
+            [seen addObject:name];
+            [rows addObject:@{@"title":WCGesturePrivateContactDisplayName(contact, name), @"value":@"", @"username":name}];
+        }
+        [rows sortUsingComparator:^NSComparisonResult(NSDictionary *a, NSDictionary *b) { return [a[@"title"] localizedStandardCompare:b[@"title"]]; }];
+        if (done || rows.count || !remaining) request.update((done || rows.count) ? rows : nil, done || !remaining);
+        if (done || !remaining) return;
+    } @catch (__unused NSException *exception) { request.update(nil, YES); return; }
+    __weak WCInfoGroupRequest *weakRequest = request;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        WCInfoGroupRequest *target = weakRequest;
+        if (target) WCInfoPollGroups(target, remaining - 1);
+    });
+}
+id WCGestureContactInfoCardLoadGroups(NSString *userName, void (^update)(NSArray<NSDictionary<NSString *,NSString *> *> *, BOOL)) {
+    id contact = WCPrivateContact(userName);
+    Class cls = NSClassFromString(@"ContactRelatedGroupLogic");
+    SEL initializer = NSSelectorFromString(@"initWithContact:");
+    if (!contact || !cls) { update(nil, YES); return nil; }
+    id allocated = [cls alloc];
+    if (!WCInfoCompatible(allocated, initializer, '@', "@")) { update(nil, YES); return nil; }
+    @try {
+        id logic = ((id (*)(id, SEL, id))objc_msgSend)(allocated, initializer, contact);
+        SEL search = NSSelectorFromString(@"trySearchRelatedGroup");
+        if (!WCInfoCompatible(logic, search, 'v', "")) { update(nil, YES); return nil; }
+        WCInfoGroupRequest *request = [WCInfoGroupRequest new];
+        request.logic = logic; request.account = [WCCurrentUserWXID() copy]; request.update = update;
+        ((void (*)(id, SEL))objc_msgSend)(logic, search);
+        WCInfoPollGroups(request, 20);
+        return request;
+    } @catch (__unused NSException *exception) { update(nil, YES); return nil; }
 }

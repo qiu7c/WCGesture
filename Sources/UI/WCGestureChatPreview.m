@@ -132,6 +132,8 @@
 @property (nonatomic, strong) UILabel *heading;
 @property (nonatomic, strong) WCGestureChatTopCapsuleView *topProfile;
 @property (nonatomic, strong) WCGestureChatTopCapsuleView *topActions;
+@property (nonatomic, strong) UIView *pinnedHeader;
+@property (nonatomic, strong) UILabel *pinnedLabel;
 @property (nonatomic, strong) UIButton *backButton;
 @property (nonatomic, strong) UIButton *controlsButton;
 @property (nonatomic, strong) UIScrollView *messages;
@@ -210,6 +212,9 @@
     _topActions.moreAction = ^{ [weakSelf controls]; };
     _topActions.searchAction = ^{ [weakSelf controls]; };
         [_navigation addSubview:_topProfile]; [_navigation addSubview:_topActions];
+    _pinnedHeader = [UIView new]; _pinnedLabel = [UILabel new];
+    _pinnedLabel.text = @"置顶消息  ·  你好"; _pinnedLabel.textColor = UIColor.labelColor;
+    [_pinnedHeader addSubview:_pinnedLabel]; [_navigation addSubview:_pinnedHeader];
 }
 - (void)back { if (self.backHandler) self.backHandler(); }
 - (void)controls { if (self.controlsHandler) self.controlsHandler(); }
@@ -235,17 +240,25 @@
     BOOL capsule = self.kind == WCGesturePreviewChatTopBar || WCGestureEnabled(WCGestureChatTopBarCapsuleEnabledKey);
     self.heading.hidden = capsule; self.backButton.hidden = capsule; self.controlsButton.hidden = capsule;
     self.topProfile.hidden = !capsule; self.topActions.hidden = !capsule;
+    self.pinnedHeader.hidden = !capsule;
     if (capsule) {
         [self ensureTopCapsules];
-        self.topProfile.hidden = NO; self.topActions.hidden = NO;
+        self.topProfile.hidden = NO; self.topActions.hidden = NO; self.pinnedHeader.hidden = NO;
         self.navigation.backgroundColor = UIColor.clearColor;
         BOOL search = WCGestureEnabled(WCGestureChatSearchEnabledKey);
         NSString *userName = WCCurrentUserWXID();
         NSString *name = WCGesturePrivateContactDisplayName(userName.length ? WCPrivateContact(userName) : nil, @"我");
-        CGSize leftSize = [self.topProfile configureWithName:name typing:NO search:NO moreImage:nil menu:nil maximumWidth:MAX(90, MIN(260, width - (search ? 88 : 44) - 48))];
-        CGSize rightSize = [self.topActions configureWithName:@"" typing:NO search:search moreImage:nil menu:nil maximumWidth:88];
+        CGSize leftSize = [self.topProfile configureWithName:name typing:NO search:NO moreImage:nil menu:nil maximumWidth:MAX(90 * WCGestureChatTopBarScale(), MIN(205 * WCGestureChatTopBarScale(), width - (search ? 76 : 40) * WCGestureChatTopBarScale() - 48))];
+        CGSize rightSize = [self.topActions configureWithName:@"" typing:NO search:search moreImage:nil menu:nil maximumWidth:76 * WCGestureChatTopBarScale()];
         self.topProfile.frame = (CGRect){CGPointMake(16, top), leftSize};
         self.topActions.frame = (CGRect){CGPointMake(width - 16 - rightSize.width, top), rightSize};
+        CGFloat scale = WCGestureChatTopBarScale();
+        self.pinnedHeader.frame = CGRectMake(0, navigationHeight + 4 * scale, width, 40 * scale);
+        self.pinnedLabel.font = [UIFont systemFontOfSize:13 * scale];
+        self.pinnedLabel.frame = CGRectInset(self.pinnedHeader.bounds, 20 * scale, 0);
+        WCGestureChatPinnedGlassApply(self.pinnedHeader, YES);
+        navigationHeight += 44 * scale;
+        self.navigation.frame = CGRectMake(0, 0, width, navigationHeight);
     }
     BOOL rounding = self.kind == WCGesturePreviewInputRounding;
     CGFloat fieldHeight = 33 + 18 * (MAX(1, self.inputLines) - 1);

@@ -37,6 +37,23 @@
 - (void)initImageGridView {
     %orig;
     WCGestureMomentsImageCornerLayout(self);
+    WCGestureMomentsImageCornerViewDidLayout(self);
+}
+%end
+
+%hook WCListSightCellView
+- (void)initTailView {
+    %orig;
+    WCGestureMomentsImageCornerLayout((UIView *)self);
+    WCGestureMomentsImageCornerViewDidLayout((UIView *)self);
+}
+%end
+
+%hook WCListHybridCellView
+- (void)reloadItemContainerView {
+    %orig;
+    WCGestureMomentsImageCornerLayout((UIView *)self);
+    WCGestureMomentsImageCornerViewDidLayout((UIView *)self);
 }
 %end
 
@@ -49,6 +66,17 @@
 - (void)albumView:(id)view displayCellsWithDataItems:(id)items cellLeftContext:(double *)context {
     %orig;
     WCGestureMomentsImageCornerRegisterProfile(view);
+}
+%end
+
+%hook WCFinderWXContactEntranceView
+- (void)layoutSubviews {
+    %orig;
+    WCGestureMomentsImageCornerFinderLayout((UIView *)self);
+}
+- (void)didMoveToWindow {
+    %orig;
+    WCGestureMomentsImageCornerFinderLayout((UIView *)self);
 }
 %end
 

@@ -4,6 +4,11 @@ NS_ASSUME_NONNULL_BEGIN
 UIView *WCGestureCreateChatGlassView(void);
 UIView *WCGestureChatGlassContent(UIView *glass);
 void WCGestureConfigureChatGlass(UIView *glass);
+void WCGestureConfigureChatPinnedGlass(UIView *glass);
+CGFloat WCGestureChatTopBarScale(void);
+void WCGestureChatPinnedGlassApply(UIView *tips, BOOL enabled);
+void WCGestureChatPinnedLayout(UIView *tips);
+void WCGestureChatPinnedRefresh(void);
 
 /// The native bar and the existing full-page chat preview use this same renderer.
 @interface WCGestureChatTopCapsuleView : UIView
@@ -17,6 +22,7 @@ void WCGestureConfigureChatGlass(UIView *glass);
 @end
 
 void WCGestureChatTopBarUpdate(UIViewController *controller);
+void WCGestureChatTopBarNavigationLayout(UINavigationBar *bar);
 void WCGestureChatTopBarRestore(UIViewController *controller);
 void WCGestureChatTopBarTitleChanged(UIViewController *controller, id _Nullable titleView);
 void WCGestureChatTopBarSettingsChanged(NSString * _Nullable key);

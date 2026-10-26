@@ -20,6 +20,14 @@
 %end
 
 %hook ChatRoomInfoViewController
+- (void)viewWillAppear:(BOOL)animated {
+    %orig;
+    WCGestureContactInfoCardApply(self, YES);
+}
+- (void)viewDidAppear:(BOOL)animated {
+    %orig;
+    WCGestureContactInfoCardApply(self, YES);
+}
 - (void)initData {
     %orig;
     WCGestureContactInfoCardApply(self, YES);

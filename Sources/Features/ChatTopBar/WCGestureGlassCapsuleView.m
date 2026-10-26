@@ -239,3 +239,12 @@ void WCGestureConfigureChatGlass(UIView *glass) {
         [view configurePseudoLiquidWithBlurIntensity:intensity / 100.0];
     else [view configureFrostedGlassWithBlurIntensity:intensity / 100.0];
 }
+
+CGFloat WCGestureChatTopBarScale(void) {
+    return WCGestureLayoutScaleFactor();
+}
+void WCGestureConfigureChatPinnedGlass(UIView *glass) {
+    double intensity = [NSUserDefaults.standardUserDefaults doubleForKey:WCGestureChatGlassBlurIntensityKey];
+    if (!isfinite(intensity)) intensity = 20;
+    [(WCGestureGlassCapsuleView *)glass configureFrostedGlassWithBlurIntensity:intensity / 100.0];
+}

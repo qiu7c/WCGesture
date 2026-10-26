@@ -5,6 +5,7 @@
 
 static char WCMomentsCornerStateKey, WCMomentsCornerTargetsKey, WCMomentsCornerBusyKey;
 static char WCMomentsCornerProfileKey, WCMomentsCornerRegisteredKey, WCMomentsCornerPendingKey;
+static char WCMomentsCornerFinderStripKey;
 
 @interface WCMomentsCornerState : NSObject
 @property (nonatomic, weak) UIView *owner;
@@ -94,10 +95,18 @@ static void WCMomentsCornerApply(UIView *view, UIView *root, CGFloat radius, NSH
     [targets addObject:view];
 }
 
-static BOOL WCMomentsCornerSkipBranch(UIView *view) {
+static BOOL WCMomentsCornerAlbumMediaRoot(UIView *root) {
+    return WCMomentsCornerClass(root, @"WCListPhotoCellView")
+        || WCMomentsCornerClass(root, @"WCListSightCellView")
+        || WCMomentsCornerClass(root, @"WCListHybridCellView");
+}
+
+static BOOL WCMomentsCornerSkipBranch(UIView *view, UIView *root) {
     NSString *name = NSStringFromClass(view.class);
     return [name containsString:@"HeadImage"] || [name containsString:@"Avatar"]
-        || [view isKindOfClass:UILabel.class] || [view isKindOfClass:UIButton.class];
+        || [view isKindOfClass:UILabel.class] || [view isKindOfClass:UITextView.class]
+        || WCMomentsCornerClass(view, @"RichTextView")
+        || ([view isKindOfClass:UIButton.class] && !WCMomentsCornerAlbumMediaRoot(root));
 }
 
 static void WCMomentsCornerWalk(UIView *view, UIView *root, CGFloat radius, NSUInteger depth,
@@ -106,7 +115,7 @@ static void WCMomentsCornerWalk(UIView *view, UIView *root, CGFloat radius, NSUI
     (*remaining)--;
     // Native grid items are explicit media tiles, including UIButton-backed thumbnails.
     if (nativeTile) { WCMomentsCornerApply(view, root, radius, targets); return; }
-    if (view != root && WCMomentsCornerSkipBranch(view)) return;
+    if (view != root && WCMomentsCornerSkipBranch(view, root)) return;
     if (WCMomentsCornerClass(view, @"WCSNSNodeVideoView")
         || WCMomentsCornerClass(view, @"WCPuzzleImageView")
         || WCMomentsCornerClass(view, @"WCImageView")
@@ -115,6 +124,11 @@ static void WCMomentsCornerWalk(UIView *view, UIView *root, CGFloat radius, NSUI
         return;
     }
     if (WCMomentsCornerClass(view, @"MMImageGridView")) {
+        if (WCMomentsCornerAlbumMediaRoot(root)) {
+            // Album/hybrid rows use one outer media frame; don't round its inner tiles again.
+            WCMomentsCornerApply(view, root, radius, targets);
+            return;
+        }
         id tiles = WCTweakSafeValue(view, @"m_arrOfViews");
         if ([tiles isKindOfClass:NSArray.class]) {
             for (id tile in tiles) {
@@ -190,6 +204,21 @@ void WCGestureMomentsImageCornerRegisterProfile(UIView *view) {
     objc_setAssociatedObject(view, &WCMomentsCornerProfileKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     WCGestureMomentsImageCornerLayout(view);
     WCGestureMomentsImageCornerViewDidLayout(view);
+}
+
+void WCGestureMomentsImageCornerFinderLayout(UIView *entrance) {
+    // The supplied profile tree identifies coverStackView; contact/auth views are siblings.
+    id candidate = WCTweakSafeValue(entrance, @"coverStackView");
+    UIView *strip = [candidate isKindOfClass:UIView.class] && entrance.window
+        && candidate != entrance && [(UIView *)candidate isDescendantOfView:entrance] ? candidate : nil;
+    UIView *previous = objc_getAssociatedObject(entrance, &WCMomentsCornerFinderStripKey);
+    if (previous && previous != strip) {
+        WCGestureMomentsImageCornerReset(previous);
+        objc_setAssociatedObject(previous, &WCMomentsCornerProfileKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        objc_setAssociatedObject(previous, &WCMomentsCornerRegisteredKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    objc_setAssociatedObject(entrance, &WCMomentsCornerFinderStripKey, strip, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    if (strip) WCGestureMomentsImageCornerRegisterProfile(strip);
 }
 
 void WCGestureMomentsImageCornerSettingsChanged(NSString *key) {

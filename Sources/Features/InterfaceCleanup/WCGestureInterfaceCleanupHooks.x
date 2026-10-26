@@ -36,4 +36,5 @@
 
 %ctor {
     %init;
+    WCGestureInterfaceCleanupInstallOptionalHooks();
 }

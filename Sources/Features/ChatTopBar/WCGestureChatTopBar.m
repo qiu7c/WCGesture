@@ -3,10 +3,18 @@
 #import "Sources/API/WCGestureInternal.h"
 
 static char WCTopBarStateKey;
+static char WCTopBarPendingKey;
 
 @interface WCTopBackgroundState : NSObject
 @property (nonatomic, weak) UIView *view;
 @property (nonatomic, assign) BOOL hidden;
+@property (nonatomic, assign) CGFloat alpha;
+@property (nonatomic, strong) UIColor *color;
+@property (nonatomic, assign) BOOL clips;
+@property (nonatomic, assign) CGFloat border;
+@property (nonatomic, assign) CGFloat corner;
+@property (nonatomic, strong) UIVisualEffect *effect;
+@property (nonatomic, assign) NSUInteger changed;
 @end
 @implementation WCTopBackgroundState
 @end
@@ -17,6 +25,9 @@ static char WCTopBarStateKey;
 @property (nonatomic, strong) UIView *title;
 @property (nonatomic, assign) BOOL supplement;
 @property (nonatomic, copy) NSArray *appearances;
+@property (nonatomic, weak) UINavigationBar *navigationBar;
+@property (nonatomic, copy) NSArray *navigationAppearances;
+@property (nonatomic, assign) BOOL translucent;
 @property (nonatomic, assign) UIRectEdge edges;
 @property (nonatomic, assign) BOOL opaqueBars;
 @property (nonatomic, strong) UIBarButtonItem *profileItem;
@@ -76,40 +87,118 @@ static void WCTopInvoke(UIBarButtonItem *item, UIViewController *controller, BOO
     if (back) [controller.navigationController popViewControllerAnimated:YES];
 }
 
-static void WCTopHideBackground(WCTopBarState *state, UIView *view) {
-    if (!view) return;
-    if (![state.backgrounds objectForKey:view]) {
-        WCTopBackgroundState *snapshot = [WCTopBackgroundState new];
-        snapshot.view = view; snapshot.hidden = view.hidden;
-        [state.backgrounds setObject:snapshot forKey:view];
-    }
-    view.hidden = YES;
+static NSMapTable *WCTopBarOwners(void) {
+    static NSMapTable *owners;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ owners = [NSMapTable weakToWeakObjectsMapTable]; });
+    return owners;
 }
-
-static void WCTopScopeBackgrounds(WCTopBarState *state, UIView *view, NSUInteger depth) {
-    if (!view || depth > 4 || [view isKindOfClass:WCGestureChatTopCapsuleView.class]) return;
-    NSString *name = NSStringFromClass(view.class);
-    // Only known navigation backgrounds; never hide content/control containers.
-    if ([name isEqualToString:@"_UIBarBackground"] || [name isEqualToString:@"_UINavigationBarBackground"]) {
-        WCTopHideBackground(state, view); return;
+static BOOL WCTopIsOurs(UIView *view) {
+    return [view isKindOfClass:WCGestureChatTopCapsuleView.class]
+        || [NSStringFromClass(view.class) isEqualToString:@"WCGestureGlassCapsuleView"];
+}
+static WCTopBackgroundState *WCTopSnapshot(WCTopBarState *state, UIView *view) {
+    WCTopBackgroundState *saved = [state.backgrounds objectForKey:view];
+    if (!saved) {
+        saved = [WCTopBackgroundState new]; saved.view = view;
+        saved.hidden = view.hidden; saved.alpha = view.alpha; saved.color = view.backgroundColor;
+        saved.clips = view.clipsToBounds; saved.border = view.layer.borderWidth; saved.corner = view.layer.cornerRadius;
+        if ([view isKindOfClass:UIVisualEffectView.class]) saved.effect = ((UIVisualEffectView *)view).effect;
+        [state.backgrounds setObject:saved forKey:view];
     }
+    return saved;
+}
+static void WCTopClearHost(WCTopBarState *state, UIView *view, BOOL geometry) {
+    if (!view || WCTopIsOurs(view)) return;
+    WCTopBackgroundState *saved = WCTopSnapshot(state, view); saved.changed |= 2;
+    if (![view.backgroundColor isEqual:UIColor.clearColor]) view.backgroundColor = UIColor.clearColor;
+    if (geometry) {
+        saved.changed |= 4;
+        view.clipsToBounds = NO; view.layer.borderWidth = 0; view.layer.cornerRadius = 0;
+    }
+}
+static BOOL WCTopHasContent(UIView *view, NSUInteger depth) {
+    if (WCTopIsOurs(view) || [view isKindOfClass:UIControl.class] || [view isKindOfClass:UILabel.class]) return YES;
+    if (depth > 6) return NO;
+    NSString *name = NSStringFromClass(view.class);
+    if ([name containsString:@"BarContent"] || [name containsString:@"NavigationBarContent"]) return YES;
+    for (UIView *child in view.subviews) if (WCTopHasContent(child, depth + 1)) return YES;
+    return NO;
+}
+static BOOL WCTopIsBackground(UIView *view) {
+    NSString *name = NSStringFromClass(view.class);
+    return [view isKindOfClass:UIVisualEffectView.class] || [name containsString:@"Background"]
+        || [name containsString:@"Backdrop"] || [name containsString:@"Material"];
+}
+static void WCTopRemoveBackground(WCTopBarState *state, UIView *view) {
+    if (!view || WCTopIsOurs(view)) return;
+    WCTopClearHost(state, view, NO);
+    WCTopBackgroundState *saved = WCTopSnapshot(state, view);
+    if ([view isKindOfClass:UIVisualEffectView.class]) {
+        saved.changed |= 8;
+        if (((UIVisualEffectView *)view).effect) ((UIVisualEffectView *)view).effect = nil;
+    }
+    if (!WCTopHasContent(view, 0)) {
+        saved.changed |= 1; view.hidden = YES; view.alpha = 0;
+    }
+}
+static void WCTopScopeBackgrounds(WCTopBarState *state, UIView *view, NSUInteger depth) {
+    if (!view || depth > 6 || WCTopIsOurs(view)) return;
+    if (WCTopIsBackground(view)) WCTopRemoveBackground(state, view);
     for (UIView *child in view.subviews) WCTopScopeBackgrounds(state, child, depth + 1);
 }
-
+static void WCTopClearPrivateLayers(WCTopBarState *state, UIView *view, NSUInteger depth) {
+    if (!view || depth > 5 || [NSStringFromClass(view.class) containsString:@"Expand"] || WCTopIsOurs(view) || [view isKindOfClass:UIControl.class] || [view isKindOfClass:UILabel.class]) return;
+    WCTopClearHost(state, view, NO);
+    if (WCTopIsBackground(view)) WCTopRemoveBackground(state, view);
+    for (UIView *child in view.subviews) WCTopClearPrivateLayers(state, child, depth + 1);
+}
 static void WCTopPrivateBackgrounds(WCTopBarState *state, UIView *view, NSUInteger depth, NSUInteger *budget) {
     if (!view || depth > 8 || !*budget) return;
     (*budget)--;
     NSString *name = NSStringFromClass(view.class);
     if ([name isEqualToString:@"MMNewMsgContentNavBar"] || [name isEqualToString:@"MMMsgContentNavBar"]) {
-        for (UIView *child in view.subviews) {
-            NSString *childName = NSStringFromClass(child.class);
-            BOOL background = [child isKindOfClass:UIVisualEffectView.class] || [childName containsString:@"Background"];
-            if (background && CGRectGetWidth(child.bounds) >= CGRectGetWidth(view.bounds) - 1)
-                WCTopHideBackground(state, child);
-        }
+        WCTopClearHost(state, view, YES);
+        WCTopClearPrivateLayers(state, view, 0);
         return;
     }
     for (UIView *child in view.subviews) WCTopPrivateBackgrounds(state, child, depth + 1, budget);
+}
+static void WCTopApplyBackgrounds(WCTopBarState *state, UIViewController *controller) {
+    UINavigationBar *bar = controller.navigationController.navigationBar;
+    if (!bar) return;
+    UIViewController *previous = [WCTopBarOwners() objectForKey:bar];
+    if (previous && previous != controller) WCGestureChatTopBarRestore(previous);
+    if (!state.navigationAppearances) {
+        state.navigationBar = bar;
+        NSMutableArray *saved = [NSMutableArray arrayWithArray:@[bar.standardAppearance, bar.scrollEdgeAppearance ?: NSNull.null,
+            bar.compactAppearance ?: NSNull.null]];
+        if (@available(iOS 15.0, *)) [saved addObject:bar.compactScrollEdgeAppearance ?: NSNull.null];
+        state.navigationAppearances = saved; state.translucent = bar.translucent;
+    }
+    [WCTopBarOwners() setObject:controller forKey:bar];
+    if (bar.standardAppearance.backgroundEffect || ![bar.standardAppearance.backgroundColor isEqual:UIColor.clearColor]
+        || (bar.scrollEdgeAppearance && (bar.scrollEdgeAppearance.backgroundEffect || ![bar.scrollEdgeAppearance.backgroundColor isEqual:UIColor.clearColor]))
+        || (bar.compactAppearance && (bar.compactAppearance.backgroundEffect || ![bar.compactAppearance.backgroundColor isEqual:UIColor.clearColor]))) {
+        bar.standardAppearance = controller.navigationItem.standardAppearance;
+        bar.scrollEdgeAppearance = controller.navigationItem.scrollEdgeAppearance;
+        bar.compactAppearance = controller.navigationItem.compactAppearance;
+        if (@available(iOS 15.0, *)) bar.compactScrollEdgeAppearance = controller.navigationItem.compactScrollEdgeAppearance;
+    }
+    if (!bar.translucent) bar.translucent = YES;
+    WCTopClearHost(state, bar, YES); WCTopClearHost(state, bar.superview, YES);
+    WCTopScopeBackgrounds(state, bar, 0);
+    for (UIView *child in bar.subviews) if (!WCTopHasContent(child, 0)) WCTopRemoveBackground(state, child);
+    UIView *navigationRoot = controller.navigationController.view;
+    UIView *host = bar;
+    for (NSUInteger depth = 0; host && depth < 4; depth++, host = host.superview) {
+        WCTopClearHost(state, host, NO);
+        if (host == navigationRoot) break;
+        for (UIView *sibling in host.superview.subviews)
+            if (sibling != host && WCTopIsBackground(sibling)) WCTopRemoveBackground(state, sibling);
+    }
+    NSUInteger budget = 400;
+    WCTopPrivateBackgrounds(state, controller.view, 0, &budget);
 }
 
 void WCGestureChatTopBarRestore(UIViewController *controller) {
@@ -128,7 +217,23 @@ void WCGestureChatTopBarRestore(UIViewController *controller) {
     if (@available(iOS 15.0, *)) item.compactScrollEdgeAppearance = saved[3] == NSNull.null ? nil : saved[3];
     controller.edgesForExtendedLayout = state.edges;
     controller.extendedLayoutIncludesOpaqueBars = state.opaqueBars;
-    for (WCTopBackgroundState *background in state.backgrounds.objectEnumerator) background.view.hidden = background.hidden;
+    UINavigationBar *bar = state.navigationBar;
+    if (bar && [WCTopBarOwners() objectForKey:bar] == controller) {
+        NSArray *savedBar = state.navigationAppearances;
+        bar.standardAppearance = savedBar[0];
+        bar.scrollEdgeAppearance = savedBar[1] == NSNull.null ? nil : savedBar[1];
+        bar.compactAppearance = savedBar[2] == NSNull.null ? nil : savedBar[2];
+        if (@available(iOS 15.0, *)) bar.compactScrollEdgeAppearance = savedBar[3] == NSNull.null ? nil : savedBar[3];
+        bar.translucent = state.translucent;
+        [WCTopBarOwners() removeObjectForKey:bar];
+        for (WCTopBackgroundState *background in state.backgrounds.objectEnumerator) {
+            UIView *view = background.view;
+            if (background.changed & 1) { view.hidden = background.hidden; view.alpha = background.alpha; }
+            if (background.changed & 2) view.backgroundColor = background.color;
+            if (background.changed & 4) { view.clipsToBounds = background.clips; view.layer.borderWidth = background.border; view.layer.cornerRadius = background.corner; }
+            if ((background.changed & 8) && [view isKindOfClass:UIVisualEffectView.class]) ((UIVisualEffectView *)view).effect = background.effect;
+        }
+    }
     objc_setAssociatedObject(controller, &WCTopBarStateKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
@@ -195,10 +300,11 @@ void WCGestureChatTopBarUpdate(UIViewController *controller) {
     CGFloat totalWidth = CGRectGetWidth(controller.navigationController.navigationBar.bounds);
     if (totalWidth < 1) totalWidth = CGRectGetWidth(controller.view.bounds);
     NSUInteger extras = (state.left.count > 1 ? state.left.count - 1 : 0) + (state.right.count > 1 ? state.right.count - 1 : 0);
-    CGFloat maxLeft = MAX(90, MIN(260, totalWidth - (search ? 88 : 44) - 48 - 44 * extras));
+    CGFloat scale = WCGestureChatTopBarScale();
+    CGFloat maxLeft = MAX(90 * scale, MIN(205 * scale, totalWidth - (search ? 76 : 40) * scale - 48 - 44 * extras));
     CGSize leftSize = [state.profile configureWithName:name typing:state.typing search:NO moreImage:nil menu:nil maximumWidth:maxLeft];
     UIBarButtonItem *more = state.right.firstObject;
-    CGSize rightSize = [state.actions configureWithName:@"" typing:NO search:search moreImage:more.image menu:more.menu maximumWidth:88];
+    CGSize rightSize = [state.actions configureWithName:@"" typing:NO search:search moreImage:more.image menu:more.menu maximumWidth:76 * scale];
     state.profile.frame = (CGRect){CGPointZero, leftSize};
     state.actions.frame = (CGRect){CGPointZero, rightSize};
     if (![item.leftBarButtonItems containsObject:state.profileItem]) {
@@ -223,13 +329,12 @@ void WCGestureChatTopBarUpdate(UIViewController *controller) {
     }
     controller.edgesForExtendedLayout |= UIRectEdgeTop;
     controller.extendedLayoutIncludesOpaqueBars = YES;
-    WCTopScopeBackgrounds(state, controller.navigationController.navigationBar, 0);
-    NSUInteger budget = 150;
-    WCTopPrivateBackgrounds(state, controller.view, 0, &budget);
+    WCTopApplyBackgrounds(state, controller);
     state.updating = NO;
 }
 
 void WCGestureChatTopBarTitleChanged(UIViewController *controller, id titleView) {
+    WCGestureGroupTitleLayout(controller);
     WCTopBarState *state = objc_getAssociatedObject(controller, &WCTopBarStateKey);
     if (state && [titleView isKindOfClass:UIView.class] && titleView != state.placeholder) {
         state.title = titleView;
@@ -238,9 +343,26 @@ void WCGestureChatTopBarTitleChanged(UIViewController *controller, id titleView)
     WCGestureChatTopBarUpdate(controller);
 }
 
+void WCGestureChatTopBarNavigationLayout(UINavigationBar *bar) {
+    UIViewController *controller = [WCTopBarOwners() objectForKey:bar];
+    if (!controller || [objc_getAssociatedObject(bar, &WCTopBarPendingKey) boolValue]) return;
+    objc_setAssociatedObject(bar, &WCTopBarPendingKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    __weak UINavigationBar *weakBar = bar;
+    __weak UIViewController *weakController = controller;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UINavigationBar *target = weakBar;
+        if (!target) return;
+        objc_setAssociatedObject(target, &WCTopBarPendingKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        UIViewController *owner = weakController;
+        if (owner && [WCTopBarOwners() objectForKey:target] == owner) WCGestureChatTopBarUpdate(owner);
+    });
+}
+
 void WCGestureChatTopBarSettingsChanged(NSString *key) {
     if (key && ![key isEqualToString:WCGestureEnabledKey] && ![key isEqualToString:WCGestureChatSearchEnabledKey]
-        && ![key hasPrefix:@"com.qiu7c.onewx.chat.top-bar-capsule."]) return;
+        && ![key hasPrefix:@"com.qiu7c.onewx.chat.top-bar-capsule."]
+        && ![key isEqualToString:WCGesturePageScaleEnabledKey] && ![key isEqualToString:WCGesturePageScalePercentKey]) return;
+    WCGestureChatPinnedRefresh();
     for (UIViewController *controller in WCTopControllers().allObjects) {
         if (controller.isViewLoaded && controller.view.window) WCGestureChatSearchUpdate(controller);
         else WCGestureChatTopBarRestore(controller);
