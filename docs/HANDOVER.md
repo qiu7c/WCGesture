@@ -10,6 +10,20 @@
 
 本次提交说明（2026-10-26，当前全部工作）：用户已明确授权提交推送，纳入自动更新微信状态、资料清空、三位置设置入口、增强分类与翻译配置更名、头像共用预览/缩放、磨砂模糊修正、朋友圈/聊天媒体圆角，以及移除收付款码跳转。下文“当前未提交”均为开发过程记录，本轮统一纳入；实时提交/推送状态以 git log/status 为准。版本保持 1.0.0，只有静态检查，未编译或真机验证，不主动查 CI；反编译包/证据/工具均在仓库外。
 
+本次提交说明（2026-10-26）：用户已授权提交推送入口图标、预览按钮去底色/类目、资料卡透明度及原生模糊半径修正。以下“当前未提交”为开发记录，统一纳入本轮提交；实时状态以 git log/status 为准。仅静态检查，未编译或真机验证，不查询 CI。
+
+## 2026-10-26 预览按钮去底色、资料卡透明与真实模糊半径（当前未提交）
+
+用户补充上一条“而且要”：预览保留原位置蓝色调节按钮，删除后方白色条和左侧当前类目；资料卡进一步透明；顶栏模糊强度仍无变化。已删除 adjustmentTitle，调节宿主改透明且仅覆盖右侧108×44按钮区域，按钮屏幕坐标保持，抽屉中的调节项目选择保留。资料卡材质 Thin→UltraThin、玻璃 alpha .72→.52、遮罩 .12→.08，内容不跟着变淡。
+
+玻璃不再只依赖 Regular 材质的动画百分比：核对本地 UIKit/WeChat 8.0.79 头文件 UIBlurEffect.h 的 +effectWithBlurRadius:(double)，运行时检查 selector、对象返回类型和 double 入参签名，创建原生实际模糊半径 0–40（对应强度0–100%）效果。不可用/异常返回时保留材质动画兼容。效果宿主需已入窗且 bounds 非零；首次布局尺寸确定后异步复核，避免在零尺寸/未入窗时建立材质。透明度改为玻璃表面的独立 CAShapeLayer alpha mask，glass/effectView UIView alpha 均保持1，减少 UIView 层透明度对采样模糊的干扰；文字/头像/按钮仍是玻璃同级内容，不一起透明。前后台/主题/系统降低透明度逻辑保留，降低透明度启用时仍按原有实色降级。
+
+未新增 key/Hook/框架，保留上一条入口图标未提交修正。仅静态检查（含真实半径接口 ABI 与生命周期），未 iOS 编译/真机验证，不承诺已解决设备渲染结果，未提交推送。
+
+## 2026-10-26 我的页面入口图标修正（当前未提交）
+
+用户反馈 One Wx 的“我的页面”入口未像微信/插件管理在文字左侧显示图标。确认 WCEntryMakeCell 兼容分支曾调用无图片参数的 normalCellForSel:target:title:rightValue:accessoryType:。现统一使用带图的原生 cell 工厂：旧 leftImage/WithDisclosureIndicator，8.0.79 NormalCell 的 detail/image/accessoryType(long long)，以及插件管理同款 leftImage/title/pathKey 兼容接口，移除纯文字回退。优先微信内置 WeChat_Lab_Logo_light_small（插件管理同款），缺失时使用蓝色系统扩展/齿轮图标；以 AlwaysOriginal 保留颜色，尺寸与文字间距交给微信原生布局。沿用原入口位置切换、标题和去重，不新增 Hook/key/default。用户“而且要”后续要求尚待补充。本修正未编译、真机验证、提交推送。
+
 ## 2026-10-26 文件选择器弃用接口编译修正（当前未提交）
 
 用户贴出 Xcode 16.4 / iOS18.5 SDK 编译错误：自动状态媒体导入使用 initWithDocumentTypes:inMode: 与 UIDocumentPickerModeImport，被 -Werror 拦截。改用 iOS14 起可用的 initForOpeningContentTypes:asCopy:YES，类型为 UTTypeMovie/UTTypeImage；加入 UniformTypeIdentifiers 系统 import 和 Theos framework 链接，保持导入副本语义和 iOS14 最低版本。未屏蔽弃用警告。仅静态检查，未编译/真机验证/提交推送，不查询 CI。

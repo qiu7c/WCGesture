@@ -84,7 +84,7 @@
     [super viewDidLoad];
     self.view.backgroundColor = UIColor.clearColor;
     UIButton *dimming = [UIButton buttonWithType:UIButtonTypeCustom];
-    dimming.backgroundColor = [UIColor.blackColor colorWithAlphaComponent:0.12];
+    dimming.backgroundColor = [UIColor.blackColor colorWithAlphaComponent:0.08];
     dimming.accessibilityLabel = @"关闭资料信息";
     [dimming addTarget:self action:@selector(close) forControlEvents:UIControlEventTouchUpInside];
     self.panel = [UIView new]; self.panel.backgroundColor = UIColor.clearColor;
@@ -153,8 +153,8 @@
 - (void)dealloc { [NSNotificationCenter.defaultCenter removeObserver:self]; }
 - (void)updateStyle {
     BOOL reduced = UIAccessibilityIsReduceTransparencyEnabled();
-    self.glass.effect = reduced ? nil : [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemThinMaterial];
-    self.glass.alpha = reduced ? 1 : 0.72;
+    self.glass.effect = reduced ? nil : [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemUltraThinMaterial];
+    self.glass.alpha = reduced ? 1 : 0.52;
     self.panel.backgroundColor = reduced ? UIColor.secondarySystemGroupedBackgroundColor : UIColor.clearColor;
     BOOL dark = self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark;
     self.panel.layer.borderColor = [UIColor.whiteColor colorWithAlphaComponent:dark ? 0.16 : 0.45].CGColor;

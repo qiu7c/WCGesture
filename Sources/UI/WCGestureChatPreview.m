@@ -139,7 +139,6 @@
 @property (nonatomic, strong) UIButton *backButton;
 @property (nonatomic, strong) UIButton *controlsButton;
 @property (nonatomic, strong) UIView *adjustmentToolbar;
-@property (nonatomic, strong) UILabel *adjustmentTitle;
 @property (nonatomic, assign) BOOL controlsExpanded;
 @property (nonatomic, strong) UIScrollView *messages;
 @property (nonatomic, strong) UILabel *separatorTime;
@@ -166,9 +165,7 @@
         [_backButton setImage:WCGestureSettingsBackImage() forState:UIControlStateNormal];
         [_backButton addTarget:self action:@selector(back) forControlEvents:UIControlEventTouchUpInside];
         _backButton.accessibilityLabel = @"返回设置";
-        _adjustmentToolbar = [UIView new]; _adjustmentToolbar.backgroundColor = UIColor.secondarySystemGroupedBackgroundColor;
-        _adjustmentTitle = [UILabel new]; _adjustmentTitle.textColor = UIColor.labelColor;
-        _adjustmentTitle.adjustsFontSizeToFitWidth = YES; _adjustmentTitle.minimumScaleFactor = 0.8;
+        _adjustmentToolbar = [UIView new]; _adjustmentToolbar.backgroundColor = UIColor.clearColor;
         _controlsButton = [UIButton buttonWithType:UIButtonTypeSystem];
         [_controlsButton setImage:[UIImage systemImageNamed:@"slider.horizontal.3" withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:12 weight:UIImageSymbolWeightRegular]] forState:UIControlStateNormal];
         _controlsButton.tintColor = UIColor.systemBlueColor;
@@ -176,7 +173,7 @@
         _controlsButton.layer.cornerRadius = 12; _controlsButton.layer.cornerCurve = kCACornerCurveContinuous;
         _controlsButton.titleEdgeInsets = UIEdgeInsetsMake(0, 5, 0, -5);
         [_controlsButton addTarget:self action:@selector(controls) forControlEvents:UIControlEventTouchUpInside];
-        for (UIView *view in @[_adjustmentTitle, _controlsButton]) [_adjustmentToolbar addSubview:view];
+        [_adjustmentToolbar addSubview:_controlsButton];
         for (UIView *view in @[_heading, _backButton]) [_navigation addSubview:view];
         _messages = [UIScrollView new]; _messages.alwaysBounceVertical = YES;
         _messages.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
@@ -276,15 +273,14 @@
     // Editing tools are outside the simulated native navigation, so enabling
     // capsules never replaces the named control with a more/search icon.
     CGFloat toolbarHeight = 52;
-    self.adjustmentToolbar.frame = CGRectMake(0, navigationHeight, width, toolbarHeight);
-    self.adjustmentTitle.frame = CGRectMake(16, 4, MAX(0, width - 152), 44);
-    self.adjustmentTitle.font = [UIFont systemFontOfSize:14 * WCGestureSettingsScaleFactor()];
-    self.adjustmentTitle.text = @[@"消息时间", @"防撤回提示", @"输入圆角", @"胶囊顶栏", @"头像圆角"][self.kind];
-    self.controlsButton.frame = CGRectMake(MAX(0, width - 124), 4, 108, 44);
+    // Only the blue control occupies this area; there is no white strip or
+    // visible category label. Keep the button at the same screen position.
+    self.adjustmentToolbar.frame = CGRectMake(MAX(0, width - 124), navigationHeight + 4, 108, 44);
+    self.controlsButton.frame = self.adjustmentToolbar.bounds;
     self.controlsButton.titleLabel.font = [UIFont systemFontOfSize:14 * WCGestureSettingsScaleFactor()];
     [self.controlsButton setTitle:self.controlsExpanded ? @"收起调节" : @"外观调节" forState:UIControlStateNormal];
     self.controlsButton.accessibilityLabel = self.controlsExpanded ? @"收起外观调节面板" : @"打开外观调节面板";
-    self.controlsButton.accessibilityValue = self.adjustmentTitle.text;
+    self.controlsButton.accessibilityValue = @[@"消息时间", @"防撤回提示", @"输入圆角", @"胶囊顶栏", @"头像圆角"][self.kind];
     BOOL rounding = self.kind == WCGesturePreviewInputRounding;
     CGFloat fieldHeight = 33 + 18 * (MAX(1, self.inputLines) - 1);
     CGFloat inputHeight = fieldHeight + 12 + self.safeAreaInsets.bottom;

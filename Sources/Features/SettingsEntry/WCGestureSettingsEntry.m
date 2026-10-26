@@ -59,19 +59,37 @@ static id WCEntryTableManager(UIViewController *controller) {
     }
     return nil;
 }
+static UIImage *WCEntryIcon(void) {
+    // The same bundled asset used by the supplied plugin manager's Me-page row.
+    UIImage *image = [UIImage imageNamed:@"WeChat_Lab_Logo_light_small"];
+    if (image) return [image imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
+    UIImage *symbol = [UIImage systemImageNamed:@"puzzlepiece.extension.fill"];
+    if (!symbol) symbol = [UIImage systemImageNamed:@"gearshape.fill"];
+    return [symbol imageWithTintColor:UIColor.systemBlueColor renderingMode:UIImageRenderingModeAlwaysOriginal];
+}
 static id WCEntryMakeCell(UIViewController *controller) {
     Class cls = NSClassFromString(@"WCTableViewCellManager");
     SEL factory = NSSelectorFromString(@"normalCellForSel:target:leftImage:title:WithDisclosureIndicator:");
     SEL action = NSSelectorFromString(@"wc_pushGestureSettings");
+    UIImage *icon = WCEntryIcon();
+    NSString *name = WCEntryName();
     id cell = nil;
     if ([cls respondsToSelector:factory]) {
-        UIImage *icon = [UIImage systemImageNamed:@"hand.draw.fill"];
-        cell = ((id (*)(id,SEL,SEL,id,id,id,BOOL))objc_msgSend)(cls,factory,action,controller,icon,WCEntryName(),YES);
-    } else {
-        cls = NSClassFromString(@"WCTableViewNormalCellManager");
-        factory = NSSelectorFromString(@"normalCellForSel:target:title:rightValue:accessoryType:");
-        if ([cls respondsToSelector:factory])
-            cell = ((id (*)(id,SEL,SEL,id,id,id,long long))objc_msgSend)(cls,factory,action,controller,WCEntryName(),nil,1LL);
+        cell = ((id (*)(id,SEL,SEL,id,id,id,BOOL))objc_msgSend)(cls,factory,action,controller,icon,name,YES);
+    }
+    if (!cell) {
+        // Current WeChat exposes a normal-cell factory that takes the image
+        // explicitly. Do not fall back to the old text-only row.
+        Class normalClass = NSClassFromString(@"WCTableViewNormalCellManager");
+        SEL imageFactory = NSSelectorFromString(@"normalCellForSel:target:title:detail:image:accessoryType:");
+        if ([normalClass respondsToSelector:imageFactory])
+            cell = ((id (*)(id,SEL,SEL,id,id,id,id,long long))objc_msgSend)(normalClass,imageFactory,action,controller,name,nil,icon,1LL);
+    }
+    if (!cell) {
+        // The supplied manager uses this compatibility variant on newer builds.
+        SEL imageFactory = NSSelectorFromString(@"normalCellForSel:target:leftImage:title:pathKey:");
+        if ([cls respondsToSelector:imageFactory])
+            cell = ((id (*)(id,SEL,SEL,id,id,id,id))objc_msgSend)(cls,imageFactory,action,controller,icon,name,nil);
     }
     if (cell) objc_setAssociatedObject(cell,&WCEntryCellKey,@YES,OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     return cell;

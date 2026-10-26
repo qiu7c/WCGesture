@@ -1,13 +1,30 @@
 #import <QuartzCore/QuartzCore.h>
 #import <math.h>
+#import <objc/message.h>
+#import <string.h>
 #import "Sources/API/WCGestureInternal.h"
 
 static void WCGlassApplyTransparency(UIView *glass);
+
+static UIBlurEffect *WCGlassRadiusEffect(double radius) {
+    // Verified against the supplied UIKit header: +effectWithBlurRadius:(double).
+    // Check the runtime ABI as this is an optional system implementation detail.
+    SEL selector = NSSelectorFromString(@"effectWithBlurRadius:");
+    NSMethodSignature *signature = [UIBlurEffect methodSignatureForSelector:selector];
+    if (![UIBlurEffect respondsToSelector:selector] || signature.numberOfArguments != 3
+        || signature.methodReturnType[0] != '@'
+        || strcmp([signature getArgumentTypeAtIndex:2], @encode(double)) != 0) return nil;
+    @try {
+        id effect = ((id (*)(id,SEL,double))objc_msgSend)(UIBlurEffect.class,selector,radius);
+        return [effect isKindOfClass:UIBlurEffect.class] ? effect : nil;
+    } @catch (__unused NSException *exception) { return nil; }
+}
 
 @interface WCGestureGlassCapsuleView : UIView
 @property (nonatomic, strong) UIVisualEffectView *effectView;
 @property (nonatomic, strong) UIView *contentView;
 @property (nonatomic, strong) UIViewPropertyAnimator *blurAnimator;
+@property (nonatomic, strong) CAShapeLayer *surfaceMask;
 @property (nonatomic, assign) CGFloat capsuleCornerRadius;
 @property (nonatomic, assign) CGFloat appliedBlurIntensity;
 @property (nonatomic, assign) BOOL blurRebuildPending;
@@ -21,6 +38,8 @@ static void WCGlassApplyTransparency(UIView *glass);
     self.translatesAutoresizingMaskIntoConstraints = NO;
     self.backgroundColor = UIColor.clearColor;
     self.appliedBlurIntensity = -1;
+    self.surfaceMask = [CAShapeLayer layer]; self.surfaceMask.fillColor = UIColor.blackColor.CGColor;
+    self.layer.mask = self.surfaceMask;
     self.effectView = [[UIVisualEffectView alloc] initWithEffect:nil];
     self.effectView.userInteractionEnabled = NO;
     self.effectView.clipsToBounds = YES;
@@ -41,38 +60,44 @@ static void WCGlassApplyTransparency(UIView *glass);
     [NSNotificationCenter.defaultCenter removeObserver:self];
     [self invalidateBlurAnimator];
 }
+- (void)scheduleBlurRebuild {
+    if (self.blurRebuildPending) return;
+    self.blurRebuildPending = YES;
+    __weak typeof(self) weakSelf = self;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        weakSelf.blurRebuildPending = NO;
+        [weakSelf rebuildBlurEffect];
+    });
+}
 - (void)rebuildBlurEffect {
-    // Navigation preparation and pinned-header layout disable animations. Do
-    // not create an effect interpolator inside those scopes: it may complete
-    // immediately, leaving every slider value with the same full blur.
-    if (!UIView.areAnimationsEnabled || [CATransaction disableActions]) {
-        if (self.blurRebuildPending) return;
-        self.blurRebuildPending = YES;
-        __weak typeof(self) weakSelf = self;
-        dispatch_async(dispatch_get_main_queue(), ^{
-            weakSelf.blurRebuildPending = NO;
-            [weakSelf rebuildBlurEffect];
-        });
-        return;
-    }
+    // The visual-effect host must already have its final bounds and a window.
+    if (!self.window || CGRectIsEmpty(self.effectView.bounds)) return;
     [self invalidateBlurAnimator];
-    self.effectView.effect = nil;
     self.effectView.alpha = 1;
     self.effectView.backgroundColor = UIColor.clearColor;
     if (UIAccessibilityIsReduceTransparencyEnabled()) {
+        self.effectView.effect = nil;
         self.effectView.backgroundColor = UIColor.secondarySystemGroupedBackgroundColor;
         return;
     }
     CGFloat intensity = MAX(0, MIN(1, self.appliedBlurIntensity));
-    if (intensity == 0) return;
+    if (intensity == 0) { self.effectView.effect = nil; return; }
+    // This changes the blur kernel radius, not the material animation's alpha.
+    UIBlurEffect *radiusEffect = WCGlassRadiusEffect(40.0 * intensity);
+    if (radiusEffect) {
+        [UIView performWithoutAnimation:^{ self.effectView.effect = radiusEffect; }];
+        return;
+    }
+    // Compatibility fallback only; never construct its animator while native
+    // navigation/pinned layout has disabled animations.
+    if (!UIView.areAnimationsEnabled || [CATransaction disableActions]) { [self scheduleBlurRebuild]; return; }
+    self.effectView.effect = nil;
+    [self.effectView layoutIfNeeded];
     UIBlurEffect *effect = [UIBlurEffect effectWithStyle:UIBlurEffectStyleRegular];
     __weak UIVisualEffectView *weakEffect = self.effectView;
     UIViewPropertyAnimator *animator = [[UIViewPropertyAnimator alloc] initWithDuration:1 curve:UIViewAnimationCurveLinear animations:^{ weakEffect.effect = effect; }];
-    animator.pausesOnCompletion = YES;
-    animator.scrubsLinearly = YES;
+    animator.pausesOnCompletion = YES; animator.scrubsLinearly = YES;
     self.blurAnimator = animator;
-    // Setting the fraction starts a paused interactive animation. Do not start
-    // a time-driven animation that can run to the same final material.
     animator.fractionComplete = intensity;
 }
 - (void)configureFrostedGlassWithBlurIntensity:(CGFloat)intensity {
@@ -96,11 +121,15 @@ static void WCGlassApplyTransparency(UIView *glass);
 }
 - (void)layoutSubviews {
     [super layoutSubviews];
+    BOOL sizeChanged = !CGSizeEqualToSize(self.effectView.bounds.size, self.bounds.size);
     [CATransaction begin]; [CATransaction setDisableActions:YES];
+    self.surfaceMask.frame = self.bounds;
+    self.surfaceMask.path = [UIBezierPath bezierPathWithRect:self.bounds].CGPath;
     self.effectView.frame = self.bounds; self.contentView.frame = self.bounds;
     self.effectView.layer.cornerRadius = self.capsuleCornerRadius > 0 ? self.capsuleCornerRadius : CGRectGetHeight(self.bounds) / 2;
     self.effectView.layer.cornerCurve = kCACornerCurveContinuous;
     [CATransaction commit];
+    if (sizeChanged && self.appliedBlurIntensity >= 0 && self.window) [self scheduleBlurRebuild];
 }
 - (void)traitCollectionDidChange:(UITraitCollection *)previous {
     [super traitCollectionDidChange:previous];
@@ -122,7 +151,14 @@ static CGFloat WCGlassNumber(NSString *key, CGFloat fallback, CGFloat low, CGFlo
 }
 static void WCGlassApplyTransparency(UIView *glass) {
     CGFloat transparency = WCGlassNumber(WCGestureChatGlassTransparencyKey, 50, 0, 100) / 100.0;
-    glass.alpha = 1 - transparency;
+    // Keep the visual-effect view and its UIView ancestors at alpha=1.
+    // A compositing mask fades only the completed glass surface, independently
+    // of the blur radius; sibling text/icons retain their original opacity.
+    glass.alpha = 1;
+    WCGestureGlassCapsuleView *view = (WCGestureGlassCapsuleView *)glass;
+    [CATransaction begin]; [CATransaction setDisableActions:YES];
+    view.surfaceMask.opacity = 1 - transparency;
+    [CATransaction commit];
 }
 CGFloat WCGestureChatTopBarShellFactor(void) { return WCGlassNumber(WCGestureChatTopBarShellScaleKey, 100, 80, 140) / 100.0; }
 CGFloat WCGestureChatTopBarActionsWidth(BOOL search) {
