@@ -387,4 +387,7 @@ FOUNDATION_EXPORT NSString *const WCGestureAutoStatusLastAttemptKey;
 
 FOUNDATION_EXPORT NSString *const WCGestureSettingsEntryLocationKey;
 
+FOUNDATION_EXPORT NSString *const WCGestureImageEditQuickSendEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureAutoSpeakerphoneEnabledKey;
+
 NS_ASSUME_NONNULL_END

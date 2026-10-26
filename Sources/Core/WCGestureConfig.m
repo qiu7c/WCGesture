@@ -1,5 +1,8 @@
 #import "Sources/API/WCGestureInternal.h"
 
+NSString *const WCGestureImageEditQuickSendEnabledKey = @"com.qiu7c.onewx.chat.image-edit-quick-send.enabled";
+NSString *const WCGestureAutoSpeakerphoneEnabledKey = @"com.qiu7c.onewx.chat.auto-speakerphone.enabled";
+
 NSString *const WCGestureSettingsEntryLocationKey = @"com.qiu7c.onewx.plugin.entry-location";
 
 NSString *const WCGestureEmoticonCornerEnabledKey = @"com.qiu7c.onewx.interface.emoticon-corner.enabled";
@@ -335,6 +338,8 @@ void WCGestureRegisterDefaults(void) {
             WCGestureCallConfirmEnabledKey: @NO,
             WCGestureContactInfoCardEnabledKey: @NO,
             WCGestureAutoCombineSendEnabledKey: @NO,
+            WCGestureImageEditQuickSendEnabledKey: @NO,
+            WCGestureAutoSpeakerphoneEnabledKey: @NO,
             WCGestureSettingsEntryLocationKey: @-1, // Automatic: manager if available, otherwise Me.
             WCGestureAutoStatusEnabledKey: @NO,
             WCGestureAutoStatusHourKey: @8,

@@ -92,8 +92,8 @@ static NSArray<NSNumber *> *WCHomeCategoryOrder(void) {
     [self.searchField addTarget:self action:@selector(updateSearchResults) forControlEvents:UIControlEventEditingChanged];
     self.tableView.tableHeaderView = WCGestureSettingsSearchHeader(self.searchField, self.view.bounds.size.width);
     UILabel *footer = [[UILabel alloc] initWithFrame:CGRectMake(0, 0, 0, 72)];
-    footer.numberOfLines = 1;
-    footer.text = @"One Wx by Cc";
+    footer.numberOfLines = 2;
+    footer.text = @"One Wx by Cc\n版本 1.0.0";
     footer.textAlignment = NSTextAlignmentCenter;
     footer.font = [UIFont systemFontOfSize:12 * WCGestureSettingsScaleFactor()];
     footer.textColor = UIColor.secondaryLabelColor;

@@ -199,4 +199,13 @@ NS_ASSUME_NONNULL_BEGIN
 @interface WCTimelineMgr : NSObject
 @end
 
+@interface VoipUIManager : NSObject
+@end
+@interface EditImageForwardAndEditLogicController : NSObject
+@end
+@interface WCActionSheet : NSObject
+@end
+@interface SharePreConfirmSheetView : NSObject
+@end
+
 NS_ASSUME_NONNULL_END

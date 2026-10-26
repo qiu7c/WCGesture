@@ -48,6 +48,9 @@ The search bar lists first-level feature entries only, including disabled featur
 
 ## Latest WCAtlas migrations (device validation pending)
 
+- 聊天类功能 → 图片编辑快捷发送：编辑图片菜单新增“发送到当前会话”，跳过联系人选择并保留微信原生发送确认；仅使用编辑结果，默认关闭。
+- 聊天类功能 → 通话接通自动扬声器：语音接通后切换一次，排除视频通话及蓝牙/有线等外接路由，默认关闭。两项均待编译与设备验证。
+
 - Interface cleanup: hide group title tails, screenshot sharing overlays, and selected Me-page entries. Reopen the affected page after changing title/entry visibility.
 - Moments: image rounding (0–40pt, default 8) and precise publication dates with a custom format. Rounding now covers the native inline video container, native grid media and the contact-profile album entrance. It preserves each target’s original layers with one owner, reapplies after private layout, and excludes avatars/text/fullscreen players; the supplied album hierarchy now permits media inside the photo/video cells’ UIButton wrappers and rounds each grid thumbnail separately, including three-thumbnail album rows, while keeping each individual puzzle thumbnail clipped as one tile. The contact-profile video-channel entrance also rounds direct cover thumbnails from its native coverStackView, preserving sibling identity/authentication content. Device verification remains pending.
 - Chat: native search button through MMUICommonUtil and the current chat’s MsgSearchHelper/WCSearcher, with cancel/return cleanup (latest correction awaits device validation); quote location with image/video filters; a +1 menu item sharing the existing repeat pipeline and menu management.

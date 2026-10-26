@@ -851,6 +851,8 @@ static NSDictionary<NSString *, NSString *> *WCConfigShareKeys(void) {
         WCGestureCallConfirmEnabledKey,
         WCGestureContactInfoCardEnabledKey,
         WCGestureAutoCombineSendEnabledKey,
+        WCGestureImageEditQuickSendEnabledKey,
+        WCGestureAutoSpeakerphoneEnabledKey,
         WCGestureSettingsEntryLocationKey,
         WCGestureAutoStatusEnabledKey,
         WCGestureAutoStatusHourKey,
@@ -1536,6 +1538,10 @@ static NSString *WCRowDetailText(WCRow *row) {
         [collapsible addObject:@NO]; [collapseKeys addObject:[prefix stringByAppendingString:@".chat.repeat-menu"]];
         [sections addObject:@[WCSwitchRow(@"通话气泡二次确认", WCGestureCallConfirmEnabledKey)]];
         [collapsible addObject:@NO]; [collapseKeys addObject:[prefix stringByAppendingString:@".chat.call-confirm"]];
+        [sections addObject:@[WCSwitchRow(@"图片编辑快捷发送", WCGestureImageEditQuickSendEnabledKey)]];
+        [collapsible addObject:@NO]; [collapseKeys addObject:[prefix stringByAppendingString:@".chat.image-edit-quick-send"]];
+        [sections addObject:@[WCSwitchRow(@"通话接通自动扬声器", WCGestureAutoSpeakerphoneEnabledKey)]];
+        [collapsible addObject:@NO]; [collapseKeys addObject:[prefix stringByAppendingString:@".chat.auto-speakerphone"]];
         [sections addObject:@[WCSwitchRow(@"自动勾选合并发送", WCGestureAutoCombineSendEnabledKey)]];
         [collapsible addObject:@NO]; [collapseKeys addObject:[prefix stringByAppendingString:@".chat.auto-combine-send"]];
         [sections addObject:@[WCSwitchRow(@"自动勾选原图", WCGestureAutoOriginalEnabledKey)]];

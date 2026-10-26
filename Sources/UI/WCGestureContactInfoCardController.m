@@ -153,10 +153,14 @@
 - (void)dealloc { [NSNotificationCenter.defaultCenter removeObserver:self]; }
 - (void)updateStyle {
     BOOL reduced = UIAccessibilityIsReduceTransparencyEnabled();
-    self.glass.effect = reduced ? nil : [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemUltraThinMaterial];
-    self.glass.alpha = reduced ? 1 : 0.52;
-    self.panel.backgroundColor = reduced ? UIColor.secondarySystemGroupedBackgroundColor : UIColor.clearColor;
     BOOL dark = self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark;
+    self.glass.effect = reduced ? nil : [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemThinMaterial];
+    self.glass.alpha = reduced ? 1 : 0.82;
+    // A translucent neutral wash above the material keeps background details
+    // from competing with the text. Dark mode uses a dark wash for contrast.
+    self.glass.contentView.backgroundColor = reduced ? UIColor.clearColor
+        : [UIColor colorWithWhite:dark ? 0.08 : 1.0 alpha:dark ? 0.24 : 0.22];
+    self.panel.backgroundColor = reduced ? UIColor.secondarySystemGroupedBackgroundColor : UIColor.clearColor;
     self.panel.layer.borderColor = [UIColor.whiteColor colorWithAlphaComponent:dark ? 0.16 : 0.45].CGColor;
     [self.avatar setNeedsLayout];
 }

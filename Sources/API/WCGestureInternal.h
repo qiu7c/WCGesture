@@ -62,3 +62,6 @@
 
 #import "Sources/API/WCGestureSettingsEntryAPI.h"
 #import "Sources/API/WCGestureProfilePrivacyAPI.h"
+
+#import "Sources/API/WCGestureImageQuickSendAPI.h"
+#import "Sources/API/WCGestureAutoSpeakerphoneAPI.h"
