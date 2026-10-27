@@ -2,6 +2,10 @@
 
 最后更新：2026-10-27。本文描述当前工作区；已替换旧版本交接中的重复历史和过期状态。
 
+## 2026-10-27 视频贴纸上下文类链接修正（本轮提交）
+
+用户提供 arm64 链接错误：WCVideoStickerContext 只有 @interface，漏写 @implementation，导致类符号未生成。已补该自有上下文类实现，由编译器生成类及属性存取器；不添加私有框架依赖。检查项目实现文件中的自有主类声明是否均有实现，并复核括号/import/Hook 去重及 git diff --check。用户随后明确授权提交推送，本修正及交接记录纳入本轮提交；仅静态检查，未编译或真机验证，不查询 CI。日志中的 CoreAudioTypes 与 multiply_defined 为 warning，当前致命错误是缺失类符号。
+
 ## 2026-10-27 视频贴纸编辑器初始化类型编译修正（本轮提交）
 
 用户提供 arm64 编译错误：协议 WCVideoStickerEditor 的 instancetype 返回值被编译器推导为 id<WCVideoStickerEditor>，不能直接赋给 UIViewController *。现先用 id 接收初始化结果，经 isKindOfClass:UIViewController.class 验证后再转换为控制器；不改原生接口或链接微信私有类。同类协议初始化写法已检查，其他结果接收为 id 或对应协议类型。用户随后明确授权提交推送，本修正及交接记录纳入本轮提交；仅静态检查，未本地编译或真机验证，不查询 CI。

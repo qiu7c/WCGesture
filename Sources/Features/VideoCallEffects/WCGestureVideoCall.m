@@ -133,6 +133,9 @@ static BOOL WCVideoApplySavedValues(id logic, id suite, NSDictionary *values) {
 @property (nonatomic, copy) NSString *account;
 @property (nonatomic, weak) UIViewController *presenter;
 @end
+@implementation WCVideoStickerContext
+@end
+
 static char WCVideoStickerContextKey;
 static char WCVideoRendererRequestedMirrorKey;
 static __thread BOOL WCVideoMirrorScope;
