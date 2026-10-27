@@ -4,7 +4,7 @@
 #import <math.h>
 #import "Sources/API/WCGestureInternal.h"
 
-static char WCFeedPlanKey, WCFeedStateKey, WCFeedRefreshKey, WCFeedRecoveringKey, WCFeedRowsKey;
+static char WCFeedPlanKey, WCFeedStateKey, WCFeedRefreshKey, WCFeedRecoveringKey, WCFeedRowsKey, WCFeedRemeasureKey;
 static __thread NSUInteger WCFeedHeightDepth;
 
 @interface WCFeedPlan : NSObject
@@ -14,6 +14,8 @@ static __thread NSUInteger WCFeedHeightDepth;
 @property (nonatomic) CGFloat rowWidth;
 @property (nonatomic, weak) id item;
 @property (nonatomic, weak) id model;
+@property (nonatomic, weak) UIView *contentView;
+@property (nonatomic, weak) UITableViewCell *wrapper;
 @property (nonatomic, copy) NSString *account;
 @property (nonatomic) CGFloat predictedExtra;
 @property (nonatomic, copy) NSString *signature;
@@ -46,6 +48,9 @@ static __thread NSUInteger WCFeedHeightDepth;
 @property (nonatomic, copy) NSString *account;
 @property (nonatomic) CFTimeInterval lastAction;
 @property (nonatomic) BOOL updating;
+@property (nonatomic) BOOL resizedContent;
+@property (nonatomic) CGFloat originalContentHeight;
+@property (nonatomic) CGFloat appliedContentHeight;
 @end
 @implementation WCFeedState
 @end
@@ -187,6 +192,44 @@ static void WCFeedRefreshAttempt(UIViewController *controller, NSUInteger attemp
 }
 static void WCFeedRefresh(UIViewController *controller) { WCFeedRefreshAttempt(controller, 5); }
 
+// A layout measurement must not reload/rebind the cells that own its row records.
+static void WCFeedRemeasureAttempt(UIViewController *controller, NSUInteger attempts) {
+    if (!NSThread.isMainThread || !WCFeedControllerSupported(controller) ||
+        [objc_getAssociatedObject(controller, &WCFeedRemeasureKey) boolValue]) return;
+    objc_setAssociatedObject(controller, &WCFeedRemeasureKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    __weak UIViewController *weakController = controller;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UIViewController *target = weakController;
+        if (!target) return;
+        id value = WCTweakSafeValue(target, @"tableView");
+        if (![value isKindOfClass:UITableView.class]) {
+            objc_setAssociatedObject(target, &WCFeedRemeasureKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC); return;
+        }
+        UITableView *table = value;
+        if (table.hasUncommittedUpdates) {
+            objc_setAssociatedObject(target, &WCFeedRemeasureKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            if (attempts) dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(.15 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                WCFeedRemeasureAttempt(weakController, attempts - 1);
+            });
+            return;
+        }
+        id cache = WCTweakSafeValue(target, @"cellHeightCache");
+        if ([cache isKindOfClass:NSMutableDictionary.class]) [cache removeAllObjects];
+        [UIView performWithoutAnimation:^{
+            [table performBatchUpdates:nil completion:^(__unused BOOL finished) {
+                objc_setAssociatedObject(target, &WCFeedRemeasureKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+                for (UITableViewCell *wrapper in table.visibleCells) {
+                    for (UIView *view in wrapper.contentView.subviews) {
+                        Class cls = NSClassFromString(@"WCTimeLineCellView");
+                        if (cls && [view isKindOfClass:cls]) [view setNeedsLayout];
+                    }
+                }
+            }];
+        }];
+    });
+}
+static void WCFeedRemeasure(UIViewController *controller) { WCFeedRemeasureAttempt(controller, 5); }
+
 static NSMutableDictionary<NSIndexPath *, WCFeedPlan *> *WCFeedRows(UIViewController *controller) {
     NSMutableDictionary *rows = objc_getAssociatedObject(controller, &WCFeedRowsKey);
     if (!rows) {
@@ -200,6 +243,15 @@ static NSIndexPath *WCFeedItemIndexPath(UIViewController *controller, id item) {
     id path = ((id (*)(id, SEL, id))objc_msgSend)(controller, NSSelectorFromString(@"indexPathOfDataItem:"), item);
     return [path isKindOfClass:NSIndexPath.class] ? path : nil;
 }
+static void WCFeedSetContentHeight(UIView *cell, CGFloat height) {
+    // Extending the hit-test bounds must not move native labels/media through
+    // flexible-top autoresizing masks after we have placed the metadata.
+    BOOL autoresizes = cell.autoresizesSubviews;
+    cell.autoresizesSubviews = NO;
+    @try {
+        CGRect frame = cell.frame; frame.size.height = height; cell.frame = frame;
+    } @finally { cell.autoresizesSubviews = autoresizes; }
+}
 double WCGestureMomentsFeedRowHeight(UIViewController *controller, UITableView *table, NSIndexPath *path, double original) {
     if (!NSThread.isMainThread || !WCFeedControllerSupported(controller) || !isfinite(original) || original <= 0 ||
         ![table isKindOfClass:UITableView.class] || ![path isKindOfClass:NSIndexPath.class] ||
@@ -210,7 +262,13 @@ double WCGestureMomentsFeedRowHeight(UIViewController *controller, UITableView *
         ![plan.account isEqualToString:WCCurrentUserWXID() ?: @""] ||
         ![plan.tid isEqualToString:WCFeedText(WCTweakSafeValue(item, @"tid"))] ||
         fabs(plan.rowWidth - table.bounds.size.width) > .5) return original;
-    NSIndexPath *current = WCFeedItemIndexPath(controller, item);
+    // Prefer the real visible wrapper binding. An item-index lookup can be unavailable
+    // while native caches are being updated even though this cell still owns the post.
+    NSIndexPath *current = nil;
+    if (plan.contentView.window && plan.wrapper &&
+        WCTweakSafeValue(plan.contentView, @"m_dataItem") == item &&
+        [plan.contentView isDescendantOfView:plan.wrapper.contentView]) current = [table indexPathForCell:plan.wrapper];
+    if (!current) current = WCFeedItemIndexPath(controller, item);
     if (!current) {
         // Detail pages have a single data item; validate it rather than assuming row zero.
         id detailItem = WCTweakSafeValue(controller, @"m_dataItem") ?: WCTweakSafeValue(controller, @"dataItem");
@@ -231,14 +289,26 @@ static void WCFeedUpdateRowHeight(UIView *cell, UIViewController *controller, id
     if (!isfinite(required) || required <= 0 || required > 10000) return;
     NSMutableDictionary *rows = WCFeedRows(controller);
     BOOL changed = rows[path] != plan || fabs(plan.rowHeight - required) > .5 || fabs(plan.rowWidth - table.bounds.size.width) > .5;
-    plan.item = item; plan.model = model; plan.account = WCCurrentUserWXID() ?: @"";
+    plan.item = item; plan.model = model; plan.contentView = cell; plan.wrapper = wrapper;
+    plan.account = WCCurrentUserWXID() ?: @"";
     plan.rowHeight = required; plan.rowWidth = table.bounds.size.width; rows[path] = plan;
     BOOL exceedsRow = required > wrapper.contentView.bounds.size.height + .5;
-    BOOL exceedsContent = bottom > cell.bounds.size.height + .5;
-    if (changed && (exceedsRow || exceedsContent)) WCFeedRefresh(controller);
-    if (exceedsRow || exceedsContent) {
+    if (changed && exceedsRow) WCFeedRemeasure(controller);
+    WCFeedState *state = objc_getAssociatedObject(cell, &WCFeedStateKey);
+    if (!exceedsRow && CGAffineTransformIsIdentity(cell.transform)) {
+        CGFloat current = cell.frame.size.height;
+        if (state.resizedContent && fabs(current - state.appliedContentHeight) > .5) state.resizedContent = NO;
+        if (!state.resizedContent && bottom > current + .5) {
+            state.originalContentHeight = current; state.resizedContent = YES;
+        }
+        if (state.resizedContent) {
+            CGFloat height = MAX(state.originalContentHeight, ceil(bottom));
+            state.appliedContentHeight = height;
+            if (fabs(current - height) > .5) WCFeedSetContentHeight(cell, height);
+        }
+    }
+    if (exceedsRow || bottom > cell.bounds.size.height + .5) {
         // Never draw custom metadata over the next comment/post while the table remeasures.
-        WCFeedState *state = objc_getAssociatedObject(cell, &WCFeedStateKey);
         for (WCFeedViewState *saved in state.views) {
             UIView *view = saved.view; view.frame = saved.frame; view.hidden = saved.hidden;
             if ([view isKindOfClass:UILabel.class]) {
@@ -349,6 +419,12 @@ void WCGestureMomentsFeedReset(UIView *cell) {
     WCFeedState *state = objc_getAssociatedObject(cell, &WCFeedStateKey);
     if (!state) return;
     WCFeedRestoreViews(cell, state); [state.footer removeFromSuperview];
+    if (state.resizedContent && state.item == WCTweakSafeValue(cell, @"m_dataItem") &&
+        [state.tid isEqualToString:WCFeedText(WCTweakSafeValue(state.item, @"tid"))] &&
+        [state.account isEqualToString:WCCurrentUserWXID() ?: @""] &&
+        CGAffineTransformIsIdentity(cell.transform) && fabs(cell.frame.size.height - state.appliedContentHeight) < .5) {
+        WCFeedSetContentHeight(cell, state.originalContentHeight);
+    }
     objc_setAssociatedObject(cell, &WCFeedStateKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 static void WCFeedSave(WCFeedState *state, UIView *view) {
@@ -436,7 +512,7 @@ void WCGestureMomentsFeedLayout(UIView *cell) {
         ![plan.tid isEqualToString:WCFeedText(WCTweakSafeValue(item, @"tid"))]) {
         plan = WCFeedRecoverPlan(cell, item, context, model, controller);
         if (!plan) { WCGestureMomentsFeedReset(cell); return; }
-        WCFeedRefresh(controller);
+        WCFeedRemeasure(controller);
     }
     WCFeedState *state = objc_getAssociatedObject(cell, &WCFeedStateKey);
     if (state.updating) return;
@@ -569,7 +645,9 @@ void WCGestureMomentsFeedLayout(UIView *cell) {
         CGFloat requiredBottom = bottom + padding;
         CGFloat needed = MAX(0, requiredBottom - plan.nativeHeight);
         if (isfinite(needed) && needed <= 4096 && needed > WCFeedExtra(plan) + .5) {
-            plan.observedExtra = needed; WCFeedRefresh(controller);
+            // Retain the estimate for future native measurements. Only an actual
+            // row-size deficit below should request a new table measurement.
+            plan.observedExtra = needed;
         }
         WCFeedUpdateRowHeight(cell, controller, item, model, plan, requiredBottom);
     } @finally { state.updating = NO; }
