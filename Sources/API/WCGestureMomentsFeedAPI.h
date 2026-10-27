@@ -3,6 +3,7 @@ NS_ASSUME_NONNULL_BEGIN
 void WCGestureMomentsFeedBeginHeight(void);
 double WCGestureMomentsFeedEndHeight(double nativeHeight, id item, id context, id model);
 double WCGestureMomentsFeedRowHeight(UIViewController *controller, UITableView *table, NSIndexPath *path, double original);
+id _Nullable WCGestureMomentsFeedCachedHeight(UIViewController *controller, id item, id _Nullable original);
 void WCGestureMomentsFeedBeforeLayout(UIView *cell);
 void WCGestureMomentsFeedLayout(UIView *cell);
 void WCGestureMomentsFeedReset(UIView *cell);

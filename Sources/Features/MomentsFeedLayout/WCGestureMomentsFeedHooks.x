@@ -18,6 +18,10 @@
 %end
 
 %hook WCBaseTimelineViewController
+- (id)heightOfTimelineCellInCache:(id)item {
+    id height = %orig(item);
+    return WCGestureMomentsFeedCachedHeight((UIViewController *)self, item, height);
+}
 - (double)tableView:(id)table heightForRowAtIndexPath:(id)path {
     double height = %orig(table, path);
     return WCGestureMomentsFeedRowHeight((UIViewController *)self, table, path, height);
