@@ -1,5 +1,15 @@
 #import "Sources/API/WCGestureInternal.h"
 
+NSString *const WCGestureMomentsFeedEnabledKey = @"com.qiu7c.onewx.moments.feed-layout.enabled";
+NSString *const WCGestureMomentsFeedSpacingKey = @"com.qiu7c.onewx.moments.feed-layout.extra-spacing";
+NSString *const WCGestureMomentsFeedLocationKey = @"com.qiu7c.onewx.moments.feed-layout.full-location";
+NSString *const WCGestureMomentsFeedActionsKey = @"com.qiu7c.onewx.moments.feed-layout.direct-actions";
+
+NSString *const WCGestureVideoCallBeautyEnabledKey = @"com.qiu7c.onewx.chat.video-call.beauty.enabled";
+NSString *const WCGestureVideoCallStickerEnabledKey = @"com.qiu7c.onewx.chat.video-call.sticker.enabled";
+NSString *const WCGestureVideoCallMirrorEnabledKey = @"com.qiu7c.onewx.chat.video-call.mirror.enabled";
+NSString *const WCGestureVideoCallBeautyValuesKey = @"com.qiu7c.onewx.chat.video-call.beauty.values";
+
 NSString *const WCGestureSendConfirmationEnabledKey = @"com.qiu7c.onewx.chat.send-confirmation.enabled";
 NSString *const WCGestureSendConfirmationUsersKey = @"com.qiu7c.onewx.chat.send-confirmation.users";
 NSString *const WCGestureSendConfirmationPauseSecondsKey = @"com.qiu7c.onewx.chat.send-confirmation.pause-seconds";
@@ -324,6 +334,10 @@ void WCGestureRegisterDefaults(void) {
             WCGestureQuoteJumpVideoKey: @YES,
             WCGestureMessageRepeatMenuEnabledKey: @NO,
             WCGestureMomentsTimeEnabledKey: @NO,
+            WCGestureMomentsFeedEnabledKey: @NO,
+            WCGestureMomentsFeedSpacingKey: @8.0,
+            WCGestureMomentsFeedLocationKey: @YES,
+            WCGestureMomentsFeedActionsKey: @YES,
             WCGestureMomentsTimeFormatKey: @"yyyy-MM-dd HH:mm:ss",
             WCGestureAutoOriginalEnabledKey: @NO,
             WCGestureChatTopBarCapsuleEnabledKey: @NO,
@@ -349,6 +363,10 @@ void WCGestureRegisterDefaults(void) {
             WCGestureSendConfirmationProfileSwitchEnabledKey: @YES,
             WCGestureImageEditQuickSendEnabledKey: @NO,
             WCGestureAutoSpeakerphoneEnabledKey: @NO,
+            WCGestureVideoCallBeautyEnabledKey: @NO,
+            WCGestureVideoCallStickerEnabledKey: @NO,
+            WCGestureVideoCallMirrorEnabledKey: @NO,
+            WCGestureVideoCallBeautyValuesKey: @{},
             WCGestureSettingsEntryLocationKey: @-1, // Automatic: manager if available, otherwise Me.
             WCGestureAutoStatusEnabledKey: @NO,
             WCGestureAutoStatusHourKey: @8,

@@ -395,4 +395,18 @@ FOUNDATION_EXPORT NSString *const WCGestureSendConfirmationUsersKey;
 FOUNDATION_EXPORT NSString *const WCGestureSendConfirmationPauseSecondsKey;
 FOUNDATION_EXPORT NSString *const WCGestureSendConfirmationProfileSwitchEnabledKey;
 
+
+// Video-call native effects. Sticker pixels are call-scoped and are never exported.
+FOUNDATION_EXPORT NSString *const WCGestureVideoCallBeautyEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureVideoCallStickerEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureVideoCallMirrorEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureVideoCallBeautyValuesKey;
+
+
+// Native Moments feed rows and direct actions.
+FOUNDATION_EXPORT NSString *const WCGestureMomentsFeedEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureMomentsFeedSpacingKey;
+FOUNDATION_EXPORT NSString *const WCGestureMomentsFeedLocationKey;
+FOUNDATION_EXPORT NSString *const WCGestureMomentsFeedActionsKey;
+
 NS_ASSUME_NONNULL_END

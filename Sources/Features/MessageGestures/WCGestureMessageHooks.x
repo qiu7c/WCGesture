@@ -45,9 +45,9 @@
 }
 
 - (void)viewWillDisappear:(BOOL)animated {
+    WCGestureChatTopBarWillDisappear(self);
     %orig;
     WCGestureSendConfirmationChatLeaving(self);
-    WCGestureChatTopBarWillDisappear(self);
     WCGestureGroupTitleRestore(self);
     if (WCVisibleChatControllerGet() == self) WCSetVisibleChatController(nil);
 }

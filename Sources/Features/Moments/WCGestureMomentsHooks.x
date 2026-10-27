@@ -7,9 +7,11 @@
 %hook WCTimeLineCellView
 
 - (void)layoutSubviews {
+    WCGestureMomentsFeedBeforeLayout(self);
     %orig;
     WCGestureMomentsImageCornerLayout(self);
     WCGestureMomentsTimeApply(self, NO);
+    WCGestureMomentsFeedLayout(self);
 }
 
 - (void)didMoveToWindow {
@@ -17,9 +19,11 @@
     WCSynchronizeMomentsDoubleTap(self);
     WCGestureMomentsImageCornerLayout(self);
     WCGestureMomentsTimeApply(self, NO);
+    WCGestureMomentsFeedLayout(self);
 }
 
 - (void)setViewModel:(id)viewModel {
+    WCGestureMomentsFeedReset(self);
     WCGestureMomentsImageCornerReset(self);
     WCGestureMomentsTimeReset(self);
     %orig;
@@ -27,6 +31,7 @@
 }
 
 - (void)prepareForReuse {
+    WCGestureMomentsFeedReset(self);
     WCGestureMomentsImageCornerReset(self);
     WCGestureMomentsTimeReset(self);
     %orig;

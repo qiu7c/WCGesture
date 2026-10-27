@@ -72,6 +72,7 @@
                 WCGestureInterfaceCleanupSettingsChanged(note.object);
                 WCGestureMomentsImageCornerSettingsChanged(note.object);
                 WCGestureMomentsTimeSettingsChanged(note.object);
+                WCGestureMomentsFeedSettingsChanged(note.object);
                 WCGestureMomentsMonitoringSettingsChanged(note.object);
                 WCGestureAutoStatusSettingsChanged(note.object);
                 WCGestureSettingsEntrySettingsChanged(note.object);

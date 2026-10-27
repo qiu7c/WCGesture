@@ -15,6 +15,7 @@ static char WCTopBarPendingKey;
 @property (nonatomic, assign) CGFloat corner;
 @property (nonatomic, strong) UIVisualEffect *effect;
 @property (nonatomic, assign) NSUInteger changed;
+@property (nonatomic, assign) BOOL sharedBar;
 @end
 @implementation WCTopBackgroundState
 @end
@@ -39,6 +40,7 @@ static char WCTopBarPendingKey;
 @property (nonatomic, copy) NSString *stableName;
 @property (nonatomic, assign) BOOL typing;
 @property (nonatomic, assign) BOOL updating;
+@property (nonatomic, assign) BOOL leaving;
 @property (nonatomic, strong) NSMapTable<UIView *, WCTopBackgroundState *> *backgrounds;
 @end
 @implementation WCTopBarState
@@ -101,6 +103,7 @@ static WCTopBackgroundState *WCTopSnapshot(WCTopBarState *state, UIView *view) {
     WCTopBackgroundState *saved = [state.backgrounds objectForKey:view];
     if (!saved) {
         saved = [WCTopBackgroundState new]; saved.view = view;
+        saved.sharedBar = state.navigationBar && (view == state.navigationBar || [view isDescendantOfView:state.navigationBar]);
         saved.hidden = view.hidden; saved.alpha = view.alpha; saved.color = view.backgroundColor;
         saved.clips = view.clipsToBounds; saved.border = view.layer.borderWidth; saved.corner = view.layer.cornerRadius;
         if ([view isKindOfClass:UIVisualEffectView.class]) saved.effect = ((UIVisualEffectView *)view).effect;
@@ -166,7 +169,8 @@ static void WCTopPrivateBackgrounds(WCTopBarState *state, UIView *view, NSUInteg
 }
 static void WCTopApplyBackgrounds(WCTopBarState *state, UIViewController *controller) {
     UINavigationBar *bar = controller.navigationController.navigationBar;
-    if (!bar) return;
+    if (!bar || state.leaving || controller.navigationController.topViewController != controller ||
+        (bar.topItem && bar.topItem != controller.navigationItem)) return;
     UIViewController *previous = [WCTopBarOwners() objectForKey:bar];
     if (previous && previous != controller) WCGestureChatTopBarRestore(previous);
     if (!state.navigationAppearances) {
@@ -186,19 +190,42 @@ static void WCTopApplyBackgrounds(WCTopBarState *state, UIViewController *contro
         if (@available(iOS 15.0, *)) bar.compactScrollEdgeAppearance = controller.navigationItem.compactScrollEdgeAppearance;
     }
     if (!bar.translucent) bar.translucent = YES;
-    WCTopClearHost(state, bar, YES); WCTopClearHost(state, bar.superview, YES);
+    WCTopClearHost(state, bar, YES);
     WCTopScopeBackgrounds(state, bar, 0);
     for (UIView *child in bar.subviews) if (!WCTopHasContent(child, 0)) WCTopRemoveBackground(state, child);
-    UIView *navigationRoot = controller.navigationController.view;
-    UIView *host = bar;
-    for (NSUInteger depth = 0; host && depth < 4; depth++, host = host.superview) {
-        WCTopClearHost(state, host, NO);
-        if (host == navigationRoot) break;
-        for (UIView *sibling in host.superview.subviews)
-            if (sibling != host && WCTopIsBackground(sibling)) WCTopRemoveBackground(state, sibling);
-    }
     NSUInteger budget = 400;
     WCTopPrivateBackgrounds(state, controller.view, 0, &budget);
+}
+
+static void WCTopRestoreBackgrounds(WCTopBarState *state, UIViewController *controller) {
+    UINavigationBar *bar = state.navigationBar;
+    BOOL ownsBar = bar && [WCTopBarOwners() objectForKey:bar] == controller;
+    // Release the shared bar before setters trigger another navigation-bar layout.
+    if (ownsBar) [WCTopBarOwners() removeObjectForKey:bar];
+    [UIView performWithoutAnimation:^{
+        NSArray *savedBar = state.navigationAppearances;
+        if (ownsBar && savedBar.count >= 3) {
+            bar.standardAppearance = savedBar[0];
+            bar.scrollEdgeAppearance = savedBar[1] == NSNull.null ? nil : savedBar[1];
+            bar.compactAppearance = savedBar[2] == NSNull.null ? nil : savedBar[2];
+            if (@available(iOS 15.0, *)) {
+                if (savedBar.count >= 4) bar.compactScrollEdgeAppearance = savedBar[3] == NSNull.null ? nil : savedBar[3];
+            }
+            bar.translucent = state.translucent;
+        }
+        for (WCTopBackgroundState *background in state.backgrounds.objectEnumerator) {
+            UIView *view = background.view;
+            if (!view) continue;
+            if (background.sharedBar && !ownsBar) continue;
+            if (background.changed & 1) { view.hidden = background.hidden; view.alpha = background.alpha; }
+            if (background.changed & 2) view.backgroundColor = background.color;
+            if (background.changed & 4) { view.clipsToBounds = background.clips; view.layer.borderWidth = background.border; view.layer.cornerRadius = background.corner; }
+            if ((background.changed & 8) && [view isKindOfClass:UIVisualEffectView.class]) ((UIVisualEffectView *)view).effect = background.effect;
+        }
+    }];
+    state.navigationBar = nil;
+    state.navigationAppearances = nil;
+    [state.backgrounds removeAllObjects];
 }
 
 void WCGestureChatTopBarRestore(UIViewController *controller) {
@@ -217,23 +244,7 @@ void WCGestureChatTopBarRestore(UIViewController *controller) {
     if (@available(iOS 15.0, *)) item.compactScrollEdgeAppearance = saved[3] == NSNull.null ? nil : saved[3];
     controller.edgesForExtendedLayout = state.edges;
     controller.extendedLayoutIncludesOpaqueBars = state.opaqueBars;
-    UINavigationBar *bar = state.navigationBar;
-    if (bar && [WCTopBarOwners() objectForKey:bar] == controller) {
-        NSArray *savedBar = state.navigationAppearances;
-        bar.standardAppearance = savedBar[0];
-        bar.scrollEdgeAppearance = savedBar[1] == NSNull.null ? nil : savedBar[1];
-        bar.compactAppearance = savedBar[2] == NSNull.null ? nil : savedBar[2];
-        if (@available(iOS 15.0, *)) bar.compactScrollEdgeAppearance = savedBar[3] == NSNull.null ? nil : savedBar[3];
-        bar.translucent = state.translucent;
-        [WCTopBarOwners() removeObjectForKey:bar];
-        for (WCTopBackgroundState *background in state.backgrounds.objectEnumerator) {
-            UIView *view = background.view;
-            if (background.changed & 1) { view.hidden = background.hidden; view.alpha = background.alpha; }
-            if (background.changed & 2) view.backgroundColor = background.color;
-            if (background.changed & 4) { view.clipsToBounds = background.clips; view.layer.borderWidth = background.border; view.layer.cornerRadius = background.corner; }
-            if ((background.changed & 8) && [view isKindOfClass:UIVisualEffectView.class]) ((UIVisualEffectView *)view).effect = background.effect;
-        }
-    }
+    WCTopRestoreBackgrounds(state, controller);
     objc_setAssociatedObject(controller, &WCTopBarStateKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
@@ -251,7 +262,7 @@ static void WCTopUpdate(UIViewController *controller, BOOL preparing) {
     // WCAtlas installs the item before the view enters a window. Only later repairs require visibility.
     if (!preparing && (!controller.view.window || controller.navigationController.topViewController != controller)) return;
     WCTopBarState *state = objc_getAssociatedObject(controller, &WCTopBarStateKey);
-    if (state.updating) return;
+    if (state.updating || state.leaving) return;
     UINavigationItem *item = controller.navigationItem;
     if (!state) {
         state = [WCTopBarState new];
@@ -344,16 +355,26 @@ void WCGestureChatTopBarUpdate(UIViewController *controller) {
 }
 
 void WCGestureChatTopBarPrepareAppearance(UIViewController *controller) {
+    WCTopBarState *state = objc_getAssociatedObject(controller, &WCTopBarStateKey);
+    state.leaving = NO;
     [UIView performWithoutAnimation:^{ WCTopUpdate(controller, YES); }];
 }
 
 void WCGestureChatTopBarWillDisappear(UIViewController *controller) {
-    // Keep the capsule through the outgoing animation, as WCAtlas does. Search restores it before opening.
-    if (!objc_getAssociatedObject(controller, &WCTopBarStateKey)) return;
+    WCTopBarState *state = objc_getAssociatedObject(controller, &WCTopBarStateKey);
+    if (!state || state.updating) return;
+    // Keep only this item's capsules for the outgoing animation. Shared backgrounds
+    // must be restored before WeChat configures the destination page.
+    state.leaving = YES;
+    state.updating = YES;
+    WCTopRestoreBackgrounds(state, controller);
+    state.updating = NO;
     __weak UIViewController *weakController = controller;
+    __weak WCTopBarState *weakState = state;
     [controller.transitionCoordinator animateAlongsideTransition:nil completion:^(id<UIViewControllerTransitionCoordinatorContext> context) {
         UIViewController *target = weakController;
-        if (!target) return;
+        WCTopBarState *expected = weakState;
+        if (!target || !expected || objc_getAssociatedObject(target, &WCTopBarStateKey) != expected) return;
         if (context.isCancelled) WCGestureChatTopBarPrepareAppearance(target);
         else WCGestureChatTopBarRestore(target);
     }];
@@ -374,7 +395,7 @@ void WCGestureChatTopBarNavigationLayout(UINavigationBar *bar) {
     if (!controller) return;
     WCTopBarState *state = objc_getAssociatedObject(controller, &WCTopBarStateKey);
     // Clear native background replacements during this layout, before the frame is rendered.
-    if (state && !state.updating && controller.navigationController.topViewController == controller
+    if (state && !state.updating && !state.leaving && controller.navigationController.topViewController == controller
         && WCGestureEnabled(WCGestureChatTopBarCapsuleEnabledKey) && !WCGestureChatSearchIsActive(controller)) {
         state.updating = YES;
         WCTopApplyBackgrounds(state, controller);

@@ -10,6 +10,12 @@
 
 static char WCGlobalTwoFingerRecognizerKey;
 static char WCGlobalThreeFingerRecognizerKey;
+static NSHashTable<UIWindow *> *WCGlobalTrackedWindows(void) {
+    static NSHashTable *windows; static dispatch_once_t once;
+    dispatch_once(&once, ^{ windows = [NSHashTable weakObjectsHashTable]; });
+    return windows;
+}
+
 
 @interface WCScreenshotSaver : NSObject
 @end
@@ -221,6 +227,12 @@ void WCPerformGlobalAction(UIViewController *presenter, WCGlobalAction action) {
 // 在指定 window 上按当前设置同步全局手势识别器
 void WCSynchronizeGlobalGesturesOnWindow(UIWindow *window) {
     if (!window) return;
+    if (!NSThread.isMainThread) {
+        __weak UIWindow *weakWindow = window;
+        dispatch_async(dispatch_get_main_queue(), ^{ WCSynchronizeGlobalGesturesOnWindow(weakWindow); });
+        return;
+    }
+    [WCGlobalTrackedWindows() addObject:window];
     BOOL enabled = WCGestureEnabled(WCGlobalGestureEnabledKey);
     // Clear retired payment-code assignments on startup and after config import.
     NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
@@ -232,6 +244,11 @@ void WCSynchronizeGlobalGesturesOnWindow(UIWindow *window) {
     NSInteger threeAction = [[NSUserDefaults standardUserDefaults] integerForKey:WCGlobalThreeFingerActionKey];
 
     UILongPressGestureRecognizer *two = objc_getAssociatedObject(window, &WCGlobalTwoFingerRecognizerKey);
+    if (two && two.view != window) {
+        [two.view removeGestureRecognizer:two];
+        objc_setAssociatedObject(window, &WCGlobalTwoFingerRecognizerKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        two = nil;
+    }
     BOOL twoWanted = enabled && twoAction != WCGlobalActionNone;
     if (twoWanted && !two) {
         two = [[UILongPressGestureRecognizer alloc] initWithTarget:window action:@selector(wc_handleGlobalLongPress:)];
@@ -244,8 +261,14 @@ void WCSynchronizeGlobalGesturesOnWindow(UIWindow *window) {
         [window removeGestureRecognizer:two];
         objc_setAssociatedObject(window, &WCGlobalTwoFingerRecognizerKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
+    if (twoWanted && two && !two.enabled) two.enabled = YES;
 
     UILongPressGestureRecognizer *three = objc_getAssociatedObject(window, &WCGlobalThreeFingerRecognizerKey);
+    if (three && three.view != window) {
+        [three.view removeGestureRecognizer:three];
+        objc_setAssociatedObject(window, &WCGlobalThreeFingerRecognizerKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        three = nil;
+    }
     BOOL threeWanted = enabled && threeAction != WCGlobalActionNone;
     if (threeWanted && !three) {
         three = [[UILongPressGestureRecognizer alloc] initWithTarget:window action:@selector(wc_handleGlobalLongPress:)];
@@ -258,11 +281,53 @@ void WCSynchronizeGlobalGesturesOnWindow(UIWindow *window) {
         [window removeGestureRecognizer:three];
         objc_setAssociatedObject(window, &WCGlobalThreeFingerRecognizerKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
+    if (threeWanted && three && !three.enabled) three.enabled = YES;
 }
 
 void WCSynchronizeGlobalGestures(void) {
-    for (UIWindow *window in UIApplication.sharedApplication.windows) {
-        WCSynchronizeGlobalGesturesOnWindow(window);
+    if (!NSThread.isMainThread) {
+        dispatch_async(dispatch_get_main_queue(), ^{ WCSynchronizeGlobalGestures(); });
+        return;
     }
+    NSMutableSet<UIWindow *> *windows = [NSMutableSet setWithArray:WCGlobalTrackedWindows().allObjects];
+    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+        if ([scene isKindOfClass:UIWindowScene.class]) [windows addObjectsFromArray:((UIWindowScene *)scene).windows];
+    }
+    // Legacy WeChat may not use scenes. KVC avoids the deprecated windows getter.
+    id legacy = WCTweakSafeValue(UIApplication.sharedApplication, @"windows");
+    if ([legacy isKindOfClass:NSArray.class]) {
+        for (id candidate in legacy) if ([candidate isKindOfClass:UIWindow.class]) [windows addObject:candidate];
+    }
+    for (UIWindow *window in windows) WCSynchronizeGlobalGesturesOnWindow(window);
+}
+
+static void WCGlobalScheduleSynchronization(void) {
+    // Scene/app activation and key/visible notifications often arrive together.
+    // Coalesce them without installing duplicate recognizers or polling.
+    static BOOL pending = NO;
+    if (pending) return;
+    pending = YES;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        pending = NO;
+        WCSynchronizeGlobalGestures();
+    });
+}
+void WCGestureGlobalGesturesStart(void) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        static dispatch_once_t once;
+        dispatch_once(&once, ^{
+            NSNotificationCenter *center = NSNotificationCenter.defaultCenter;
+            for (NSString *name in @[UIApplicationDidFinishLaunchingNotification,
+                UIApplicationDidBecomeActiveNotification, UISceneDidActivateNotification,
+                UIWindowDidBecomeVisibleNotification, UIWindowDidBecomeKeyNotification]) {
+                [center addObserverForName:name object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note) {
+                    if ([note.object isKindOfClass:UIWindow.class]) WCSynchronizeGlobalGesturesOnWindow(note.object);
+                    WCGlobalScheduleSynchronization();
+                }];
+            }
+        });
+        // Also handles injection after launch; runs after all dylib constructors/default migration.
+        WCGlobalScheduleSynchronization();
+    });
 }
 

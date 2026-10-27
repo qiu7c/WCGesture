@@ -273,7 +273,9 @@ void WCSynchronizeReplyGesture(CommonMessageCellView *cell) {
         ? WCMessageGestureAction(cell, WCMessageTripleTapSelfActionKey, WCMessageTripleTapOtherActionKey)
         : WCReplySwipeActionNone;
 
-    if (!hasSwipeAction) {
+    // Native media cells may remove recognizers while rebuilding their content.
+    // An associated object alone does not mean the recognizer is still installed.
+    if (!hasSwipeAction || (panRecognizer && panRecognizer.view != cell)) {
         if (panRecognizer) {
             NSArray *snapshots = objc_getAssociatedObject(cell, &WCReplyTransformSnapshotsKey);
             if (snapshots.count) WCRestoreReplyTransforms(snapshots);
@@ -281,7 +283,7 @@ void WCSynchronizeReplyGesture(CommonMessageCellView *cell) {
                 NSValue *originalTransform = objc_getAssociatedObject(cell, &WCReplyOriginalTransformKey);
                 if (originalTransform) cell.transform = originalTransform.CGAffineTransformValue;
             }
-            [cell removeGestureRecognizer:panRecognizer];
+            [panRecognizer.view removeGestureRecognizer:panRecognizer];
         }
         objc_setAssociatedObject(cell, &WCReplyPanRecognizerKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         objc_setAssociatedObject(cell, &WCReplyPanDelegateKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
@@ -309,23 +311,25 @@ void WCSynchronizeReplyGesture(CommonMessageCellView *cell) {
         objc_setAssociatedObject(cell, &WCReplyPanDelegateKey, delegate, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
 
-    if (doubleAction == WCReplySwipeActionNone && doubleRecognizer) {
-        [cell removeGestureRecognizer:doubleRecognizer];
+    BOOL tapDependencyChanged = NO;
+    if (doubleRecognizer && (doubleAction == WCReplySwipeActionNone || doubleRecognizer.view != cell)) {
+        [doubleRecognizer.view removeGestureRecognizer:doubleRecognizer];
         objc_setAssociatedObject(cell, &WCMessageDoubleTapRecognizerKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         doubleRecognizer = nil;
     }
-    if (tripleAction == WCReplySwipeActionNone && tripleRecognizer) {
-        [cell removeGestureRecognizer:tripleRecognizer];
+    if (tripleRecognizer && (tripleAction == WCReplySwipeActionNone || tripleRecognizer.view != cell)) {
+        [tripleRecognizer.view removeGestureRecognizer:tripleRecognizer];
         objc_setAssociatedObject(cell, &WCMessageTripleTapRecognizerKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         tripleRecognizer = nil;
         if (doubleRecognizer) {
-            [cell removeGestureRecognizer:doubleRecognizer];
+            [doubleRecognizer.view removeGestureRecognizer:doubleRecognizer];
             objc_setAssociatedObject(cell, &WCMessageDoubleTapRecognizerKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             doubleRecognizer = nil;
         }
     }
     if (!doubleRecognizer && doubleAction != WCReplySwipeActionNone) {
         doubleRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:cell action:@selector(wc_handleMessageTapAction:)];
+        tapDependencyChanged = YES;
         doubleRecognizer.numberOfTapsRequired = 2;
         doubleRecognizer.numberOfTouchesRequired = 1;
         doubleRecognizer.cancelsTouchesInView = YES;
@@ -334,13 +338,15 @@ void WCSynchronizeReplyGesture(CommonMessageCellView *cell) {
     }
     if (!tripleRecognizer && tripleAction != WCReplySwipeActionNone) {
         tripleRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:cell action:@selector(wc_handleMessageTapAction:)];
+        tapDependencyChanged = YES;
         tripleRecognizer.numberOfTapsRequired = 3;
         tripleRecognizer.numberOfTouchesRequired = 1;
         tripleRecognizer.cancelsTouchesInView = YES;
         [cell addGestureRecognizer:tripleRecognizer];
         objc_setAssociatedObject(cell, &WCMessageTripleTapRecognizerKey, tripleRecognizer, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
-    if (doubleRecognizer && tripleRecognizer) [doubleRecognizer requireGestureRecognizerToFail:tripleRecognizer];
+    if (doubleRecognizer && tripleRecognizer && tapDependencyChanged)
+        [doubleRecognizer requireGestureRecognizerToFail:tripleRecognizer];
 }
 
 #pragma mark - Repeat path (no send-confirmation)

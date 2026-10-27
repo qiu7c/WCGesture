@@ -109,16 +109,20 @@ static void WCPresentKeyboardNumberEditor(__unused UIViewController *presenter,
         || [defaultsKey isEqualToString:WCGestureChatInputOuterRadiusKey];
     BOOL isScale = [defaultsKey isEqualToString:WCMomentsHeightScaleKey];
     BOOL isSendConfirmationPause = [defaultsKey isEqualToString:WCGestureSendConfirmationPauseSecondsKey];
+    BOOL isFeedSpacing = [defaultsKey isEqualToString:WCGestureMomentsFeedSpacingKey];
     BOOL isReminderInterval = [defaultsKey isEqualToString:WCGestureMomentsReminderIntervalKey];
     double minValue = isPageScale ? 70.0 : (isFontLevel ? 1.0 : (isScale ? 100.0 : (isWidth ? 0.0 : (isOffset ? -400.0 : 20.0))));
     double maxValue = isPageScale ? 100.0 : (isFontLevel ? 8.0 : (isScale ? 160.0 : (isWidth ? 1000.0 : (isOffset ? 400.0 : 200.0))));
     if (isReminderInterval) { minValue = 30; maxValue = 3600; }
+    if (isFeedSpacing) { minValue = 0; maxValue = 48; }
     if (isSendConfirmationPause) { minValue = 5; maxValue = 3600; }
     if (isAvatarCorner) { minValue = 0; maxValue = 100; }
     if (isTimeSize) { minValue = 8.0; maxValue = 18.0; }
     if (isRounding || isMomentsCorner) { minValue = 0.0; maxValue = 40.0; }
     NSString *placeholder;
-    if (isSendConfirmationPause) {
+    if (isFeedSpacing) {
+        placeholder = @"0 - 48（默认 8）";
+    } else if (isSendConfirmationPause) {
         placeholder = @"5 - 3600 秒（默认 60）";
     } else if (isReminderInterval) {
         placeholder = @"30 - 3600 秒";
@@ -787,6 +791,10 @@ static NSDictionary<NSString *, NSString *> *WCConfigShareKeys(void) {
         WCGestureQuoteJumpVideoKey,
         WCGestureMessageRepeatMenuEnabledKey,
         WCGestureMomentsTimeEnabledKey,
+        WCGestureMomentsFeedEnabledKey,
+        WCGestureMomentsFeedSpacingKey,
+        WCGestureMomentsFeedLocationKey,
+        WCGestureMomentsFeedActionsKey,
         WCGestureMomentsTimeFormatKey,
         WCGestureAutoOriginalEnabledKey,
         WCGestureVoiceTranscriptionEnabledKey,
@@ -861,6 +869,10 @@ static NSDictionary<NSString *, NSString *> *WCConfigShareKeys(void) {
         WCGestureSendConfirmationProfileSwitchEnabledKey,
         WCGestureImageEditQuickSendEnabledKey,
         WCGestureAutoSpeakerphoneEnabledKey,
+        WCGestureVideoCallBeautyEnabledKey,
+        WCGestureVideoCallStickerEnabledKey,
+        WCGestureVideoCallMirrorEnabledKey,
+        WCGestureVideoCallBeautyValuesKey,
         WCGestureSettingsEntryLocationKey,
         WCGestureAutoStatusEnabledKey,
         WCGestureAutoStatusHourKey,
@@ -1003,6 +1015,7 @@ typedef NS_ENUM(NSInteger, WCRowKind) {
     WCRowKindSwitch,        // toggle
     WCRowKindMomentsReminderUsers,
     WCRowKindSendConfirmationUsers,
+    WCRowKindVideoCallSettings,
     WCRowKindMomentsReminderForwardTarget,
     WCRowKindSectionTitle,  // section header with no setting value
     WCRowKindGroupToggle,   // tap → fold/unfold the rows below it
@@ -1169,6 +1182,7 @@ static NSString *WCRowDetailText(WCRow *row) {
     NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
     switch (row.kind) {
         case WCRowKindEntryLocation: return @"";
+        case WCRowKindVideoCallSettings: return @"";
         case WCRowKindChatOption: return WCGestureChatOptionDetail(row.chatOption);
         case WCRowKindSwitch:
             return [d boolForKey:row.defaultsKey] ? @"开" : @"关";
@@ -1558,6 +1572,8 @@ static NSString *WCRowDetailText(WCRow *row) {
         [collapsible addObject:@YES]; [collapseKeys addObject:[prefix stringByAppendingString:@".chat.send-confirmation"]];
         [sections addObject:@[WCSwitchRow(@"图片编辑快捷发送", WCGestureImageEditQuickSendEnabledKey)]];
         [collapsible addObject:@NO]; [collapseKeys addObject:[prefix stringByAppendingString:@".chat.image-edit-quick-send"]];
+        [sections addObject:@[WCPlainRow(@"视频通话增强", WCRowKindVideoCallSettings)]];
+        [collapsible addObject:@NO]; [collapseKeys addObject:[prefix stringByAppendingString:@".chat.video-call-effects"]];
         [sections addObject:@[WCSwitchRow(@"通话接通自动扬声器", WCGestureAutoSpeakerphoneEnabledKey)]];
         [collapsible addObject:@NO]; [collapseKeys addObject:[prefix stringByAppendingString:@".chat.auto-speakerphone"]];
         [sections addObject:@[WCSwitchRow(@"自动勾选合并发送", WCGestureAutoCombineSendEnabledKey)]];
@@ -1682,6 +1698,11 @@ static NSString *WCRowDetailText(WCRow *row) {
         timeFormat.chatOption = @{ @"title": timeFormat.title, @"type": @"format", @"key": WCGestureMomentsTimeFormatKey };
         [sections addObject:@[WCSwitchRow(@"朋友圈精确发布时间", WCGestureMomentsTimeEnabledKey), timeFormat]];
         [collapsible addObject:@YES]; [collapseKeys addObject:[prefix stringByAppendingString:@".moments.precise-time"]];
+        [sections addObject:@[WCSwitchRow(@"朋友圈排版", WCGestureMomentsFeedEnabledKey),
+            WCNumberRow(@"额外留白", WCGestureMomentsFeedSpacingKey),
+            WCSwitchRow(@"完整显示定位", WCGestureMomentsFeedLocationKey),
+            WCSwitchRow(@"独立点赞评论", WCGestureMomentsFeedActionsKey)]];
+        [collapsible addObject:@YES]; [collapseKeys addObject:[prefix stringByAppendingString:@".moments.feed-layout"]];
         NSMutableArray *reminders = [NSMutableArray arrayWithObjects:
             WCSwitchRow(@"朋友圈特别关心", WCGestureMomentsReminderEnabledKey),
             WCPlainRow(@"特别关心好友", WCRowKindMomentsReminderUsers),
@@ -1990,6 +2011,9 @@ static NSString *WCRowDetailText(WCRow *row) {
     WCRow *row = self.sections[section][indexPath.row];
     switch (row.kind) {
         case WCRowKindEntryLocation: break;
+        case WCRowKindVideoCallSettings:
+            [self.navigationController pushViewController:WCGestureCreateVideoCallSettingsController() animated:YES];
+            break;
         case WCRowKindSendConfirmationUsers:
             [self.navigationController pushViewController:WCGestureCreateSendConfirmationPicker() animated:YES];
             break;

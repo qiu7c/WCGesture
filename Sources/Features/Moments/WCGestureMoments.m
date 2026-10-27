@@ -4,6 +4,21 @@
 
 static char WCMomentsDoubleTapRecognizerKey;
 
+@interface WCMomentsDoubleTapDelegate : NSObject <UIGestureRecognizerDelegate>
+@end
+@implementation WCMomentsDoubleTapDelegate
+- (BOOL)gestureRecognizer:(UIGestureRecognizer *)recognizer shouldReceiveTouch:(UITouch *)touch {
+    for (UIView *view = touch.view; view && view != recognizer.view; view = view.superview)
+        if ([view isKindOfClass:UIControl.class]) return NO;
+    return YES;
+}
+@end
+
+static id<UIGestureRecognizerDelegate> WCMomentsDoubleTapDelegateInstance(void) {
+    static WCMomentsDoubleTapDelegate *delegate; static dispatch_once_t once;
+    dispatch_once(&once, ^{ delegate = [WCMomentsDoubleTapDelegate new]; }); return delegate;
+}
+
 static BOOL WCMomentsIsNativeDetailContext(id responderObject) {
     Class detailClass = NSClassFromString(@"WCCommentDetailViewControllerFB");
     if (!detailClass) return NO;
@@ -55,6 +70,7 @@ void WCSynchronizeMomentsDoubleTap(WCTimeLineCellView *cell) {
     if (enabled && !recognizer) {
         recognizer = [[UITapGestureRecognizer alloc] initWithTarget:cell action:@selector(wc_handleMomentsDoubleTap)];
         recognizer.numberOfTapsRequired = 2;
+        recognizer.delegate = WCMomentsDoubleTapDelegateInstance();
         recognizer.cancelsTouchesInView = NO;
         [cell addGestureRecognizer:recognizer];
         objc_setAssociatedObject(cell, &WCMomentsDoubleTapRecognizerKey, recognizer, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
@@ -68,6 +84,7 @@ void WCMomentsHandleDoubleTap(WCTimeLineCellView *cell) {
     if (!WCGestureEnabled(WCMomentsDoubleTapLikeKey) ||
         WCMomentsIsNativeDetailContext(cell)) return;
     UITapGestureRecognizer *recognizer = objc_getAssociatedObject(cell, &WCMomentsDoubleTapRecognizerKey);
+    if (recognizer && WCGestureMomentsFeedIsActionPoint(cell, [recognizer locationInView:cell])) return;
     [cell onAccessibilityLike];
     WCShowMomentsHeart(cell, recognizer);
     if ([[NSUserDefaults standardUserDefaults] boolForKey:WCMomentsLikeHapticKey]) {

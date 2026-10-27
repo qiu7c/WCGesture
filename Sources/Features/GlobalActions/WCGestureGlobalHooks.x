@@ -4,7 +4,7 @@
 
 #pragma mark - Global gesture hook
 
-// 绑定到每个 window 的手势
+// Early window callbacks supplement startup/activation/visible-window notifications.
 %hook UIWindow
 
 - (void)didMoveToWindow {
@@ -38,4 +38,5 @@
 
 %ctor {
     %init;
+    WCGestureGlobalGesturesStart();
 }

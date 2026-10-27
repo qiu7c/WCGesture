@@ -3,6 +3,9 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+/// Installs lifecycle observers once and restores saved gestures on existing/new windows.
+void WCGestureGlobalGesturesStart(void);
+
 /// Adds or removes the two-/three-finger recognizers on a window according to
 /// the current settings. The UIWindow hook calls this for every window.
 void WCSynchronizeGlobalGesturesOnWindow(UIWindow *window);

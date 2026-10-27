@@ -2,6 +2,8 @@
 
 Current package version: 1.0.0.
 
+- 朋友圈功能 → 朋友圈排版: adjustable extra spacing (0–48pt, default 8), wrapping location and timestamp text, and direct native Like/Comment actions alongside the More button. Disabled by default; source integrated, awaiting compilation and device validation.
+
 One Wx is a WeChat enhancement plugin that grew out of WCGesture (originally extracted from [WCAtlas](https://github.com/qiu7c/WCAtlas)). It covers gestures, the keyboard strip, AI, translation, global actions, layout and interface tweaks.
 
 ## Features
@@ -83,7 +85,7 @@ The search bar lists first-level feature entries only, including disabled featur
 
 ## Chat top capsules (device validation pending)
 
-“界面类功能 → 胶囊顶栏” ports WCAtlas's avatar/name/back capsule and more/search capsule; off by default. The existing full-page message-time preview adds a “顶栏” target, sharing the native capsule renderer and your current-account avatar. It supports frosted/pseudo-liquid glass, 0–100% glass transparency (default 50), 20–100% blur, independent 80–140% outer-shell sizing and 12–26pt icon sizing, plus 24–34pt avatars and 12–18pt names. Glass transparency leaves text and icons fully visible. Long names truncate within the available navigation width; compact glass follows the interface scale inside a 44pt navigation host. Search and multi-select restore the native bar, and leaving/turning off restores saved navigation state, including shared navigation backgrounds. The pinned-message header uses the same blur intensity on frosted glass, capped at the original 40pt even when the list expands, without applying the interface scale a second time. The existing preview includes a pinned-row sample. No separate preview page or explanatory small-print rows are introduced. Private navigation backgrounds, transitions, dark mode and search coexistence require device verification.
+“界面类功能 → 胶囊顶栏” ports WCAtlas's avatar/name/back capsule and more/search capsule; off by default. The existing full-page message-time preview adds a “顶栏” target, sharing the native capsule renderer and your current-account avatar. It supports frosted/pseudo-liquid glass, 0–100% glass transparency (default 50), 20–100% blur, independent 80–140% outer-shell sizing and 12–26pt icon sizing, plus 24–34pt avatars and 12–18pt names. Glass transparency leaves text and icons fully visible. Long names truncate within the available navigation width; compact glass follows the interface scale inside a 44pt navigation host. Search and multi-select restore the native bar, and leaving/turning off restores saved navigation state, including shared navigation backgrounds. The pinned-message header uses the same blur intensity on frosted glass, capped at the original 40pt even when the list expands, without applying the interface scale a second time. The existing preview includes a pinned-row sample. No separate preview page or explanatory small-print rows are introduced. Background cleanup is confined to the navigation bar and chat-specific views. Shared backgrounds restore before the native leaving callback; only the chat item stays through the outgoing transition, and cancelled transitions reinstall it. Private navigation backgrounds, transitions, dark mode and search coexistence require device verification.
 
 ## Notification direct chat (device validation pending)
 
@@ -230,3 +232,10 @@ The shared full-page preview now includes avatar rounding. Its editing toolbar r
 增强类功能 contains 自动确认登录, 自动更新微信状态, 后台保活 and 清空地区与性别信息. 插件类配置 retains entry location, plugin name, haptics, AI 配置, 翻译配置 and configuration import/export. Existing settings and collapsed states are preserved.
 
 Payment/receive-code shortcuts are currently removed. The retired global-action value 11 is reserved and old two-/three-finger assignments are cleared to 不设置 during gesture synchronization. Personal contact QR and scanning remain available.
+
+
+## 视频通话增强（源码接入，待编译与真机验证）
+
+聊天类功能 → 视频通话增强：视频美颜、图片贴纸、前摄视频镜像，默认关闭。美颜使用微信自身资源包和引擎，参数取当前原生方案；图片由系统相册选择并用微信编辑器调整，再合成到视频帧。通话页的“通话调节”在 iOS15+ 默认半屏显示，可观察真实画面。图片仅保留本次通话，挂断清理。
+
+本轮不含在线素材、文字模板、PAG动态手势或妆容/滤镜。接口、方向、对端效果与原生美颜叠加仍需设备验证，不能将源码接入视为完整复刻。实现与验证边界见 [接入记录](docs/VIDEO_CALL_EFFECTS.md)。
