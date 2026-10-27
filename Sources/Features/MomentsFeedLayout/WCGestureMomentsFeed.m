@@ -368,14 +368,14 @@ static WCFeedPlan *WCFeedBuildPlan(double nativeHeight, id item, id context, id 
         (WCFeedOwnPost(item) && [WCTweakSafeValue(model, @"canShowDeleteButton") boolValue]));
     BOOL hideText = feedEnabled && WCGestureEnabled(WCGestureMomentsFeedHideActionTextKey);
     NSUInteger count = (actions ? 2 : 0) + (forward ? 1 : 0);
-    if (feedEnabled && count && width < (count * 60 + count * 6 + 80) * scale) hideText = YES;
-    CGFloat controlsWidth = count ? count * (hideText ? 44 : 60) * scale + (count - 1) * 6 * scale + 6 * scale : 0;
-    CGFloat timeExtra = feedEnabled ? MAX(0, MAX(count ? 60 * scale : 0,
+    if (feedEnabled && count && width < (count * 54 + count * 6 + 80) * scale) hideText = YES;
+    CGFloat controlsWidth = count ? count * (hideText ? 30 : 54) * scale + (count - 1) * 6 * scale + 6 * scale : 0;
+    CGFloat timeExtra = feedEnabled ? MAX(0, MAX(count ? 32 * scale : 0,
         WCFeedHeight(time, font, MAX(40 * scale, width - controlsWidth))) - ceil(font.lineHeight)) : 0;
     BOOL ownControls = feedEnabled && [WCTweakSafeValue(model, @"canShowDeleteButton") boolValue];
     CGFloat extra = (feedEnabled ? MAX(12 * scale, WCFeedSpacing()) + 15 * scale : 0) + timeExtra +
         (location.length ? MAX(0, WCFeedHeight(location, font, width) - ceil(font.lineHeight)) + 6 * scale : 0) +
-        (ownControls ? 24 * scale : 0) + (!feedEnabled && forward ? 66 * scale : 0);
+        (ownControls ? 24 * scale : 0) + (!feedEnabled && forward ? 38 * scale : 0);
     if (!isfinite(extra) || extra > 4096) return nil;
     NSString *signature = [NSString stringWithFormat:@"%@|%@|%@|%.2f|%@|%.2f|%.2f|%d|%d|%.2f|%d|%d|%d|%d",
         WCFeedText(WCTweakSafeValue(item, @"tid")), time, location, width, font.fontName, font.pointSize,
@@ -485,26 +485,30 @@ static BOOL WCFeedCurrent(UIView *cell, WCFeedState *state) {
     [super layoutSubviews];
     CGFloat scale = WCFeedScale();
     BOOL hasText = self.currentTitle.length > 0;
-    CGFloat iconBox = 30 * scale, labelHeight = hasText ? ceil(self.titleLabel.font.lineHeight) : 0;
-    CGFloat groupHeight = iconBox + (hasText ? 4 * scale + labelHeight : 0);
-    CGFloat y = MAX(0, (self.bounds.size.height - groupHeight) / 2);
+    CGFloat iconBox = 16 * scale, gap = hasText ? 4 * scale : 0;
+    CGFloat textWidth = hasText ? ceil([self.currentTitle sizeWithAttributes:@{NSFontAttributeName:self.titleLabel.font}].width) : 0;
+    textWidth = MIN(textWidth, MAX(0, self.bounds.size.width - iconBox - gap - 4 * scale));
+    CGFloat groupWidth = iconBox + gap + textWidth;
+    CGFloat x = MAX(0, (self.bounds.size.width - groupWidth) / 2);
     CGSize size = self.currentImage.size;
-    CGFloat factor = size.width > 0 && size.height > 0 ? MIN(iconBox / size.height, MIN(iconBox, MAX(0, self.bounds.size.width - 8 * scale)) / size.width) : 0;
+    CGFloat factor = size.width > 0 && size.height > 0 ? MIN(iconBox / size.height, iconBox / size.width) : 0;
     CGSize imageSize = CGSizeMake(size.width * factor, size.height * factor);
-    self.imageView.frame = CGRectMake((self.bounds.size.width - imageSize.width) / 2, y + (iconBox - imageSize.height) / 2, imageSize.width, imageSize.height);
-    self.titleLabel.hidden = !hasText; self.titleLabel.textAlignment = NSTextAlignmentCenter;
-    self.titleLabel.frame = CGRectMake(0, y + iconBox + 4 * scale, self.bounds.size.width, labelHeight);
+    self.imageView.frame = CGRectMake(x + (iconBox - imageSize.width) / 2,
+        (self.bounds.size.height - imageSize.height) / 2, imageSize.width, imageSize.height);
+    self.titleLabel.hidden = !hasText; self.titleLabel.textAlignment = NSTextAlignmentLeft;
+    CGFloat labelHeight = hasText ? ceil(self.titleLabel.font.lineHeight) : 0;
+    self.titleLabel.frame = CGRectMake(x + iconBox + gap, (self.bounds.size.height - labelHeight) / 2, textWidth, labelHeight);
 }
 @end
 static UIButton *WCFeedButton(NSString *title, NSString *symbol) {
     UIButton *button = [[WCFeedActionButton alloc] initWithFrame:CGRectZero];
     [button setTitle:title forState:UIControlStateNormal];
     if (symbol) [button setImage:[UIImage systemImageNamed:symbol withConfiguration:
-        [UIImageSymbolConfiguration configurationWithPointSize:14 * WCFeedScale() weight:UIImageSymbolWeightRegular]]
+        [UIImageSymbolConfiguration configurationWithPointSize:16 * WCFeedScale() weight:UIImageSymbolWeightRegular]]
         forState:UIControlStateNormal];
     button.tintColor = UIColor.labelColor;
     [button setTitleColor:UIColor.labelColor forState:UIControlStateNormal];
-    button.titleLabel.font = [UIFont systemFontOfSize:12 * WCFeedScale()];
+    button.titleLabel.font = [UIFont systemFontOfSize:13 * WCFeedScale()];
     return button;
 }
 static WCFeedState *WCFeedCreateState(UIView *cell) {
@@ -594,7 +598,7 @@ void WCGestureMomentsFeedLayout(UIView *cell) {
         state.like.hidden = state.comment.hidden = !actions; state.forward.hidden = !forward;
         state.actionsAvailable = actions;
         NSArray<UIButton *> *buttons = actions ? (forward ? @[state.like, state.comment, state.forward] : @[state.like, state.comment]) : (forward ? @[state.forward] : @[]);
-        if (feedEnabled && buttons.count && width < (buttons.count * 60 + buttons.count * 6 + 80) * scale) hideText = YES;
+        if (feedEnabled && buttons.count && width < (buttons.count * 54 + buttons.count * 6 + 80) * scale) hideText = YES;
         BOOL liked = [WCTweakSafeValue(item, @"likeFlag") boolValue];
         NSArray *titles = @[liked ? @"已赞" : @"点赞", @"评论", @"转发"];
         NSArray *symbols = @[liked ? @"heart.fill" : @"heart", @"text.bubble", @"arrow.turn.up.right"];
@@ -602,7 +606,7 @@ void WCGestureMomentsFeedLayout(UIView *cell) {
         for (UIButton *button in @[state.like, state.comment, state.forward]) {
             UIColor *color = [UIColor.labelColor resolvedColorWithTraitCollection:cell.traitCollection];
             UIImage *icon = [UIImage systemImageNamed:symbols[index] withConfiguration:
-                [UIImageSymbolConfiguration configurationWithPointSize:30 * scale weight:UIImageSymbolWeightRegular]];
+                [UIImageSymbolConfiguration configurationWithPointSize:16 * scale weight:UIImageSymbolWeightRegular]];
             // Custom buttons and original-rendered images do not inherit WeChat's blue system-button state.
             icon = [icon imageWithTintColor:color renderingMode:UIImageRenderingModeAlwaysOriginal];
             for (NSNumber *value in @[@(UIControlStateNormal), @(UIControlStateHighlighted), @(UIControlStateSelected), @(UIControlStateDisabled)]) {
@@ -610,14 +614,14 @@ void WCGestureMomentsFeedLayout(UIView *cell) {
                 [button setTitle:hideText ? nil : titles[index] forState:controlState];
                 [button setTitleColor:color forState:controlState]; [button setImage:icon forState:controlState];
             }
-            button.tintColor = color; button.titleLabel.font = [UIFont systemFontOfSize:15 * scale];
+            button.tintColor = color; button.titleLabel.font = [UIFont systemFontOfSize:13 * scale];
             button.accessibilityLabel = index == 0 && liked ? @"取消点赞" : titles[index];
             index++;
         }
-        CGFloat buttonWidth = (hideText ? 44 : 60) * scale;
+        CGFloat buttonWidth = (hideText ? 30 : 54) * scale;
         if (feedEnabled && buttons.count) buttonWidth = MIN(buttonWidth,
             MAX(16 * scale, (width - 40 * scale - spacing * buttons.count) / buttons.count));
-        CGFloat buttonHeight = 60 * scale;
+        CGFloat buttonHeight = 32 * scale;
         CGFloat buttonsWidth = buttons.count ? buttons.count * buttonWidth + (buttons.count - 1) * spacing : 0;
         UIView *privacy = WCFeedView(cell, @"m_privacyButton"), *delete = WCFeedView(cell, @"m_deleteButton");
         NSMutableArray<UIView *> *ownButtons = [NSMutableArray array];
@@ -637,8 +641,7 @@ void WCGestureMomentsFeedLayout(UIView *cell) {
             CGFloat available = width - (buttonsWidth > 0 ? buttonsWidth + spacing : 0);
             if (available < 40 * scale) return;
             CGFloat timeHeight = MAX(time.font.lineHeight, WCFeedHeight(time.text ?: @"", time.font, available));
-            CGFloat labelHeight = hideText ? 0 : ceil([UIFont systemFontOfSize:15 * scale].lineHeight);
-            CGFloat iconCenter = (buttonHeight - 30 * scale - (hideText ? 0 : 4 * scale + labelHeight)) / 2 + 15 * scale;
+            CGFloat iconCenter = buttonHeight / 2;
             CGFloat anchor = buttons.count ? MAX(timeHeight / 2, iconCenter) : timeHeight / 2;
             WCFeedSave(state, time); time.numberOfLines = 0; time.lineBreakMode = NSLineBreakByWordWrapping;
             time.frame = CGRectMake(left, top + anchor - timeHeight / 2, available, timeHeight);
