@@ -8,6 +8,7 @@
 }
 
 - (void)prepareForReuse {
+    WCGestureChatMediaResetCell((UIView *)self);
     WCGestureMediaCornerReset(self);
     WCGestureMessageTimeHide(self);
     WCGestureAntiRevokeHide(self);

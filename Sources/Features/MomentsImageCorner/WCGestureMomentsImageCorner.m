@@ -17,7 +17,7 @@ static char WCMomentsCornerFinderStripKey;
 @implementation WCMomentsCornerState
 @end
 
-static CGFloat WCMomentsCornerResolvedRadius(CGSize size, double requested) {
+CGFloat WCGestureMomentsImageCornerResolvedRadius(CGSize size, double requested) {
     CGFloat side = MIN(size.width, size.height);
     if (!isfinite(side) || side <= 0) return 0;
     CGFloat radius = isfinite(requested) ? MIN(40, MAX(0, requested)) : 8;
@@ -84,7 +84,7 @@ static void WCMomentsCornerApply(UIView *view, UIView *root, CGFloat radius, NSH
         [oldTargets removeObject:view];
     }
     state.owner = root;
-    CGFloat resolved = WCMomentsCornerResolvedRadius(view.bounds.size, radius);
+    CGFloat resolved = WCGestureMomentsImageCornerResolvedRadius(view.bounds.size, radius);
     [CATransaction begin];
     [CATransaction setDisableActions:YES];
     if (fabs(view.layer.cornerRadius - resolved) > 0.01) view.layer.cornerRadius = resolved;

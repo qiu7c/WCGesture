@@ -247,7 +247,7 @@ static NSDictionary *WCParameter(NSString *title, NSString *key, double minimum,
         label.font = [UIFont monospacedDigitSystemFontOfSize:14 * WCGestureSettingsScaleFactor() weight:UIFontWeightRegular];
         double value = [NSUserDefaults.standardUserDefaults doubleForKey:parameter[@"key"]];
         label.text = [NSString stringWithFormat:@"%@   %.0f", parameter[@"title"], value];
-        UISlider *slider = [UISlider new]; slider.tag = 9200;
+        UISlider *slider = [UISlider new]; slider.tag = 9200; slider.minimumTrackTintColor = UIColor.systemBlueColor;
         slider.minimumValue = [parameter[@"minimum"] floatValue]; slider.maximumValue = [parameter[@"maximum"] floatValue]; slider.value = value;
         slider.accessibilityIdentifier = parameter[@"key"];
         [slider addTarget:self action:@selector(slid:) forControlEvents:UIControlEventValueChanged];

@@ -15,7 +15,7 @@ static NSDictionary *WCCornerNumber(NSString *title, NSString *key, double maxim
     self.sections = @[
         @[WCCornerSwitch(@"全局头像圆角",WCGestureGlobalAvatarRoundingEnabledKey),WCCornerNumber(@"头像圆角程度 (%)",WCGestureGlobalAvatarCornerPercentKey,100),@{@"title":@"整页头像预览与调节",@"previewKind":@(WCGesturePreviewAvatarRounding)}],
         @[WCCornerSwitch(@"聊天输入栏圆角",WCGestureChatInputRoundingEnabledKey),WCCornerSwitch(@"输入框内部圆角",WCGestureChatInputInnerRoundingKey),WCCornerNumber(@"内部圆角程度",WCGestureChatInputInnerRadiusKey,40),WCCornerSwitch(@"外部工具栏圆角",WCGestureChatInputOuterRoundingKey),WCCornerNumber(@"外部圆角程度",WCGestureChatInputOuterRadiusKey,40),@{@"title":@"整页圆角预览与调节",@"previewKind":@(WCGesturePreviewInputRounding)}],
-        @[WCCornerSwitch(@"朋友圈圆角",WCGestureMomentsImageCornerEnabledKey),WCCornerNumber(@"圆角程度",WCGestureMomentsImageCornerRadiusKey,40)],
+        @[WCCornerSwitch(@"朋友圈圆角",WCGestureMomentsImageCornerEnabledKey),WCCornerNumber(@"圆角程度",WCGestureMomentsImageCornerRadiusKey,40),@{@"title":@"朋友圈预览与调节",@"momentsPreview":@YES}],
         @[WCCornerSwitch(@"表情圆角",WCGestureEmoticonCornerEnabledKey),WCCornerNumber(@"圆角程度",WCGestureEmoticonCornerRadiusKey,40)],
         @[WCCornerSwitch(@"聊天媒体圆角",WCGestureChatImageCornerEnabledKey),WCCornerNumber(@"圆角程度",WCGestureChatImageCornerRadiusKey,40)]
     ];
@@ -71,6 +71,7 @@ static NSDictionary *WCCornerNumber(NSString *title, NSString *key, double maxim
         if ([self.collapsed containsIndex:path.section]) [self.collapsed removeIndex:path.section]; else [self.collapsed addIndex:path.section];
         [tableView reloadSections:[NSIndexSet indexSetWithIndex:path.section] withRowAnimation:UITableViewRowAnimationAutomatic]; return;
     }
+    if (row[@"momentsPreview"]) { [self.navigationController pushViewController:WCGestureCreateMomentsFeedPreviewController() animated:YES]; return; }
     if (row[@"previewKind"]) { [self.navigationController pushViewController:WCGestureCreatePositionEditor([row[@"previewKind"] integerValue]) animated:YES]; return; }
     if (!row[@"maximum"]) return;
     [WCPopup showInputWithTitle:row[@"title"] message:nil text:[NSString stringWithFormat:@"%.0f",[NSUserDefaults.standardUserDefaults doubleForKey:row[@"key"]]] placeholder:[NSString stringWithFormat:@"0 - %@",row[@"maximum"]] keyboard:UIKeyboardTypeDecimalPad completion:^(NSString *text) {

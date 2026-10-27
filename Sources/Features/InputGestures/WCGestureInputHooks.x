@@ -47,6 +47,16 @@
     WCPerformInputAction(self, action);
 }
 
+%new
+- (void)wc_handleInputLongPress:(UILongPressGestureRecognizer *)recognizer {
+    if (!WCGestureEnabled(WCInputGestureEnabledKey)) { WCGestureInputVoiceCancel(); return; }
+    WCInputAction action = (WCInputAction)[[NSUserDefaults standardUserDefaults] integerForKey:WCInputLongPressActionKey];
+    if (action == WCInputActionRecordVoice) { WCGestureInputVoiceHandle((UIView *)self, recognizer); return; }
+    if (recognizer.state == UIGestureRecognizerStateBegan && self.window) {
+        if ([[NSUserDefaults standardUserDefaults] boolForKey:WCInputGestureHapticKey]) WCPlayConfiguredHaptic();
+        WCPerformInputAction(self, action);
+    }
+}
 %end
 
 %ctor {

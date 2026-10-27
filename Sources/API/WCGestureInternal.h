@@ -75,3 +75,9 @@
 #import "Sources/API/WCGestureServicePageLockAPI.h"
 
 #import "Sources/API/WCGestureVirtualLocationAPI.h"
+
+#import "Sources/API/WCGestureLocalEditingAPI.h"
+#import "Sources/API/WCGestureChatMediaReplacementAPI.h"
+#import "Sources/API/WCGestureChatMessageOrderingAPI.h"
+#import "Sources/API/WCGestureWalletDisplayAPI.h"
+#import "Sources/API/WCGestureInputVoiceAPI.h"

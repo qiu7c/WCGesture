@@ -14,6 +14,7 @@ NSString *const WCGestureMomentsAlbumPageLockEnabledKey = @"com.qiu7c.onewx.priv
 NSString *const WCGestureMomentsForwardEnabledKey = @"com.qiu7c.onewx.moments.forward.enabled";
 NSString *const WCGestureMomentsFeedSpacingKey = @"com.qiu7c.onewx.moments.feed-layout.extra-spacing";
 NSString *const WCGestureMomentsFeedLocationKey = @"com.qiu7c.onewx.moments.feed-layout.full-location";
+NSString *const WCGestureMomentsFeedButtonSizeKey = @"com.qiu7c.onewx.moments.feed-layout.button-size-percent";
 NSString *const WCGestureMomentsFeedHideActionTextKey = @"com.qiu7c.onewx.moments.feed-layout.hide-action-text";
 NSString *const WCGestureMomentsFeedActionsKey = @"com.qiu7c.onewx.moments.feed-layout.direct-actions";
 
@@ -322,6 +323,15 @@ void WCGestureMigrateLegacyDefaults(void) {
     [defaults synchronize];
 }
 
+NSString *const WCGestureTextEditEnabledKey = @"com.qiu7c.onewx.local-chat.text-edit.enabled";
+NSString *const WCGestureTimeEditEnabledKey = @"com.qiu7c.onewx.local-chat.time-edit.enabled";
+NSString *const WCGestureTransferDisplayEditEnabledKey = @"com.qiu7c.onewx.local-chat.transfer-display.enabled";
+NSString *const WCGestureChatMediaReplacementEnabledKey = @"com.qiu7c.onewx.local-chat.media-replacement.enabled";
+NSString *const WCGestureChatSortEnabledKey = @"com.qiu7c.onewx.local-chat.message-ordering.enabled";
+NSString *const WCGestureWalletDisplayEnabledKey = @"com.qiu7c.onewx.local-display.wallet.enabled";
+NSString *const WCGestureWalletDisplayFenKey = @"com.qiu7c.onewx.local-display.wallet.fen";
+NSString *const WCInputLongPressActionKey = @"com.qiu7c.onewx.input.long-press.action";
+
 void WCGestureRegisterDefaults(void) {
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
@@ -333,6 +343,15 @@ void WCGestureRegisterDefaults(void) {
             [stored setBool:NO forKey:WCGestureMessageTimeBelowAvatarKey];
         }
         NSDictionary *defaults = @{
+            WCGestureTextEditEnabledKey: @NO,
+            WCGestureTimeEditEnabledKey: @NO,
+            WCGestureTransferDisplayEditEnabledKey: @NO,
+            WCGestureChatMediaReplacementEnabledKey: @NO,
+            WCGestureChatSortEnabledKey: @NO,
+            WCGestureWalletDisplayEnabledKey: @NO,
+            WCGestureWalletDisplayFenKey: @0,
+            WCInputLongPressActionKey: @(WCInputActionNone),
+
             WCGestureHideGroupTitleTailKey: @NO,
             WCGestureHideScreenshotForwardKey: @NO,
             WCGestureHideMeFinderKey: @NO,
@@ -361,6 +380,7 @@ void WCGestureRegisterDefaults(void) {
             WCGestureMomentsFeedLocationKey: @YES,
             WCGestureMomentsFeedActionsKey: @YES,
             WCGestureMomentsFeedHideActionTextKey: @NO,
+            WCGestureMomentsFeedButtonSizeKey: @100.0,
             WCGestureMomentsTimeFormatKey: @"yyyy-MM-dd HH:mm:ss",
             WCGestureAutoOriginalEnabledKey: @NO,
             WCGestureChatTopBarCapsuleEnabledKey: @NO,

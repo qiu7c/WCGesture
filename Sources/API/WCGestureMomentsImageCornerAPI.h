@@ -1,5 +1,6 @@
 #import <UIKit/UIKit.h>
 NS_ASSUME_NONNULL_BEGIN
+CGFloat WCGestureMomentsImageCornerResolvedRadius(CGSize size, double requested);
 void WCGestureMomentsImageCornerLayout(UIView *root);
 void WCGestureMomentsImageCornerViewDidLayout(UIView *view);
 void WCGestureMomentsImageCornerRegisterProfile(UIView *view);

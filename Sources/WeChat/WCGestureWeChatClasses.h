@@ -222,3 +222,11 @@ NS_ASSUME_NONNULL_BEGIN
 @end
 
 NS_ASSUME_NONNULL_END
+
+@interface ChatTimeCellView : UIView
+@end
+@interface TimeoutNumber : UIView
+- (void)updateNumber:(unsigned long long)value;
+@end
+@interface WCPayWalletEntryHeaderView : UIView
+@end

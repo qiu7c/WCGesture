@@ -7,6 +7,7 @@
 %hook CommonMessageCellView
 
 - (void)setViewModel:(id)viewModel {
+    WCGestureChatMediaResetCell((UIView *)self);
     WCGestureMediaCornerReset(self);
     WCGestureMessageTimeHide(self);
     WCGestureAntiRevokeHide(self);
@@ -46,6 +47,8 @@
 
 - (void)viewWillDisappear:(BOOL)animated {
     WCGestureChatTopBarWillDisappear(self);
+    WCGestureInputVoiceCancel();
+    WCGestureChatSortEnd((UIViewController *)self);
     %orig;
     WCGestureSendConfirmationChatLeaving(self);
     WCGestureGroupTitleRestore(self);

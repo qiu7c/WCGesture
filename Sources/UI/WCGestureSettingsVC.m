@@ -110,17 +110,21 @@ static void WCPresentKeyboardNumberEditor(__unused UIViewController *presenter,
     BOOL isScale = [defaultsKey isEqualToString:WCMomentsHeightScaleKey];
     BOOL isSendConfirmationPause = [defaultsKey isEqualToString:WCGestureSendConfirmationPauseSecondsKey];
     BOOL isFeedSpacing = [defaultsKey isEqualToString:WCGestureMomentsFeedSpacingKey];
+    BOOL isFeedButton = [defaultsKey isEqualToString:WCGestureMomentsFeedButtonSizeKey];
     BOOL isReminderInterval = [defaultsKey isEqualToString:WCGestureMomentsReminderIntervalKey];
     double minValue = isPageScale ? 70.0 : (isFontLevel ? 1.0 : (isScale ? 100.0 : (isWidth ? 0.0 : (isOffset ? -400.0 : 20.0))));
     double maxValue = isPageScale ? 100.0 : (isFontLevel ? 8.0 : (isScale ? 160.0 : (isWidth ? 1000.0 : (isOffset ? 400.0 : 200.0))));
     if (isReminderInterval) { minValue = 30; maxValue = 3600; }
     if (isFeedSpacing) { minValue = 0; maxValue = 48; }
+    if (isFeedButton) { minValue = 60; maxValue = 180; }
     if (isSendConfirmationPause) { minValue = 5; maxValue = 3600; }
     if (isAvatarCorner) { minValue = 0; maxValue = 100; }
     if (isTimeSize) { minValue = 8.0; maxValue = 18.0; }
     if (isRounding || isMomentsCorner) { minValue = 0.0; maxValue = 40.0; }
     NSString *placeholder;
-    if (isFeedSpacing) {
+    if (isFeedButton) {
+        placeholder = @"60 - 180（默认 100）";
+    } else if (isFeedSpacing) {
         placeholder = @"0 - 48（默认 8）";
     } else if (isSendConfirmationPause) {
         placeholder = @"5 - 3600 秒（默认 60）";
@@ -806,6 +810,7 @@ static NSDictionary<NSString *, NSString *> *WCConfigShareKeys(void) {
         WCGestureMomentsFeedLocationKey,
         WCGestureMomentsFeedActionsKey,
         WCGestureMomentsFeedHideActionTextKey,
+        WCGestureMomentsFeedButtonSizeKey,
         WCGestureMomentsTimeFormatKey,
         WCGestureAutoOriginalEnabledKey,
         WCGestureVoiceTranscriptionEnabledKey,
@@ -839,6 +844,14 @@ static NSDictionary<NSString *, NSString *> *WCConfigShareKeys(void) {
         WCGesturePageScaleEnabledKey,
         WCGestureGlobalAvatarRoundingEnabledKey,
         WCGestureGlobalAvatarCornerPercentKey,
+        WCGestureTextEditEnabledKey,
+        WCGestureTimeEditEnabledKey,
+        WCGestureTransferDisplayEditEnabledKey,
+        WCGestureChatMediaReplacementEnabledKey,
+        WCGestureChatSortEnabledKey,
+        WCGestureWalletDisplayEnabledKey,
+        WCGestureWalletDisplayFenKey,
+        WCInputLongPressActionKey,
         WCGestureChatInputRoundingEnabledKey,
         WCGestureChatInputInnerRoundingKey,
         WCGestureChatInputOuterRoundingKey,
@@ -994,6 +1007,7 @@ static NSArray<NSDictionary *> *WCInputActionOptions(void) {
 
 static NSString *WCInputActionName(NSInteger action) {
     // Saved configs may still hold the old "译成中文" value.
+    if (action == WCInputActionRecordVoice) return @"现场录音后发送";
     if (action == WCInputActionTranslateLegacy) action = WCInputActionTranslate;
     for (NSDictionary *option in WCInputActionOptions()) {
         if ([option[@"value"] integerValue] == action) return option[@"title"];
@@ -1007,7 +1021,9 @@ static void WCPresentInputSwipeActionPicker(__unused UIViewController *presenter
     NSInteger current = [[NSUserDefaults standardUserDefaults] integerForKey:defaultsKey];
     if (current == WCInputActionTranslateLegacy) current = WCInputActionTranslate;
     NSMutableArray<WCPopupOption *> *options = [NSMutableArray array];
-    for (NSDictionary *option in WCInputActionOptions()) {
+    NSMutableArray *actionOptions = [WCInputActionOptions() mutableCopy];
+    if ([defaultsKey isEqualToString:WCInputLongPressActionKey]) [actionOptions addObject:@{@"title":@"现场录音后发送", @"value":@(WCInputActionRecordVoice)}];
+    for (NSDictionary *option in actionOptions) {
         [options addObject:[WCPopupOption optionWithTitle:option[@"title"] value:option[@"value"]]];
     }
     [WCPopup showOptionsWithTitle:title
@@ -1561,6 +1577,13 @@ static NSString *WCRowDetailText(WCRow *row) {
             [collapsible addObject:@YES];
             [collapseKeys addObject:[prefix stringByAppendingString:suffixes[i]]];
         }
+        [sections addObject:@[WCPlainRow(@"本地聊天编辑", WCRowKindSectionTitle),
+            WCSwitchRow(@"文字修改", WCGestureTextEditEnabledKey),
+            WCSwitchRow(@"时间标签修改", WCGestureTimeEditEnabledKey),
+            WCSwitchRow(@"聊天媒体替换", WCGestureChatMediaReplacementEnabledKey),
+            WCSwitchRow(@"当前聊天排序", WCGestureChatSortEnabledKey),
+            WCSwitchRow(@"转账卡片金额显示", WCGestureTransferDisplayEditEnabledKey)]];
+        [collapsible addObject:@YES]; [collapseKeys addObject:[prefix stringByAppendingString:@".chat.local-editing"]];
         [sections addObject:@[WCSwitchRow(@"通知直达聊天", WCGestureNotificationDirectChatEnabledKey)]];
         [collapsible addObject:@NO];
         [collapseKeys addObject:[prefix stringByAppendingString:@".chat.notification-direct-chat"]];
@@ -1622,6 +1645,7 @@ static NSString *WCRowDetailText(WCRow *row) {
             [input addObject:WCInputActionRow(@"右滑动作", WCInputSwipeRightActionKey)];
             [input addObject:WCInputActionRow(@"双击动作", WCInputDoubleTapActionKey)];
             [input addObject:WCInputActionRow(@"三击动作", WCInputTripleTapActionKey)];
+            [input addObject:WCInputActionRow(@"长按动作", WCInputLongPressActionKey)];
         }
         [sections addObject:input];
         [collapsible addObject:@YES];
@@ -1711,7 +1735,10 @@ static NSString *WCRowDetailText(WCRow *row) {
         timeFormat.chatOption = @{ @"title": timeFormat.title, @"type": @"format", @"key": WCGestureMomentsTimeFormatKey };
         [sections addObject:@[WCSwitchRow(@"朋友圈精确发布时间", WCGestureMomentsTimeEnabledKey), timeFormat]];
         [collapsible addObject:@YES]; [collapseKeys addObject:[prefix stringByAppendingString:@".moments.precise-time"]];
+        WCRow *feedPreview = WCPlainRow(@"整页预览与调节", WCRowKindChatOption);
+        feedPreview.chatOption = @{@"title":feedPreview.title,@"type":@"moments-feed-preview",@"key":@""};
         [sections addObject:@[WCSwitchRow(@"朋友圈排版", WCGestureMomentsFeedEnabledKey),
+            feedPreview, WCNumberRow(@"按钮大小 (%)", WCGestureMomentsFeedButtonSizeKey),
             WCNumberRow(@"额外留白", WCGestureMomentsFeedSpacingKey),
             WCSwitchRow(@"完整显示定位", WCGestureMomentsFeedLocationKey),
             WCSwitchRow(@"独立点赞评论", WCGestureMomentsFeedActionsKey),
@@ -1809,6 +1836,10 @@ static NSString *WCRowDetailText(WCRow *row) {
         [sections addObject:@[WCSwitchRow(@"后台保活", WCGestureBackgroundKeepAliveEnabledKey)]];
         [collapsible addObject:@NO];
         [collapseKeys addObject:[prefix stringByAppendingString:@".background.keep-alive"]];
+        WCRow *wallet = WCPlainRow(@"余额显示金额", WCRowKindChatOption);
+        wallet.chatOption = @{@"title":wallet.title, @"type":@"wallet-display", @"key":WCGestureWalletDisplayFenKey};
+        [sections addObject:@[WCSwitchRow(@"钱包余额本机显示", WCGestureWalletDisplayEnabledKey), wallet]];
+        [collapsible addObject:@YES]; [collapseKeys addObject:[prefix stringByAppendingString:@".enhance.wallet-display"]];
         WCRow *clearProfile = WCPlainRow(@"清空地区与性别信息", WCRowKindChatOption);
         clearProfile.chatOption = @{@"title":clearProfile.title, @"type":@"clear-profile", @"key":@""};
         [sections addObject:@[clearProfile]]; [collapsible addObject:@NO];

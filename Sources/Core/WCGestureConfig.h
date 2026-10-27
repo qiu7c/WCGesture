@@ -250,7 +250,16 @@ typedef NS_ENUM(NSInteger, WCHapticStyle) {
     WCHapticStyleRigid = 4,
 };
 
-/// Input-box gesture action enum (shared by swipe and multi-tap).
+FOUNDATION_EXPORT NSString *const WCGestureTextEditEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureTimeEditEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureTransferDisplayEditEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureChatMediaReplacementEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureChatSortEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureWalletDisplayEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureWalletDisplayFenKey;
+FOUNDATION_EXPORT NSString *const WCInputLongPressActionKey;
+
+/// Input-box actions; live recording is offered only for input long press.
 typedef NS_ENUM(NSInteger, WCInputAction) {
     WCInputActionNone = 0,
     WCInputActionClear = 1,   // 清空输入框
@@ -264,6 +273,7 @@ typedef NS_ENUM(NSInteger, WCInputAction) {
     WCInputActionTrim = 9,               // 去空格/换行
     WCInputActionAIAnswer = 10,          // AI 回答输入框里的问题
     WCInputActionAIPolish = 11,          // AI 润色输入框文字
+    WCInputActionRecordVoice = 12,       // 长按现场录音，松开发送
 };
 
 /// Notification posted when an enhancement key changes, so gesture recognizers
@@ -415,6 +425,7 @@ FOUNDATION_EXPORT NSString *const WCGestureMomentsFeedSpacingKey;
 FOUNDATION_EXPORT NSString *const WCGestureMomentsFeedLocationKey;
 FOUNDATION_EXPORT NSString *const WCGestureMomentsFeedActionsKey;
 FOUNDATION_EXPORT NSString *const WCGestureMomentsFeedHideActionTextKey;
+FOUNDATION_EXPORT NSString *const WCGestureMomentsFeedButtonSizeKey;
 
 // Virtual location.
 FOUNDATION_EXPORT NSString *const WCGestureVirtualLocationEnabledKey;

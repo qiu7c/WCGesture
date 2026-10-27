@@ -39,6 +39,7 @@
         // Install after %init so the dock's layoutSubviews chains into the
         // global UIView hook below instead of bypassing it.
         WCInstallKeyboardDockHook();
+        WCGestureChatSortInstall();
         WCGestureMomentsMonitoringStart();
 
         [[NSNotificationCenter defaultCenter] addObserverForName:UIKeyboardWillChangeFrameNotification
@@ -67,6 +68,11 @@
             // Resync on the next runloop so the cell re-reads the new value.
             dispatch_async(dispatch_get_main_queue(), ^{
                 WCGestureLayoutSettingsChanged(note.object);
+                WCGestureLocalEditSettingsChanged(note.object);
+                WCGestureChatMediaSettingsChanged(note.object);
+                WCGestureChatSortSettingsChanged(note.object);
+                WCGestureWalletDisplaySettingsChanged(note.object);
+                WCGestureInputVoiceSettingsChanged();
                 WCGestureChatInputRoundingSettingsChanged(note.object);
                 WCGestureRefreshTrackedGlobalAvatarViews();
                 WCGestureInterfaceCleanupSettingsChanged(note.object);

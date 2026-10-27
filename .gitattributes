@@ -1,0 +1,2 @@
+# Preserve upstream Silk SDK bytes and its original whitespace.
+Vendor/Silk/** -text -whitespace

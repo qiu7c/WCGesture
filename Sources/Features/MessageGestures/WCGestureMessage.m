@@ -544,6 +544,22 @@ BOOL WCGestureResendVoiceMessage(id message, NSString *session) {
     return WCSendVoiceMessage(message, nil, session);
 }
 
+BOOL WCGestureSendRecordedVoiceFile(NSString *path, NSUInteger durationMilliseconds, NSString *session) {
+    if (!path.length || !session.length || !WCCurrentUserWXID().length || durationMilliseconds < 500 || durationMilliseconds > 60000) return NO;
+    Class cls = NSClassFromString(@"CMessageWrap");
+    SEL init = NSSelectorFromString(@"initWithMsgType:");
+    if (![cls instancesRespondToSelector:init]) return NO;
+    id wrap = ((id (*)(id, SEL, long long))objc_msgSend)([cls alloc], init, 34);
+    if (!wrap) return NO;
+    WCTweakSetValue(wrap, @"m_uiVoiceTime", @(durationMilliseconds));
+    WCTweakSetValue(wrap, @"m_uiVoiceFormat", @4);
+    WCTweakSetValue(wrap, @"m_uiVoiceEndFlag", @1);
+    id extension = WCTweakSafeValue(wrap, @"m_extendInfoWithMsgType");
+    WCTweakSetValue(extension, @"m_uiVoiceTime", @(durationMilliseconds));
+    WCTweakSetValue(extension, @"m_uiVoiceFormat", @4);
+    return WCSendVoiceMessage(wrap, path, session);
+}
+
 static BOOL WCRepeatPlainTextMessageFallback(CommonMessageCellView *cell) {
     id source = WCMessageWrapForCell(cell);
     NSInteger messageType = [WCTweakSafeValue(source, @"m_uiMessageType") integerValue];

@@ -7,6 +7,7 @@ static char WCInputSwipeLeftRecognizerKey;
 static char WCInputSwipeRightRecognizerKey;
 static char WCInputDoubleTapRecognizerKey;
 static char WCInputTripleTapRecognizerKey;
+static char WCInputLongPressRecognizerKey;
 
 #pragma mark - Text access
 
@@ -186,6 +187,19 @@ void WCPerformInputAction(MMGrowTextView *view, WCInputAction action) {
 void WCSynchronizeInputGestures(MMGrowTextView *view) {
     if (!view) return;
     BOOL enabled = WCGestureEnabled(WCInputGestureEnabledKey) && view.window;
+    UILongPressGestureRecognizer *hold = objc_getAssociatedObject(view, &WCInputLongPressRecognizerKey);
+    BOOL holdOn = enabled && [[NSUserDefaults standardUserDefaults] integerForKey:WCInputLongPressActionKey] != WCInputActionNone;
+    if (holdOn && !hold) {
+        hold = [[UILongPressGestureRecognizer alloc] initWithTarget:view action:NSSelectorFromString(@"wc_handleInputLongPress:")];
+        hold.minimumPressDuration = .5;
+        hold.allowableMovement = CGFLOAT_MAX;
+        hold.cancelsTouchesInView = YES;
+        [view addGestureRecognizer:hold];
+        objc_setAssociatedObject(view, &WCInputLongPressRecognizerKey, hold, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    } else if (!holdOn && hold) {
+        [view removeGestureRecognizer:hold];
+        objc_setAssociatedObject(view, &WCInputLongPressRecognizerKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
     // Swipe recognizers
     UISwipeGestureRecognizer *left = objc_getAssociatedObject(view, &WCInputSwipeLeftRecognizerKey);
     UISwipeGestureRecognizer *right = objc_getAssociatedObject(view, &WCInputSwipeRightRecognizerKey);

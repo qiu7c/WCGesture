@@ -4,7 +4,7 @@
 #import <math.h>
 #import "Sources/API/WCGestureInternal.h"
 
-static char WCFeedPlanKey, WCFeedStateKey, WCFeedRefreshKey, WCFeedRecoveringKey, WCFeedRowsKey, WCFeedRemeasureKey;
+static char WCFeedPlanKey, WCFeedStateKey, WCFeedRefreshKey, WCFeedRecoveringKey, WCFeedRowsKey, WCFeedRemeasureKey, WCFeedButtonStyleKey, WCFeedNeedsRefreshKey;
 static __thread NSUInteger WCFeedHeightDepth;
 
 @interface WCFeedPlan : NSObject
@@ -123,6 +123,19 @@ static BOOL WCFeedEnabledForItem(id item, id controller) {
         WCGestureMomentsForwardCanForward(item);
 }
 static CGFloat WCFeedScale(void) { return MAX(.5, MIN(1.5, WCGestureLayoutScaleFactor())); }
+static CGFloat WCFeedButtonScale(void) {
+    NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
+    double percent = [defaults objectForKey:WCGestureMomentsFeedButtonSizeKey] ? [defaults doubleForKey:WCGestureMomentsFeedButtonSizeKey] : 100;
+    return WCFeedScale() * (isfinite(percent) ? MAX(60, MIN(180, percent)) : 100) / 100;
+}
+WCGestureMomentsFeedActionMetrics WCGestureMomentsFeedResolveActionMetrics(CGFloat width, NSUInteger count, BOOL hideText) {
+    CGFloat scale = WCFeedScale(), buttonScale = WCFeedButtonScale(), spacing = 6 * scale;
+    if (count && width < count * 54 * buttonScale + count * spacing + 80 * scale) hideText = YES;
+    CGFloat buttonWidth = (hideText ? 30 : 54) * buttonScale;
+    if (count) buttonWidth = MIN(buttonWidth, MAX(16 * scale, (width - 40 * scale - spacing * count) / count));
+    return (WCGestureMomentsFeedActionMetrics){buttonWidth, 32 * buttonScale,
+        count ? count * buttonWidth + (count - 1) * spacing : 0, spacing, hideText};
+}
 static CGFloat WCFeedSpacing(void) {
     double value = [NSUserDefaults.standardUserDefaults doubleForKey:WCGestureMomentsFeedSpacingKey];
     return (isfinite(value) ? MAX(0, MIN(48, value)) : 8) * WCFeedScale();
@@ -178,6 +191,11 @@ static void WCFeedRefreshAttempt(UIViewController *controller, NSUInteger attemp
             objc_setAssociatedObject(target, &WCFeedRefreshKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC); return;
         }
         UITableView *table = view;
+        if (!table.window) {
+            if ([cache isKindOfClass:NSMutableDictionary.class]) [cache removeAllObjects];
+            objc_setAssociatedObject(target, &WCFeedNeedsRefreshKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            objc_setAssociatedObject(target, &WCFeedRefreshKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC); return;
+        }
         if (table.hasUncommittedUpdates) {
             if (attempts) dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(.15 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
                 UIViewController *retry = weakController;
@@ -219,11 +237,27 @@ static void WCFeedRemeasureAttempt(UIViewController *controller, NSUInteger atte
             objc_setAssociatedObject(target, &WCFeedRemeasureKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC); return;
         }
         UITableView *table = value;
-        if (table.hasUncommittedUpdates) {
-            objc_setAssociatedObject(target, &WCFeedRemeasureKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            if (attempts) dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(.15 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-                WCFeedRemeasureAttempt(weakController, attempts - 1);
+        if (!table.window) {
+            objc_setAssociatedObject(target, &WCFeedRemeasureKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC); return;
+        }
+        if (table.dragging || table.decelerating || table.tracking) {
+            // One pending request per controller; do not invalidate row geometry mid-fling.
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(.12 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                UIViewController *retry = weakController;
+                if (!retry) return;
+                objc_setAssociatedObject(retry, &WCFeedRemeasureKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+                WCFeedRemeasureAttempt(retry, attempts);
             });
+            return;
+        }
+        if (table.hasUncommittedUpdates) {
+            if (attempts) dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(.15 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                UIViewController *retry = weakController;
+                if (!retry) return;
+                objc_setAssociatedObject(retry, &WCFeedRemeasureKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+                WCFeedRemeasureAttempt(retry, attempts - 1);
+            });
+            else objc_setAssociatedObject(target, &WCFeedRemeasureKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             return;
         }
         id cache = WCTweakSafeValue(target, @"cellHeightCache");
@@ -297,10 +331,13 @@ id WCGestureMomentsFeedCachedHeight(UIViewController *controller, id item, id or
     if (![table isKindOfClass:UITableView.class]) return original;
     NSDictionary *rows = objc_getAssociatedObject(controller, &WCFeedRowsKey);
     NSString *tid = WCFeedText(WCTweakSafeValue(item, @"tid"));
-    for (WCFeedPlan *plan in rows.allValues) {
+    NSString *account = WCCurrentUserWXID() ?: @"";
+    CGFloat width = ((UITableView *)table).bounds.size.width;
+    for (NSIndexPath *path in rows) {
+        WCFeedPlan *plan = rows[path];
         if (plan.item && [plan.tid isEqualToString:WCFeedText(WCTweakSafeValue(plan.item, @"tid"))] &&
-            [plan.tid isEqualToString:tid] && [plan.account isEqualToString:WCCurrentUserWXID() ?: @""] &&
-            fabs(plan.rowWidth - ((UITableView *)table).bounds.size.width) <= .5 && plan.rowHeight > height)
+            [plan.tid isEqualToString:tid] && [plan.account isEqualToString:account] &&
+            fabs(plan.rowWidth - width) <= .5 && plan.rowHeight > height)
             height = plan.rowHeight;
     }
     return height > [original doubleValue] ? @(height) : original;
@@ -368,18 +405,19 @@ static WCFeedPlan *WCFeedBuildPlan(double nativeHeight, id item, id context, id 
         (WCFeedOwnPost(item) && [WCTweakSafeValue(model, @"canShowDeleteButton") boolValue]));
     BOOL hideText = feedEnabled && WCGestureEnabled(WCGestureMomentsFeedHideActionTextKey);
     NSUInteger count = (actions ? 2 : 0) + (forward ? 1 : 0);
-    if (feedEnabled && count && width < (count * 54 + count * 6 + 80) * scale) hideText = YES;
-    CGFloat controlsWidth = count ? count * (hideText ? 30 : 54) * scale + (count - 1) * 6 * scale + 6 * scale : 0;
-    CGFloat timeExtra = feedEnabled ? MAX(0, MAX(count ? 32 * scale : 0,
+    WCGestureMomentsFeedActionMetrics metrics = WCGestureMomentsFeedResolveActionMetrics(width, count, hideText);
+    hideText = metrics.hidesText;
+    CGFloat controlsWidth = metrics.totalWidth > 0 ? metrics.totalWidth + metrics.spacing : 0;
+    CGFloat timeExtra = feedEnabled ? MAX(0, MAX(count ? metrics.buttonHeight : 0,
         WCFeedHeight(time, font, MAX(40 * scale, width - controlsWidth))) - ceil(font.lineHeight)) : 0;
     BOOL ownControls = feedEnabled && [WCTweakSafeValue(model, @"canShowDeleteButton") boolValue];
     CGFloat extra = (feedEnabled ? MAX(12 * scale, WCFeedSpacing()) + 15 * scale : 0) + timeExtra +
         (location.length ? MAX(0, WCFeedHeight(location, font, width) - ceil(font.lineHeight)) + 6 * scale : 0) +
-        (ownControls ? 24 * scale : 0) + (!feedEnabled && forward ? 38 * scale : 0);
+        (ownControls ? 24 * scale : 0) + (!feedEnabled && forward ? metrics.buttonHeight + 6 * scale : 0);
     if (!isfinite(extra) || extra > 4096) return nil;
-    NSString *signature = [NSString stringWithFormat:@"%@|%@|%@|%.2f|%@|%.2f|%.2f|%d|%d|%.2f|%d|%d|%d|%d",
+    NSString *signature = [NSString stringWithFormat:@"%@|%@|%@|%.2f|%@|%.2f|%.2f|%d|%d|%.2f|%d|%d|%d|%d|%.3f",
         WCFeedText(WCTweakSafeValue(item, @"tid")), time, location, width, font.fontName, font.pointSize,
-        scale, fullLocation, actions, WCFeedSpacing(), feedEnabled, forward, hideText, ownControls];
+        scale, fullLocation, actions, WCFeedSpacing(), feedEnabled, forward, hideText, ownControls, WCFeedButtonScale()];
     @synchronized (holder) {
         WCFeedPlan *plan = objc_getAssociatedObject(holder, &WCFeedPlanKey);
         if (plan.controller != controller || ![plan.signature isEqualToString:signature]) {
@@ -431,10 +469,11 @@ static void WCFeedRestoreViews(UIView *cell, WCFeedState *state) {
     // post. Restoring them here would resurrect its location/visibility.
     for (WCFeedViewState *saved in (sameContent ? state.views : @[])) {
         UIView *view = saved.view;
-        view.frame = saved.frame; view.hidden = saved.hidden;
+        if (!CGRectEqualToRect(view.frame, saved.frame)) view.frame = saved.frame;
+        if (view.hidden != saved.hidden) view.hidden = saved.hidden;
         if ([view isKindOfClass:UILabel.class]) {
-            ((UILabel *)view).numberOfLines = saved.lines;
-            ((UILabel *)view).lineBreakMode = saved.lineBreak;
+            if (((UILabel *)view).numberOfLines != saved.lines) ((UILabel *)view).numberOfLines = saved.lines;
+            if (((UILabel *)view).lineBreakMode != saved.lineBreak) ((UILabel *)view).lineBreakMode = saved.lineBreak;
         }
     }
     [state.views removeAllObjects];
@@ -485,7 +524,8 @@ static BOOL WCFeedCurrent(UIView *cell, WCFeedState *state) {
     [super layoutSubviews];
     CGFloat scale = WCFeedScale();
     BOOL hasText = self.currentTitle.length > 0;
-    CGFloat iconBox = 16 * scale, gap = hasText ? 4 * scale : 0;
+    CGFloat buttonScale = WCFeedButtonScale();
+    CGFloat iconBox = MIN(16 * buttonScale, MAX(0, self.bounds.size.width - 4 * scale)), gap = hasText ? 4 * buttonScale : 0;
     CGFloat textWidth = hasText ? ceil([self.currentTitle sizeWithAttributes:@{NSFontAttributeName:self.titleLabel.font}].width) : 0;
     textWidth = MIN(textWidth, MAX(0, self.bounds.size.width - iconBox - gap - 4 * scale));
     CGFloat groupWidth = iconBox + gap + textWidth;
@@ -500,22 +540,37 @@ static BOOL WCFeedCurrent(UIView *cell, WCFeedState *state) {
     self.titleLabel.frame = CGRectMake(x + iconBox + gap, (self.bounds.size.height - labelHeight) / 2, textWidth, labelHeight);
 }
 @end
-static UIButton *WCFeedButton(NSString *title, NSString *symbol) {
+void WCGestureConfigureMomentsFeedButton(UIButton *button, NSString *title, NSString *symbol, BOOL hideText) {
+    CGFloat scale = WCFeedButtonScale();
+    UIUserInterfaceStyle style = button.traitCollection.userInterfaceStyle;
+    UIAccessibilityContrast contrast = button.traitCollection.accessibilityContrast;
+    NSDictionary *old = objc_getAssociatedObject(button, &WCFeedButtonStyleKey);
+    if ([old[@"title"] isEqualToString:title] && [old[@"symbol"] isEqualToString:symbol] &&
+        [old[@"hidden"] boolValue] == hideText && fabs([old[@"scale"] doubleValue] - scale) < .0001 &&
+        [old[@"style"] integerValue] == style && [old[@"contrast"] integerValue] == contrast) return;
+    objc_setAssociatedObject(button, &WCFeedButtonStyleKey, @{@"title":title,@"symbol":symbol,@"hidden":@(hideText),
+        @"scale":@(scale),@"style":@(style),@"contrast":@(contrast)}, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    UIColor *color = [UIColor.labelColor resolvedColorWithTraitCollection:button.traitCollection];
+    UIImage *icon = [UIImage systemImageNamed:symbol withConfiguration:
+        [UIImageSymbolConfiguration configurationWithPointSize:16 * WCFeedButtonScale() weight:UIImageSymbolWeightRegular]];
+    icon = [icon imageWithTintColor:color renderingMode:UIImageRenderingModeAlwaysOriginal];
+    for (NSNumber *value in @[@(UIControlStateNormal), @(UIControlStateHighlighted), @(UIControlStateSelected), @(UIControlStateDisabled)]) {
+        UIControlState state = value.unsignedIntegerValue;
+        [button setTitle:hideText ? nil : title forState:state]; [button setTitleColor:color forState:state];
+        [button setImage:icon forState:state];
+    }
+    button.tintColor = color; button.titleLabel.font = [UIFont systemFontOfSize:13 * WCFeedButtonScale()];
+    button.accessibilityLabel = title; [button setNeedsLayout];
+}
+UIButton *WCGestureCreateMomentsFeedButton(NSString *title, NSString *symbol) {
     UIButton *button = [[WCFeedActionButton alloc] initWithFrame:CGRectZero];
-    [button setTitle:title forState:UIControlStateNormal];
-    if (symbol) [button setImage:[UIImage systemImageNamed:symbol withConfiguration:
-        [UIImageSymbolConfiguration configurationWithPointSize:16 * WCFeedScale() weight:UIImageSymbolWeightRegular]]
-        forState:UIControlStateNormal];
-    button.tintColor = UIColor.labelColor;
-    [button setTitleColor:UIColor.labelColor forState:UIControlStateNormal];
-    button.titleLabel.font = [UIFont systemFontOfSize:13 * WCFeedScale()];
-    return button;
+    WCGestureConfigureMomentsFeedButton(button, title, symbol, NO); return button;
 }
 static WCFeedState *WCFeedCreateState(UIView *cell) {
     WCFeedState *state = [WCFeedState new]; state.views = [NSMutableArray array];
     state.footer = [UIView new]; state.footer.backgroundColor = UIColor.clearColor; state.footer.hidden = YES;
-    state.like = WCFeedButton(@"点赞", @"heart"); state.comment = WCFeedButton(@"评论", @"text.bubble");
-    state.forward = WCFeedButton(@"转发", @"arrow.turn.up.right");
+    state.like = WCGestureCreateMomentsFeedButton(@"点赞", @"heart"); state.comment = WCGestureCreateMomentsFeedButton(@"评论", @"text.bubble");
+    state.forward = WCGestureCreateMomentsFeedButton(@"转发", @"arrow.turn.up.right");
     for (UIButton *button in @[state.like, state.comment, state.forward]) [state.footer addSubview:button];
     [cell addSubview:state.footer];
     __weak UIView *weakCell = cell; __weak WCFeedState *weakState = state;
@@ -552,6 +607,10 @@ void WCGestureMomentsFeedLayout(UIView *cell) {
     UIViewController *controller = WCViewControllerForResponder(cell);
     if (!WCFeedControllerSupported(controller)) controller = WCFeedResolveController(context, item);
     WCFeedRegister(controller);
+    if (cell.window && [objc_getAssociatedObject(controller, &WCFeedNeedsRefreshKey) boolValue]) {
+        objc_setAssociatedObject(controller, &WCFeedNeedsRefreshKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        WCFeedRefresh(controller);
+    }
     if (!cell.window || !WCFeedEnabledForItem(item, controller) || !WCFeedControllerSupported(controller) ||
         !WCFeedPost(item)) { WCGestureMomentsFeedReset(cell); return; }
     WCFeedBindController(context, item, controller);
@@ -598,31 +657,18 @@ void WCGestureMomentsFeedLayout(UIView *cell) {
         state.like.hidden = state.comment.hidden = !actions; state.forward.hidden = !forward;
         state.actionsAvailable = actions;
         NSArray<UIButton *> *buttons = actions ? (forward ? @[state.like, state.comment, state.forward] : @[state.like, state.comment]) : (forward ? @[state.forward] : @[]);
-        if (feedEnabled && buttons.count && width < (buttons.count * 54 + buttons.count * 6 + 80) * scale) hideText = YES;
+        CGFloat actionRight = right;
+        if (feedEnabled && !actions && operate.superview == cell && !operate.hidden)
+            actionRight = MIN(right, CGRectGetMinX(operate.frame) - spacing);
+        CGFloat actionWidth = MAX(40 * scale, actionRight - left);
+        WCGestureMomentsFeedActionMetrics metrics = WCGestureMomentsFeedResolveActionMetrics(actionWidth, buttons.count, hideText);
+        hideText = metrics.hidesText;
         BOOL liked = [WCTweakSafeValue(item, @"likeFlag") boolValue];
-        NSArray *titles = @[liked ? @"已赞" : @"点赞", @"评论", @"转发"];
-        NSArray *symbols = @[liked ? @"heart.fill" : @"heart", @"text.bubble", @"arrow.turn.up.right"];
-        NSUInteger index = 0;
-        for (UIButton *button in @[state.like, state.comment, state.forward]) {
-            UIColor *color = [UIColor.labelColor resolvedColorWithTraitCollection:cell.traitCollection];
-            UIImage *icon = [UIImage systemImageNamed:symbols[index] withConfiguration:
-                [UIImageSymbolConfiguration configurationWithPointSize:16 * scale weight:UIImageSymbolWeightRegular]];
-            // Custom buttons and original-rendered images do not inherit WeChat's blue system-button state.
-            icon = [icon imageWithTintColor:color renderingMode:UIImageRenderingModeAlwaysOriginal];
-            for (NSNumber *value in @[@(UIControlStateNormal), @(UIControlStateHighlighted), @(UIControlStateSelected), @(UIControlStateDisabled)]) {
-                UIControlState controlState = value.unsignedIntegerValue;
-                [button setTitle:hideText ? nil : titles[index] forState:controlState];
-                [button setTitleColor:color forState:controlState]; [button setImage:icon forState:controlState];
-            }
-            button.tintColor = color; button.titleLabel.font = [UIFont systemFontOfSize:13 * scale];
-            button.accessibilityLabel = index == 0 && liked ? @"取消点赞" : titles[index];
-            index++;
-        }
-        CGFloat buttonWidth = (hideText ? 30 : 54) * scale;
-        if (feedEnabled && buttons.count) buttonWidth = MIN(buttonWidth,
-            MAX(16 * scale, (width - 40 * scale - spacing * buttons.count) / buttons.count));
-        CGFloat buttonHeight = 32 * scale;
-        CGFloat buttonsWidth = buttons.count ? buttons.count * buttonWidth + (buttons.count - 1) * spacing : 0;
+        WCGestureConfigureMomentsFeedButton(state.like, liked ? @"已赞" : @"点赞", liked ? @"heart.fill" : @"heart", hideText);
+        WCGestureConfigureMomentsFeedButton(state.comment, @"评论", @"text.bubble", hideText);
+        WCGestureConfigureMomentsFeedButton(state.forward, @"转发", @"arrow.turn.up.right", hideText);
+        state.like.accessibilityLabel = liked ? @"取消点赞" : @"点赞";
+        CGFloat buttonWidth = metrics.buttonWidth, buttonHeight = metrics.buttonHeight, buttonsWidth = metrics.totalWidth;
         UIView *privacy = WCFeedView(cell, @"m_privacyButton"), *delete = WCFeedView(cell, @"m_deleteButton");
         NSMutableArray<UIView *> *ownButtons = [NSMutableArray array];
         if (feedEnabled) for (UIView *view in @[privacy ?: [UIView new], delete ?: [UIView new]])
@@ -637,21 +683,11 @@ void WCGestureMomentsFeedLayout(UIView *cell) {
                 UIView *view = WCFeedView(cell, key);
                 if (view.superview == cell && !view.hidden && view.alpha >= .01 && !CGRectIsEmpty(view.frame)) bodyBottom = MAX(bodyBottom, CGRectGetMaxY(view.frame));
             }
-            CGFloat top = bodyBottom > 0 ? bodyBottom + 22 * scale : time.frame.origin.y + 15 * scale;
-            CGFloat available = width - (buttonsWidth > 0 ? buttonsWidth + spacing : 0);
-            if (available < 40 * scale) return;
-            CGFloat timeHeight = MAX(time.font.lineHeight, WCFeedHeight(time.text ?: @"", time.font, available));
-            CGFloat iconCenter = buttonHeight / 2;
-            CGFloat anchor = buttons.count ? MAX(timeHeight / 2, iconCenter) : timeHeight / 2;
-            WCFeedSave(state, time); time.numberOfLines = 0; time.lineBreakMode = NSLineBreakByWordWrapping;
-            time.frame = CGRectMake(left, top + anchor - timeHeight / 2, available, timeHeight);
-            state.footer.frame = CGRectMake(right - buttonsWidth, top + anchor - iconCenter, buttonsWidth, buttonHeight);
-            bottom = MAX(CGRectGetMaxY(time.frame), buttons.count ? CGRectGetMaxY(state.footer.frame) : 0);
-
-            // Preserve native source/music/app/location views and their actions, arranged below the time row.
+            CGFloat cursor = bodyBottom > 0 ? bodyBottom + 22 * scale : time.frame.origin.y + 15 * scale;
+            // Preserve native source/music/app/location views and their actions, arranged above the time row.
             NSMutableArray<UIView *> *metadata = [NSMutableArray array];
             for (NSString *key in @[@"m_sourceLabel", @"m_individualSourceLabel", @"m_weAppView", @"m_individualWeAppView",
-                @"m_actionLabel", @"m_musicLabel", @"m_locationLabel", @"m_individualLocationLabel", @"m_ecsView", @"m_errTipsView"]) {
+                @"m_actionLabel", @"m_musicLabel", @"m_locationLabel", @"m_individualLocationLabel", @"ecsView", @"m_errTipsView"]) {
                 UIView *view = WCFeedView(cell, key);
                 if (view.superview == cell && !view.hidden && view.alpha >= .01 && !CGRectIsEmpty(view.frame) && ![metadata containsObject:view]) [metadata addObject:view];
             }
@@ -667,17 +703,31 @@ void WCGestureMomentsFeedLayout(UIView *cell) {
                     height = ceil(MAX(wrappedLocation.font.lineHeight, [wrappedLocation sizeThatFits:CGSizeMake(width, CGFLOAT_MAX)].height));
                 }
                 CGFloat viewWidth = view == wrappedLocation ? width : MIN(width, view.bounds.size.width);
-                view.frame = CGRectMake(left, bottom + spacing, viewWidth, height); bottom = CGRectGetMaxY(view.frame);
+                view.frame = CGRectMake(left, cursor, viewWidth, height); cursor = CGRectGetMaxY(view.frame) + spacing;
             }
             if (ownButtons.count) {
                 CGFloat x = left, ownHeight = 0;
                 for (UIView *view in ownButtons) {
                     WCFeedSave(state, view); CGRect frame = view.frame;
-                    frame.origin = CGPointMake(x, bottom + spacing); view.frame = frame;
+                    frame.origin = CGPointMake(x, cursor); view.frame = frame;
                     x += frame.size.width + 12 * scale; ownHeight = MAX(ownHeight, frame.size.height);
                 }
-                bottom += spacing + ownHeight;
+                cursor += ownHeight + spacing;
             }
+            CGFloat top = cursor;
+            CGFloat available = actionWidth - (buttonsWidth > 0 ? buttonsWidth + spacing : 0);
+            if (available < 40 * scale) return;
+            CGFloat timeHeight = MAX(time.font.lineHeight, WCFeedHeight(time.text ?: @"", time.font, available));
+            CGFloat iconCenter = buttonHeight / 2;
+            CGFloat anchor = buttons.count ? MAX(timeHeight / 2, iconCenter) : timeHeight / 2;
+            WCFeedSave(state, time); time.numberOfLines = 0; time.lineBreakMode = NSLineBreakByWordWrapping;
+            time.frame = CGRectMake(left, top + anchor - timeHeight / 2, available, timeHeight);
+            state.footer.frame = CGRectMake(actionRight - buttonsWidth, top + anchor - iconCenter, buttonsWidth, buttonHeight);
+            if (!actions && operate.superview == cell && !operate.hidden) {
+                WCFeedSave(state, operate); CGRect frame = operate.frame;
+                frame.origin.y = top + anchor - frame.size.height / 2; operate.frame = frame;
+            }
+            bottom = MAX(CGRectGetMaxY(time.frame), buttons.count ? CGRectGetMaxY(state.footer.frame) : 0);
         } else {
             // Forwarding can also be enabled without timeline restyling (including the detail page).
             for (UIView *view in cell.subviews) if (view != state.footer && !view.hidden && view.alpha >= .01 && !CGRectIsEmpty(view.frame))
