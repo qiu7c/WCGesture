@@ -1,5 +1,12 @@
 #import "Sources/API/WCGestureInternal.h"
 
+NSString *const WCGestureVirtualLocationEnabledKey = @"com.qiu7c.onewx.enhance.virtual-location.enabled";
+NSString *const WCGestureVirtualLocationMomentsEnabledKey = @"com.qiu7c.onewx.enhance.virtual-location.moments-enabled";
+NSString *const WCGestureVirtualLocationLatitudeKey = @"com.qiu7c.onewx.enhance.virtual-location.latitude";
+NSString *const WCGestureVirtualLocationLongitudeKey = @"com.qiu7c.onewx.enhance.virtual-location.longitude";
+NSString *const WCGestureVirtualLocationNameKey = @"com.qiu7c.onewx.enhance.virtual-location.name";
+NSString *const WCGestureVirtualLocationPresetsKey = @"com.qiu7c.onewx.enhance.virtual-location.presets";
+
 NSString *const WCGestureMomentsFeedEnabledKey = @"com.qiu7c.onewx.moments.feed-layout.enabled";
 NSString *const WCGestureServicePageLockEnabledKey = @"com.qiu7c.onewx.privacy.service-page-lock.enabled";
 NSString *const WCGestureFavoritesPageLockEnabledKey = @"com.qiu7c.onewx.privacy.favorites-page-lock.enabled";
@@ -7,6 +14,7 @@ NSString *const WCGestureMomentsAlbumPageLockEnabledKey = @"com.qiu7c.onewx.priv
 NSString *const WCGestureMomentsForwardEnabledKey = @"com.qiu7c.onewx.moments.forward.enabled";
 NSString *const WCGestureMomentsFeedSpacingKey = @"com.qiu7c.onewx.moments.feed-layout.extra-spacing";
 NSString *const WCGestureMomentsFeedLocationKey = @"com.qiu7c.onewx.moments.feed-layout.full-location";
+NSString *const WCGestureMomentsFeedHideActionTextKey = @"com.qiu7c.onewx.moments.feed-layout.hide-action-text";
 NSString *const WCGestureMomentsFeedActionsKey = @"com.qiu7c.onewx.moments.feed-layout.direct-actions";
 
 NSString *const WCGestureVideoCallBeautyEnabledKey = @"com.qiu7c.onewx.chat.video-call.beauty.enabled";
@@ -340,12 +348,19 @@ void WCGestureRegisterDefaults(void) {
             WCGestureMomentsTimeEnabledKey: @NO,
             WCGestureMomentsFeedEnabledKey: @NO,
             WCGestureMomentsForwardEnabledKey: @NO,
+            WCGestureVirtualLocationEnabledKey: @NO,
+            WCGestureVirtualLocationMomentsEnabledKey: @NO,
+            WCGestureVirtualLocationLatitudeKey: @0.0,
+            WCGestureVirtualLocationLongitudeKey: @0.0,
+            WCGestureVirtualLocationNameKey: @"",
+            WCGestureVirtualLocationPresetsKey: @[],
             WCGestureServicePageLockEnabledKey: @NO,
             WCGestureFavoritesPageLockEnabledKey: @NO,
             WCGestureMomentsAlbumPageLockEnabledKey: @NO,
             WCGestureMomentsFeedSpacingKey: @8.0,
             WCGestureMomentsFeedLocationKey: @YES,
             WCGestureMomentsFeedActionsKey: @YES,
+            WCGestureMomentsFeedHideActionTextKey: @NO,
             WCGestureMomentsTimeFormatKey: @"yyyy-MM-dd HH:mm:ss",
             WCGestureAutoOriginalEnabledKey: @NO,
             WCGestureChatTopBarCapsuleEnabledKey: @NO,

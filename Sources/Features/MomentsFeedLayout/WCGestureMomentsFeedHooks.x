@@ -17,6 +17,20 @@
 }
 %end
 
+%hook WCBaseTimelineViewController
+- (double)tableView:(id)table heightForRowAtIndexPath:(id)path {
+    double height = %orig(table, path);
+    return WCGestureMomentsFeedRowHeight((UIViewController *)self, table, path, height);
+}
+%end
+
+%hook WCCommentDetailViewControllerFB
+- (double)tableView:(id)table heightForRowAtIndexPath:(id)path {
+    double height = %orig(table, path);
+    return WCGestureMomentsFeedRowHeight((UIViewController *)self, table, path, height);
+}
+%end
+
 %ctor {
     %init;
 }

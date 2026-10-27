@@ -155,6 +155,8 @@ void WCGestureEditChatOption(UIViewController *presenter, NSDictionary *option) 
     NSNumber *previewKind = previewKinds[type];
     if (previewKind) {
         [presenter.navigationController pushViewController:WCGestureCreatePositionEditor(previewKind.integerValue) animated:YES];
+    } else if ([type isEqualToString:@"virtual-location"]) {
+        [presenter.navigationController pushViewController:WCGestureCreateVirtualLocationSettingsController() animated:YES];
     } else if ([type isEqualToString:@"clear-profile"]) {
         WCGesturePresentClearProfileInformation();
     } else if ([type isEqualToString:@"auto-status"]) {

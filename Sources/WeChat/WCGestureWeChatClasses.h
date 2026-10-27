@@ -215,4 +215,10 @@ NS_ASSUME_NONNULL_BEGIN
 @interface WeixinContentLogicController : BaseMsgContentLogicController
 @end
 
+// Native row-height owners (WeChat 8.0.79).
+@interface WCBaseTimelineViewController : UIViewController
+@end
+@interface WCCommentDetailViewControllerFB : UIViewController
+@end
+
 NS_ASSUME_NONNULL_END

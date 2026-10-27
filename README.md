@@ -2,11 +2,13 @@
 
 Current package version: 1.0.0.
 
+- 增强类功能 → 虚拟定位：迁移 WCAtlas 的原生地图选点、手动经纬度、最多20个收藏、四向微调及朋友圈独立开关。默认关闭，取消选点不保存，选点期间暂停替换坐标，清除或关闭后恢复原生坐标；待编译和设备验证。
+
 - 增强类功能 → 页面上锁: independent locks for Me → Services, Favorites and personal Moments album entries, using system biometrics with device-passcode fallback. Each entry needs a new verification; canceled, failed or stale requests do not navigate, and authorization is scoped to that page. All disabled by default; compilation/device verification pending. See docs/SERVICE_PAGE_LOCK.md.
 
 - 朋友圈功能 → 朋友圈转发: adds Forward to the native More menu and the compact inline action row, opening WeChat's native Moments composer for text, up to nine photos, video, or supported structured shares. The native menu entry works independently of custom feed layout. Media are downloaded through WCMediaDownloader when needed; publication remains manual. Disabled by default. Live Photos follow WCAtlas's static-image forwarding path. Compilation/device verification pending.
 
-- 朋友圈功能 → 朋友圈排版: adjustable extra spacing (0–48pt, default 8), wrapping native location labels and timestamp text, and compact right-aligned Like/Comment buttons replacing More. Location text, color and taps remain native; action icons use the system label color (black in light mode). Disabled by default; source integrated, awaiting compilation and device validation.
+- 朋友圈功能 → 朋友圈排版: adjustable extra spacing (0–48pt, default 8), wrapping native location labels and timestamp text, and compact Like/Comment/Forward buttons aligned with the time row. An optional switch hides button text; narrow layouts use icons. Native permission/delete icons sit below location, followed by at least 12pt × layout scale of space before comments; the actual table row gets a measured minimum height. Location text, color and taps remain native; action icons use the system label color (black in light mode). Disabled by default; source integrated, awaiting compilation and device validation.
 
 One Wx is a WeChat enhancement plugin that grew out of WCGesture (originally extracted from [WCAtlas](https://github.com/qiu7c/WCAtlas)). It covers gestures, the keyboard strip, AI, translation, global actions, layout and interface tweaks.
 

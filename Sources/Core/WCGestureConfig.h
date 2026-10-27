@@ -414,5 +414,14 @@ FOUNDATION_EXPORT NSString *const WCGestureMomentsFeedEnabledKey;
 FOUNDATION_EXPORT NSString *const WCGestureMomentsFeedSpacingKey;
 FOUNDATION_EXPORT NSString *const WCGestureMomentsFeedLocationKey;
 FOUNDATION_EXPORT NSString *const WCGestureMomentsFeedActionsKey;
+FOUNDATION_EXPORT NSString *const WCGestureMomentsFeedHideActionTextKey;
+
+// Virtual location.
+FOUNDATION_EXPORT NSString *const WCGestureVirtualLocationEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureVirtualLocationMomentsEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureVirtualLocationLatitudeKey;
+FOUNDATION_EXPORT NSString *const WCGestureVirtualLocationLongitudeKey;
+FOUNDATION_EXPORT NSString *const WCGestureVirtualLocationNameKey;
+FOUNDATION_EXPORT NSString *const WCGestureVirtualLocationPresetsKey;
 
 NS_ASSUME_NONNULL_END

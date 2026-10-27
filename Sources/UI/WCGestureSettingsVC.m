@@ -793,12 +793,19 @@ static NSDictionary<NSString *, NSString *> *WCConfigShareKeys(void) {
         WCGestureMomentsTimeEnabledKey,
         WCGestureMomentsFeedEnabledKey,
         WCGestureMomentsForwardEnabledKey,
+        WCGestureVirtualLocationEnabledKey,
+        WCGestureVirtualLocationMomentsEnabledKey,
+        WCGestureVirtualLocationLatitudeKey,
+        WCGestureVirtualLocationLongitudeKey,
+        WCGestureVirtualLocationNameKey,
+        WCGestureVirtualLocationPresetsKey,
         WCGestureServicePageLockEnabledKey,
         WCGestureFavoritesPageLockEnabledKey,
         WCGestureMomentsAlbumPageLockEnabledKey,
         WCGestureMomentsFeedSpacingKey,
         WCGestureMomentsFeedLocationKey,
         WCGestureMomentsFeedActionsKey,
+        WCGestureMomentsFeedHideActionTextKey,
         WCGestureMomentsTimeFormatKey,
         WCGestureAutoOriginalEnabledKey,
         WCGestureVoiceTranscriptionEnabledKey,
@@ -1707,7 +1714,8 @@ static NSString *WCRowDetailText(WCRow *row) {
         [sections addObject:@[WCSwitchRow(@"朋友圈排版", WCGestureMomentsFeedEnabledKey),
             WCNumberRow(@"额外留白", WCGestureMomentsFeedSpacingKey),
             WCSwitchRow(@"完整显示定位", WCGestureMomentsFeedLocationKey),
-            WCSwitchRow(@"独立点赞评论", WCGestureMomentsFeedActionsKey)]];
+            WCSwitchRow(@"独立点赞评论", WCGestureMomentsFeedActionsKey),
+            WCSwitchRow(@"隐藏按钮文字", WCGestureMomentsFeedHideActionTextKey)]];
         [collapsible addObject:@YES]; [collapseKeys addObject:[prefix stringByAppendingString:@".moments.feed-layout"]];
         NSMutableArray *reminders = [NSMutableArray arrayWithObjects:
             WCSwitchRow(@"朋友圈特别关心", WCGestureMomentsReminderEnabledKey),
@@ -1781,6 +1789,10 @@ static NSString *WCRowDetailText(WCRow *row) {
         [collapsible addObject:@NO];
         [collapseKeys addObject:[prefix stringByAppendingString:@".enhance.separators"]];
     } else if (self.category == WCGestureCategoryEnhancements) {
+        WCRow *location = WCPlainRow(@"虚拟定位", WCRowKindChatOption);
+        location.chatOption = @{@"title": location.title, @"type": @"virtual-location", @"key": @""};
+        [sections addObject:@[location]]; [collapsible addObject:@NO];
+        [collapseKeys addObject:[prefix stringByAppendingString:@".enhance.virtual-location"]];
         [sections addObject:@[WCPlainRow(@"页面上锁", WCRowKindSectionTitle),
             WCSwitchRow(@"服务页上锁", WCGestureServicePageLockEnabledKey),
             WCSwitchRow(@"收藏页上锁", WCGestureFavoritesPageLockEnabledKey),
