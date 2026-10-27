@@ -776,9 +776,10 @@ void WCGestureVideoCallEditSticker(UIViewController *presenter, UIImage *image) 
         id config = [NSClassFromString(@"MMFinderLiveStickerEditingViewControllerConfiguration") new];
         WCTweakSetValue(config, @"forceResetTransformation", @YES);
         if (!item || !config) { WCShowToast(@"贴纸编辑器不可用"); return; }
-        UIViewController *editor = [(id<WCVideoStickerEditor>)[editorClass alloc]
+        id candidate = [(id<WCVideoStickerEditor>)[editorClass alloc]
             initWithLiveTaskId:nil stickerItem:item configuration:config reporter:nil];
-        if (![editor isKindOfClass:UIViewController.class]) return;
+        if (![candidate isKindOfClass:UIViewController.class]) return;
+        UIViewController *editor = (UIViewController *)candidate;
         WCVideoStickerContext *context = [WCVideoStickerContext new];
         context.generation = coordinator.generation; context.account = coordinator.account; context.presenter = presenter;
         objc_setAssociatedObject(editor, &WCVideoStickerContextKey, context, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
