@@ -246,6 +246,7 @@ void WCGestureMomentsForwardPresent(id item, UIViewController *presenter) {
 }
 void WCGestureMomentsForwardSettingsChanged(NSString *key) {
     if (key && ![key isEqualToString:WCGestureMomentsForwardEnabledKey]) return;
+    WCGestureMomentsForwardMenuSettingsChanged();
     if (!WCGestureEnabled(WCGestureMomentsForwardEnabledKey))
         for (WCMomentsForwardTask *task in WCForwardTasks().allObjects) [task finish:nil];
 }

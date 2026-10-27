@@ -4,7 +4,7 @@
 #import <math.h>
 #import "Sources/API/WCGestureInternal.h"
 
-static char WCFeedPlanKey, WCFeedStateKey, WCFeedRefreshKey;
+static char WCFeedPlanKey, WCFeedStateKey, WCFeedRefreshKey, WCFeedRecoveringKey;
 static __thread NSUInteger WCFeedHeightDepth;
 
 @interface WCFeedPlan : NSObject
@@ -76,6 +76,33 @@ static BOOL WCFeedControllerSupported(id controller) {
         if (cls && [controller isKindOfClass:cls]) return YES;
     }
     return NO;
+}
+static NSMapTable *WCFeedControllerHints(void) {
+    static NSMapTable *hints; static dispatch_once_t once;
+    dispatch_once(&once, ^{ hints = [NSMapTable weakToWeakObjectsMapTable]; }); return hints;
+}
+static void WCFeedBindController(id context, id item, UIViewController *controller) {
+    NSMapTable *hints = WCFeedControllerHints();
+    @synchronized (hints) {
+        if (context) [hints setObject:controller forKey:context];
+        if (item) [hints setObject:controller forKey:item];
+    }
+}
+static UIViewController *WCFeedResolveController(id context, id item) {
+    NSMapTable *hints = WCFeedControllerHints();
+    @synchronized (hints) {
+        id bound = (context ? [hints objectForKey:context] : nil) ?: (item ? [hints objectForKey:item] : nil);
+        if (WCFeedControllerSupported(bound)) return bound;
+    }
+    id root = WCTweakSafeValue(context, @"rootViewController");
+    if (WCFeedControllerSupported(root)) return root;
+    if (NSThread.isMainThread && [root isKindOfClass:UIViewController.class]) {
+        for (UIViewController *parent = [root parentViewController]; parent; parent = parent.parentViewController)
+            if (WCFeedControllerSupported(parent)) return parent;
+        if ([root isKindOfClass:UINavigationController.class] && WCFeedControllerSupported([root topViewController]))
+            return [root topViewController];
+    }
+    return nil;
 }
 static BOOL WCFeedPost(id item) {
     return item && WCFeedText(WCTweakSafeValue(item, @"tid")).length &&
@@ -155,14 +182,10 @@ static void WCFeedRefreshAttempt(UIViewController *controller, NSUInteger attemp
 }
 static void WCFeedRefresh(UIViewController *controller) { WCFeedRefreshAttempt(controller, 5); }
 
-void WCGestureMomentsFeedBeginHeight(void) { WCFeedHeightDepth++; }
-double WCGestureMomentsFeedEndHeight(double nativeHeight, id item, id context, id model) {
-    if (WCFeedHeightDepth) WCFeedHeightDepth--;
-    if (WCFeedHeightDepth || !isfinite(nativeHeight) || nativeHeight <= 0) return nativeHeight;
-    id controller = WCTweakSafeValue(context, @"rootViewController");
-    if (!WCFeedControllerSupported(controller)) return nativeHeight;
+static WCFeedPlan *WCFeedBuildPlan(double nativeHeight, id item, id context, id model, UIViewController *controller) {
+    if (!isfinite(nativeHeight) || nativeHeight <= 0 || !WCFeedControllerSupported(controller)) return nil;
     WCFeedRegister(controller);
-    if (!WCFeedEnabledForItem(item, controller) || !WCFeedPost(item)) return nativeHeight;
+    if (!WCFeedEnabledForItem(item, controller) || !WCFeedPost(item)) return nil;
     BOOL feedEnabled = WCFeedTimeline(controller) && WCGestureEnabled(WCGestureMomentsFeedEnabledKey);
     BOOL forward = WCGestureMomentsForwardCanForward(item);
     id holder = model ?: item;
@@ -179,7 +202,7 @@ double WCGestureMomentsFeedEndHeight(double nativeHeight, id item, id context, i
     CGFloat timeExtra = feedEnabled ? MAX(0, WCFeedHeight(time, font, MAX(80, width - 80 * scale)) - ceil(font.lineHeight)) : 0;
     CGFloat extra = (feedEnabled ? WCFeedSpacing() : 0) + timeExtra + (location.length ? WCFeedHeight(location, font, width) + 6 * scale : 0)
         + ((actions || forward) ? 46 * scale : 0);
-    if (!isfinite(extra) || extra > 4096) return nativeHeight;
+    if (!isfinite(extra) || extra > 4096) return nil;
     NSString *signature = [NSString stringWithFormat:@"%@|%@|%@|%.2f|%@|%.2f|%.2f|%d|%d|%.2f|%d|%d",
         WCFeedText(WCTweakSafeValue(item, @"tid")), time, location, width, font.fontName, font.pointSize,
         scale, fullLocation, actions, WCFeedSpacing(), feedEnabled, forward];
@@ -193,8 +216,36 @@ double WCGestureMomentsFeedEndHeight(double nativeHeight, id item, id context, i
         }
         plan.nativeHeight = nativeHeight;
         if (holder != item) objc_setAssociatedObject(item, &WCFeedPlanKey, plan, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        return nativeHeight + WCFeedExtra(plan);
+        return plan;
     }
+}
+void WCGestureMomentsFeedBeginHeight(void) { WCFeedHeightDepth++; }
+double WCGestureMomentsFeedEndHeight(double nativeHeight, id item, id context, id model) {
+    if (WCFeedHeightDepth) WCFeedHeightDepth--;
+    if (WCFeedHeightDepth) return nativeHeight;
+    UIViewController *controller = WCFeedResolveController(context, item);
+    WCFeedPlan *plan = WCFeedBuildPlan(nativeHeight, item, context, model, controller);
+    return plan ? nativeHeight + WCFeedExtra(plan) : nativeHeight;
+}
+static WCFeedPlan *WCFeedRecoverPlan(UIView *cell, id item, id context, id model, UIViewController *controller) {
+    if ([objc_getAssociatedObject(cell, &WCFeedRecoveringKey) boolValue]) return nil;
+    Class cls = NSClassFromString(@"WCTimeLineCellView");
+    SEL selector = NSSelectorFromString(@"heightForDataItem:pageContext:actionAreaVM:");
+    if (!WCFeedHas(cls, NSStringFromSelector(selector), 3)) return nil;
+    double nativeHeight = 0;
+    objc_setAssociatedObject(cell, &WCFeedRecoveringKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    // Ask WeChat to measure its native content. Suppress only our own added
+    // height during this call, so recovery cannot accumulate an old extension.
+    WCFeedHeightDepth++;
+    @try {
+        nativeHeight = ((double (*)(id, SEL, id, id, id))objc_msgSend)(cls, selector, item, context, model);
+    } @catch (__unused NSException *exception) {
+        nativeHeight = 0;
+    } @finally {
+        WCFeedHeightDepth--;
+        objc_setAssociatedObject(cell, &WCFeedRecoveringKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    return WCFeedBuildPlan(nativeHeight, item, context, model, controller);
 }
 
 static void WCFeedRestoreViews(UIView *cell, WCFeedState *state) {
@@ -239,6 +290,8 @@ static void WCFeedSave(WCFeedState *state, UIView *view) {
 static BOOL WCFeedCurrent(UIView *cell, WCFeedState *state) {
     id item = WCTweakSafeValue(cell, @"m_dataItem");
     UIViewController *controller = WCViewControllerForResponder(cell);
+    if (!WCFeedControllerSupported(controller))
+        controller = WCFeedResolveController(WCTweakSafeValue(cell, @"pageContext"), item);
     return cell.window && WCFeedEnabledForItem(item, controller) && WCFeedPost(item) &&
         WCFeedControllerSupported(controller) && item == state.item &&
         state.model == WCTweakSafeValue(cell, @"actionAreaVM") &&
@@ -294,16 +347,22 @@ static WCFeedState *WCFeedCreateState(UIView *cell) {
 
 void WCGestureMomentsFeedLayout(UIView *cell) {
     if (!NSThread.isMainThread) return;
-    UIViewController *controller = WCViewControllerForResponder(cell);
-    WCFeedRegister(controller);
+    if ([objc_getAssociatedObject(cell, &WCFeedRecoveringKey) boolValue]) return;
     id item = WCTweakSafeValue(cell, @"m_dataItem"), model = WCTweakSafeValue(cell, @"actionAreaVM");
+    id context = WCTweakSafeValue(cell, @"pageContext") ?: WCTweakSafeValue(model, @"pageContext");
+    UIViewController *controller = WCViewControllerForResponder(cell);
+    if (!WCFeedControllerSupported(controller)) controller = WCFeedResolveController(context, item);
+    WCFeedRegister(controller);
     if (!cell.window || !WCFeedEnabledForItem(item, controller) || !WCFeedControllerSupported(controller) ||
         !WCFeedPost(item)) { WCGestureMomentsFeedReset(cell); return; }
+    WCFeedBindController(context, item, controller);
     WCFeedPlan *plan = objc_getAssociatedObject(model ?: item, &WCFeedPlanKey);
     if (!plan) plan = objc_getAssociatedObject(item, &WCFeedPlanKey);
     if (!plan || plan.controller != controller || !plan.nativeHeight ||
         ![plan.tid isEqualToString:WCFeedText(WCTweakSafeValue(item, @"tid"))]) {
-        WCGestureMomentsFeedReset(cell); return;
+        plan = WCFeedRecoverPlan(cell, item, context, model, controller);
+        if (!plan) { WCGestureMomentsFeedReset(cell); return; }
+        WCFeedRefresh(controller);
     }
     WCFeedState *state = objc_getAssociatedObject(cell, &WCFeedStateKey);
     if (state.updating) return;

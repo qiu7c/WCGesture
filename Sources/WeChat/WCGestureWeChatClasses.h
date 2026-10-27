@@ -131,6 +131,8 @@ NS_ASSUME_NONNULL_BEGIN
 @end
 @interface MoreViewController : UIViewController
 @end
+@interface WCOperateFloatView : UIView
+@end
 @interface NewSettingViewController : UIViewController
 @end
 @interface MMAssetPickerController : UIViewController

@@ -4,7 +4,7 @@ Current package version: 1.0.0.
 
 - 增强类功能 → 页面上锁: independent locks for Me → Services, Favorites and personal Moments album entries, using system biometrics with device-passcode fallback. Each entry needs a new verification; canceled, failed or stale requests do not navigate, and authorization is scoped to that page. All disabled by default; compilation/device verification pending. See docs/SERVICE_PAGE_LOCK.md.
 
-- 朋友圈功能 → 朋友圈转发: a compact right-aligned action opens WeChat's native Moments composer for text, up to nine photos, video, or supported structured shares. Media are downloaded through WCMediaDownloader when needed; publication remains manual. Independent of 朋友圈排版 and disabled by default. Live Photos follow WCAtlas's static-image forwarding path. Compilation/device verification pending.
+- 朋友圈功能 → 朋友圈转发: adds Forward to the native More menu and the compact inline action row, opening WeChat's native Moments composer for text, up to nine photos, video, or supported structured shares. The native menu entry works independently of custom feed layout. Media are downloaded through WCMediaDownloader when needed; publication remains manual. Disabled by default. Live Photos follow WCAtlas's static-image forwarding path. Compilation/device verification pending.
 
 - 朋友圈功能 → 朋友圈排版: adjustable extra spacing (0–48pt, default 8), wrapping native location labels and timestamp text, and compact right-aligned Like/Comment buttons replacing More. Location text, color and taps remain native; action icons use the system label color (black in light mode). Disabled by default; source integrated, awaiting compilation and device validation.
 
@@ -240,6 +240,6 @@ Payment/receive-code shortcuts are currently removed. The retired global-action 
 
 ## 视频通话增强（源码接入，待编译与真机验证）
 
-聊天类功能 → 视频通话增强：视频美颜、图片贴纸、前摄视频镜像，默认关闭。美颜使用微信自身资源包和引擎，参数取当前原生方案；图片由系统相册选择并用微信编辑器调整，再合成到视频帧。通话页的“通话调节”在 iOS15+ 默认半屏显示，可观察真实画面。图片仅保留本次通话，挂断清理。
+聊天类功能 → 视频通话增强：视频美颜、图片贴纸、前摄视频镜像，默认关闭。美颜用微信资源与引擎，列表滑杆实时预览、松手保存；通话调节使用半透明模糊面板，默认约320pt，可拖动导航栏调整高度；入口跟随原生通话操作区。贴纸在透明通话画布上拖动、双指缩放/旋转，可再次调整已有贴纸，完成后才合成到发送帧。镜像改用系统采集连接水平翻转，移除私有旋转换轴和渲染器覆盖；合成链路增加运行时四角颜色方向校验。图片仅保留本次通话，挂断清理；效果仍待真机验证。
 
 本轮不含在线素材、文字模板、PAG动态手势或妆容/滤镜。接口、方向、对端效果与原生美颜叠加仍需设备验证，不能将源码接入视为完整复刻。实现与验证边界见 [接入记录](docs/VIDEO_CALL_EFFECTS.md)。

@@ -6,6 +6,7 @@
 #import <objc/runtime.h>
 #import <math.h>
 #import <string.h>
+#import <stdlib.h>
 #import "Sources/API/WCGestureInternal.h"
 
 NSString *const WCGestureVideoCallStateDidChangeNotification = @"WCGestureVideoCallStateDidChangeNotification";
@@ -25,13 +26,6 @@ NSString *const WCGestureVideoCallStateDidChangeNotification = @"WCGestureVideoC
 @property (nonatomic) BOOL mirror;
 @property (nonatomic) long long renderRotation;
 @end
-@protocol WCVideoStickerEditor <NSObject>
-- (instancetype)initWithLiveTaskId:(id)task stickerItem:(id)item configuration:(id)config reporter:(id)reporter;
-@end
-@protocol WCVideoStickerItem <NSObject>
-- (instancetype)initWithInstanceId:(NSString *)identifier;
-@end
-
 static BOOL WCVideoOnEffectThread(id<WCVideoEffectEngine> engine, void (^work)(void)) {
     __block BOOL completed = NO;
     @try {
@@ -128,38 +122,29 @@ static BOOL WCVideoApplySavedValues(id logic, id suite, NSDictionary *values) {
     return changed;
 }
 
-@interface WCVideoStickerContext : NSObject
+static char WCVideoEndedKey;
+static char WCVideoCaptureMirrorKey;
+@interface WCVideoCaptureMirrorState : NSObject
+@property (nonatomic, weak) id device;
+@property (nonatomic) BOOL originalMirror;
+@property (nonatomic) BOOL originalAutomatic;
+@property (nonatomic) BOOL captured;
+@property (nonatomic) BOOL applied;
+@property (nonatomic) BOOL pending;
+@property (nonatomic) BOOL forceRestore;
 @property (nonatomic) NSUInteger generation;
 @property (nonatomic, copy) NSString *account;
-@property (nonatomic, weak) UIViewController *presenter;
 @end
-@implementation WCVideoStickerContext
+@implementation WCVideoCaptureMirrorState
 @end
-
-static char WCVideoStickerContextKey;
-static char WCVideoRendererRequestedMirrorKey;
-static char WCVideoEndedKey;
-static __thread BOOL WCVideoMirrorScope;
-static NSHashTable *WCVideoRenderers(void) {
-    static NSHashTable *renderers;
+static NSHashTable *WCVideoCaptureConnections(void) {
+    static NSHashTable *connections;
     static dispatch_once_t once;
-    dispatch_once(&once, ^{ renderers = [NSHashTable weakObjectsHashTable]; });
-    return renderers;
+    dispatch_once(&once, ^{ connections = [NSHashTable weakObjectsHashTable]; });
+    return connections;
 }
-static void WCVideoRefreshRenderers(void) {
-    dispatch_async(dispatch_get_main_queue(), ^{
-        NSHashTable *table = WCVideoRenderers();
-        NSArray *renderers;
-        @synchronized (table) { renderers = table.allObjects; }
-        for (id renderer in renderers) {
-            NSNumber *requested = objc_getAssociatedObject(renderer, &WCVideoRendererRequestedMirrorKey);
-            if (requested && WCVideoHas(renderer, @"setMirror:", 1)) {
-                @try { ((void (*)(id, SEL, BOOL))objc_msgSend)(renderer, NSSelectorFromString(@"setMirror:"), requested.boolValue); }
-                @catch (__unused NSException *exception) {}
-            }
-        }
-    });
-}
+static void WCVideoRefreshCaptureMirroring(void);
+static void WCVideoCaptureMirrorUpdate(id device, id value, BOOL forceRestore);
 
 @interface WCVideoCallCoordinator : NSObject {
     CVPixelBufferPoolRef _pool;
@@ -170,6 +155,8 @@ static void WCVideoRefreshRenderers(void) {
 @property (nonatomic, strong) NSLock *lock;
 @property (nonatomic, strong) dispatch_queue_t controlQueue;
 @property (nonatomic, strong) CIContext *context;
+@property (nonatomic) BOOL renderOrientationReady;
+@property (nonatomic) BOOL renderFlipped;
 @property (nonatomic, strong) WCVideoBeautySession *beauty;
 @property (atomic, weak) UIViewController *host;
 @property (nonatomic, weak) UIView *talkingView;
@@ -189,6 +176,8 @@ static void WCVideoRefreshRenderers(void) {
 @property (nonatomic) BOOL preparing;
 @property (nonatomic) BOOL attempted;
 @property (atomic, strong) CIImage *sticker;
+@property (atomic, strong) UIImage *stickerSource;
+@property (atomic, copy) NSDictionary *stickerPlacement;
 - (void)refresh;
 - (void)prepare;
 - (void)retire;
@@ -201,6 +190,70 @@ static WCVideoCallCoordinator *WCVideoCoordinator(void) {
     static dispatch_once_t once;
     dispatch_once(&once, ^{ coordinator = [WCVideoCallCoordinator new]; });
     return coordinator;
+}
+
+static void WCVideoCaptureMirrorUpdate(id device, id value, BOOL forceRestore) {
+    if (![value isKindOfClass:AVCaptureConnection.class]) return;
+    AVCaptureConnection *connection = value;
+    WCVideoCallCoordinator *coordinator = WCVideoCoordinator();
+    BOOL wanted = device && !forceRestore && coordinator.active && coordinator.host && coordinator.mirrorEnabled &&
+        (!coordinator.device || coordinator.device == device) &&
+        !coordinator.suspended && !coordinator.frameFailed && ![WCTweakSafeValue(device, @"m_usingBackCamera") boolValue];
+    @synchronized (connection) {
+        WCVideoCaptureMirrorState *state = objc_getAssociatedObject(connection, &WCVideoCaptureMirrorKey);
+        if (!state && (!wanted || !connection.isVideoMirroringSupported)) return;
+        if (!state) {
+            state = [WCVideoCaptureMirrorState new]; state.device = device;
+            state.generation = coordinator.generation; state.account = coordinator.account;
+            objc_setAssociatedObject(connection, &WCVideoCaptureMirrorKey, state, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            NSHashTable *connections = WCVideoCaptureConnections();
+            @synchronized (connections) { [connections addObject:connection]; }
+        }
+        state.forceRestore = state.forceRestore || forceRestore;
+        if (state.pending || (wanted && state.applied && !state.forceRestore &&
+            connection.videoMirrored == !state.originalMirror && !connection.automaticallyAdjustsVideoMirroring)) return;
+        state.pending = YES;
+        dispatch_async(coordinator.controlQueue, ^{
+            @synchronized (connection) {
+                if (objc_getAssociatedObject(connection, &WCVideoCaptureMirrorKey) != state) return;
+                BOOL enabled = device && !state.forceRestore && coordinator.active && coordinator.host && coordinator.mirrorEnabled &&
+                    (!coordinator.device || coordinator.device == device) &&
+                    state.generation == coordinator.generation && [state.account isEqualToString:coordinator.account] &&
+                    !coordinator.suspended && !coordinator.frameFailed && state.device == device &&
+                    ![WCTweakSafeValue(device, @"m_usingBackCamera") boolValue];
+                @try {
+                    if (enabled && connection.isVideoMirroringSupported) {
+                        if (!state.captured) {
+                            state.originalMirror = connection.videoMirrored;
+                            state.originalAutomatic = connection.automaticallyAdjustsVideoMirroring;
+                            state.captured = YES;
+                        }
+                        connection.automaticallyAdjustsVideoMirroring = NO;
+                        connection.videoMirrored = !state.originalMirror;
+                        state.applied = YES;
+                    } else {
+                        if (state.captured) {
+                            if (connection.isVideoMirroringSupported) connection.videoMirrored = state.originalMirror;
+                            connection.automaticallyAdjustsVideoMirroring = state.originalAutomatic;
+                        }
+                        objc_setAssociatedObject(connection, &WCVideoCaptureMirrorKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+                        NSHashTable *connections = WCVideoCaptureConnections();
+                        @synchronized (connections) { [connections removeObject:connection]; }
+                    }
+                } @catch (__unused NSException *exception) {
+                    coordinator.status = @"相机镜像暂不可用"; WCVideoNotify();
+                } @finally { state.pending = NO; }
+            }
+        });
+    }
+}
+static void WCVideoRefreshCaptureMirroring(void) {
+    NSHashTable *table = WCVideoCaptureConnections(); NSArray *connections;
+    @synchronized (table) { connections = table.allObjects; }
+    for (AVCaptureConnection *connection in connections) {
+        WCVideoCaptureMirrorState *state = objc_getAssociatedObject(connection, &WCVideoCaptureMirrorKey);
+        WCVideoCaptureMirrorUpdate(state.device, connection, NO);
+    }
 }
 
 static WCVideoBeautySession *WCVideoBuildBeauty(NSString *account, id service, NSString **failure) {
@@ -306,6 +359,29 @@ static WCVideoBeautySession *WCVideoBuildBeauty(NSString *account, id service, N
     }
 }
 
+// Resolve native control geometry on each layout; the waiting and connected views differ.
+static CGRect WCVideoCallControlsRect(UIView *container, id owner) {
+    CGRect result = CGRectNull;
+    for (NSString *key in @[@"m_micButton", @"m_speakerButton", @"m_videoModeButton",
+        @"m_flipCameraView", @"m_flipCameraButton", @"m_hangupBtn", @"m_hangupButton"]) {
+        id value = WCTweakSafeValue(owner, key);
+        if (![value isKindOfClass:UIView.class]) continue;
+        UIView *control = value;
+        if (![control isDescendantOfView:container] || !control.window) continue;
+        BOOL visible = YES;
+        for (UIView *parent = control; parent && parent != container; parent = parent.superview) {
+            if (parent.hidden || parent.alpha < .01) { visible = NO; break; }
+        }
+        if (!visible || CGRectIsEmpty(control.bounds)) continue;
+        CGRect rect = [control convertRect:control.bounds toView:container];
+        if (!isfinite(rect.origin.x) || !isfinite(rect.origin.y) || !isfinite(rect.size.width) ||
+            !isfinite(rect.size.height) || CGRectIsEmpty(rect) ||
+            !CGRectIntersectsRect(container.bounds, rect) || CGRectGetMidY(rect) < CGRectGetMidY(container.bounds)) continue;
+        result = CGRectIsNull(result) ? rect : CGRectUnion(result, rect);
+    }
+    return result;
+}
+
 @implementation WCVideoCallCoordinator
 - (instancetype)init {
     if ((self = [super init])) {
@@ -321,7 +397,7 @@ static WCVideoBeautySession *WCVideoBuildBeauty(NSString *account, id service, N
     self.beautyEnabled = WCGestureEnabled(WCGestureVideoCallBeautyEnabledKey);
     self.stickerEnabled = WCGestureEnabled(WCGestureVideoCallStickerEnabledKey);
     self.mirrorEnabled = WCGestureEnabled(WCGestureVideoCallMirrorEnabledKey);
-    WCVideoRefreshRenderers();
+    WCVideoRefreshCaptureMirroring();
     dispatch_async(dispatch_get_main_queue(), ^{
         [self layoutButton];
         if (!self.stickerEnabled && self.editor) WCGestureVideoCallCancelSticker(self.editor);
@@ -412,9 +488,10 @@ static WCVideoBeautySession *WCVideoBuildBeauty(NSString *account, id service, N
     self.beautyItems = @[];
     self.frameFailed = NO;
     NSUInteger retirement = self.generation;
-    self.device = nil; self.sticker = nil;
+    UIViewController *retiringEditor = self.editor; self.editor = nil;
+    self.device = nil; self.sticker = nil; self.stickerSource = nil; self.stickerPlacement = nil;
     self.talkingView = nil;
-    WCVideoRefreshRenderers();
+    WCVideoRefreshCaptureMirroring();
     self.status = @"请在视频通话中调节";
     dispatch_async(self.controlQueue, ^{
         [self.lock lock];
@@ -430,14 +507,9 @@ static WCVideoBeautySession *WCVideoBuildBeauty(NSString *account, id service, N
         WCVideoNotify();
     });
     dispatch_async(dispatch_get_main_queue(), ^{
+        if (retiringEditor) WCGestureVideoCallCancelSticker(retiringEditor);
         if (self.generation != retirement) return;
         [self.button removeFromSuperview]; self.button = nil;
-        UIViewController *editor = self.editor;
-        if (editor && objc_getAssociatedObject(editor, &WCVideoStickerContextKey)) {
-            objc_setAssociatedObject(editor, &WCVideoStickerContextKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            [editor dismissViewControllerAnimated:NO completion:nil];
-        }
-        self.editor = nil;
     });
 }
 - (void)layoutButton {
@@ -461,29 +533,25 @@ static WCVideoBeautySession *WCVideoBuildBeauty(NSString *account, id service, N
         [button setTitle:@"通话调节" forState:UIControlStateNormal];
         [button setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
         button.titleLabel.font = [UIFont systemFontOfSize:14];
-        button.backgroundColor = [UIColor.systemBlueColor colorWithAlphaComponent:.9];
-        button.layer.cornerRadius = 18;
+        button.backgroundColor = [UIColor.blackColor colorWithAlphaComponent:.35];
+        button.layer.cornerRadius = 17;
         __weak WCVideoCallCoordinator *weakSelf = self;
         [button addAction:[UIAction actionWithHandler:^(__unused UIAction *action) {
             WCVideoCallCoordinator *strongSelf = weakSelf;
             UIViewController *presenter = strongSelf.host;
             if (!presenter || presenter.presentedViewController) return;
-            UIViewController *settings = WCGestureCreateVideoCallSettingsController();
-            UINavigationController *navigation = [[UINavigationController alloc] initWithRootViewController:settings];
-            navigation.modalPresentationStyle = UIModalPresentationPageSheet;
-            if (@available(iOS 15.0, *)) {
-                navigation.sheetPresentationController.detents = @[[UISheetPresentationControllerDetent mediumDetent],
-                    [UISheetPresentationControllerDetent largeDetent]];
-                navigation.sheetPresentationController.selectedDetentIdentifier = UISheetPresentationControllerDetentIdentifierMedium;
-                navigation.sheetPresentationController.largestUndimmedDetentIdentifier = UISheetPresentationControllerDetentIdentifierMedium;
-                navigation.sheetPresentationController.prefersGrabberVisible = YES;
-            }
-            [presenter presentViewController:navigation animated:YES completion:nil];
+            WCGesturePresentVideoCallSettings(presenter);
         }] forControlEvents:UIControlEventTouchUpInside];
         [container addSubview:button]; self.button = button;
     }
     UIEdgeInsets safe = container.safeAreaInsets;
-    CGRect frame = CGRectMake(MAX(safe.left + 12, CGRectGetWidth(container.bounds) - safe.right - 104), safe.top + 12, 92, 36);
+    CGRect controls = WCVideoCallControlsRect(container, talkingVisible ? (id)talking : (id)host);
+    if (CGRectIsNull(controls) && talkingVisible) controls = WCVideoCallControlsRect(container, host);
+    CGFloat right = CGRectIsNull(controls) ? CGRectGetWidth(container.bounds) - safe.right - 16 : CGRectGetMaxX(controls);
+    CGFloat top = CGRectIsNull(controls) ? CGRectGetHeight(container.bounds) - safe.bottom - 190 : CGRectGetMinY(controls) - 46;
+    CGFloat x = MAX(safe.left + 12, MIN(right - 88, CGRectGetWidth(container.bounds) - safe.right - 100));
+    CGFloat y = MAX(safe.top + 12, MIN(top, CGRectGetHeight(container.bounds) - safe.bottom - 46));
+    CGRect frame = CGRectMake(x, y, 88, 34);
     if (!CGRectEqualToRect(button.frame, frame)) button.frame = frame;
     if (container.subviews.lastObject != button) [container bringSubviewToFront:button];
 }
@@ -557,16 +625,52 @@ static CMSampleBufferRef WCVideoNewSample(CVPixelBufferRef pixels, CMSampleBuffe
     return result;
 }
 
-static CGAffineTransform WCVideoHorizontalMirrorTransform(CGSize size, int rotation) {
-    // Reflect horizontally in the final display coordinates, then map back to
-    // the capture buffer. A quarter-turn swaps its horizontal/vertical axes.
-    if (rotation % 180 != 0)
-        return CGAffineTransformMake(1, 0, 0, -1, 0, size.height);
-    return CGAffineTransformMake(-1, 0, 0, 1, size.width, 0);
+static BOOL WCVideoCalibrateRenderOrientation(CIContext *context, BOOL *flipped) {
+    CVPixelBufferRef source = NULL, output = NULL;
+    CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+    if (!colorSpace) return NO;
+    BOOL matched = NO;
+    const uint8_t corners[2][8] = {{0, 0, 255, 255, 0, 255, 0, 255}, {255, 0, 0, 255, 255, 255, 255, 255}};
+    @try {
+        NSDictionary *attributes = @{(id)kCVPixelBufferIOSurfacePropertiesKey:@{}};
+        if (CVPixelBufferCreate(kCFAllocatorDefault, 2, 2, kCVPixelFormatType_32BGRA,
+            (__bridge CFDictionaryRef)attributes, &source) != kCVReturnSuccess ||
+            CVPixelBufferCreate(kCFAllocatorDefault, 2, 2, kCVPixelFormatType_32BGRA,
+            (__bridge CFDictionaryRef)attributes, &output) != kCVReturnSuccess) return NO;
+        if (CVPixelBufferLockBaseAddress(source, 0) != kCVReturnSuccess) return NO;
+        for (NSUInteger row = 0; row < 2; row++)
+            memcpy((uint8_t *)CVPixelBufferGetBaseAddress(source) + row * CVPixelBufferGetBytesPerRow(source), corners[row], 8);
+        CVPixelBufferUnlockBaseAddress(source, 0);
+        CIImage *probe = [CIImage imageWithCVPixelBuffer:source];
+        for (NSUInteger attempt = 0; attempt < 2 && !matched; attempt++) {
+            CIRenderDestination *destination = [[CIRenderDestination alloc] initWithPixelBuffer:output];
+            destination.colorSpace = colorSpace; destination.flipped = attempt != 0;
+            NSError *error = nil;
+            CIRenderTask *task = [context startTaskToRender:probe fromRect:CGRectMake(0, 0, 2, 2)
+                toDestination:destination atPoint:CGPointZero error:&error];
+            if (!task || error || ![task waitUntilCompletedAndReturnError:&error] || error) continue;
+            if (CVPixelBufferLockBaseAddress(output, kCVPixelBufferLock_ReadOnly) != kCVReturnSuccess) continue;
+            matched = YES;
+            for (NSUInteger row = 0; row < 2; row++) {
+                uint8_t *bytes = (uint8_t *)CVPixelBufferGetBaseAddress(output) + row * CVPixelBufferGetBytesPerRow(output);
+                for (NSUInteger i = 0; i < 8; i++)
+                    if (abs((int)bytes[i] - (int)corners[row][i]) > 12) matched = NO;
+            }
+            CVPixelBufferUnlockBaseAddress(output, kCVPixelBufferLock_ReadOnly);
+            if (matched) *flipped = attempt != 0;
+        }
+    } @catch (__unused NSException *exception) { matched = NO; }
+    @finally {
+        if (source) CVPixelBufferRelease(source);
+        if (output) CVPixelBufferRelease(output);
+        CGColorSpaceRelease(colorSpace);
+    }
+    return matched;
 }
 
-CMSampleBufferRef WCGestureVideoCallCreateFrame(id device, CMSampleBufferRef sample, __unused id connection) {
+CMSampleBufferRef WCGestureVideoCallCreateFrame(id device, CMSampleBufferRef sample, id connection) {
     WCVideoCallCoordinator *coordinator = WCVideoCoordinator();
+    WCVideoCaptureMirrorUpdate(device, connection, NO);
     if (!coordinator.active || !coordinator.host || coordinator.suspended || coordinator.frameFailed ||
         (!coordinator.beautyEnabled && !coordinator.stickerEnabled && !coordinator.mirrorEnabled) ||
         !sample || !CMSampleBufferIsValid(sample) || !CMSampleBufferDataIsReady(sample)) return NULL;
@@ -586,15 +690,10 @@ CMSampleBufferRef WCGestureVideoCallCreateFrame(id device, CMSampleBufferRef sam
         WCVideoBeautySession *beauty = coordinator.beautyEnabled ? coordinator.beauty : nil;
         if (beauty.generation != generation || ![beauty.account isEqualToString:coordinator.account]) beauty = nil;
         BOOL front = ![WCTweakSafeValue(device, @"m_usingBackCamera") boolValue];
-        if (!beauty && !(coordinator.stickerEnabled && coordinator.sticker) && !(front && coordinator.mirrorEnabled)) return NULL;
+        // Pure mirroring belongs to AVCaptureConnection, so it never enters
+        // Core Image or changes pixel rows using a private rotation value.
+        if (!beauty && !(coordinator.stickerEnabled && coordinator.sticker)) return NULL;
         id rotationValue = WCTweakSafeValue(device, @"rotation");
-        BOOL knownRotation = [rotationValue isKindOfClass:NSNumber.class] && isfinite([rotationValue doubleValue]) &&
-            fmod([rotationValue doubleValue], 90) == 0;
-        if (front && coordinator.mirrorEnabled && !knownRotation) {
-            coordinator.frameFailed = YES;
-            coordinator.status = @"视频镜像方向不可用，已恢复原生画面";
-            WCVideoRefreshRenderers(); WCVideoNotify(); return NULL;
-        }
         int rotation = [rotationValue intValue];
         image = [CIImage imageWithCVPixelBuffer:input];
         if (beauty) {
@@ -630,7 +729,7 @@ CMSampleBufferRef WCGestureVideoCallCreateFrame(id device, CMSampleBufferRef sam
             if (!effectCompleted || !rendered) {
                 coordinator.frameFailed = YES;
                 coordinator.status = @"美颜帧输出不可用，已恢复原生画面";
-                WCVideoRefreshRenderers(); WCVideoNotify();
+                WCVideoRefreshCaptureMirroring(); WCVideoNotify();
                 return NULL;
             }
             image = [CIImage imageWithCVPixelBuffer:rendered]; changed = YES;
@@ -645,22 +744,20 @@ CMSampleBufferRef WCGestureVideoCallCreateFrame(id device, CMSampleBufferRef sam
         if (fabs(inputAspect / outputAspect - 1) > .02) {
             coordinator.frameFailed = YES;
             coordinator.status = @"美颜输出方向不兼容，已恢复原生画面";
-            WCVideoRefreshRenderers(); WCVideoNotify(); return NULL;
+            WCVideoRefreshCaptureMirroring(); WCVideoNotify(); return NULL;
         }
         image = [image imageByApplyingTransform:CGAffineTransformMakeTranslation(-extent.origin.x, -extent.origin.y)];
         image = [image imageByApplyingTransform:CGAffineTransformMakeScale(target.size.width / extent.size.width,
                                                                          target.size.height / extent.size.height)];
-        // Mirror the camera before compositing: the sticker stays where it was edited,
-        // including readable text inside the selected image.
-        if (front && coordinator.mirrorEnabled) {
-            image = [image imageByApplyingTransform:WCVideoHorizontalMirrorTransform(target.size, rotation)];
-            changed = YES;
-        }
+        // Capture mirroring has already happened before this callback. Stickers
+        // are composited afterwards and their text is not mirrored.
         CIImage *sticker = coordinator.stickerEnabled ? coordinator.sticker : nil;
         if (sticker) {
             CGRect size = sticker.extent;
             if (size.size.width > 0 && size.size.height > 0) {
-                CGFloat scale = MAX(target.size.width / size.size.width, target.size.height / size.size.height);
+                // Inverse of the live view's aspect-fill: preserve the full
+                // editable screen canvas inside the outgoing video, not crop it.
+                CGFloat scale = MIN(target.size.width / size.size.width, target.size.height / size.size.height);
                 CGAffineTransform transform = CGAffineTransformMake(scale, 0, 0, scale,
                     (target.size.width - size.size.width * scale) / 2,
                     (target.size.height - size.size.height * scale) / 2);
@@ -672,12 +769,26 @@ CMSampleBufferRef WCGestureVideoCallCreateFrame(id device, CMSampleBufferRef sam
         output = [coordinator newPixelsLike:input];
         if (!output) return NULL;
         CVBufferPropagateAttachments(input, output);
+        if (!coordinator.context) {
+            coordinator.context = [CIContext contextWithOptions:@{kCIContextCacheIntermediates:@NO}];
+            coordinator.renderOrientationReady = NO;
+        }
+        if (!coordinator.renderOrientationReady) {
+            BOOL flipped = NO;
+            if (!WCVideoCalibrateRenderOrientation(coordinator.context, &flipped)) {
+                coordinator.frameFailed = YES;
+                coordinator.status = @"视频方向校验未通过，已恢复原生画面";
+                WCVideoRefreshCaptureMirroring(); WCVideoNotify(); return NULL;
+            }
+            coordinator.renderFlipped = flipped; coordinator.renderOrientationReady = YES;
+        }
         CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
-        if (!coordinator.context) coordinator.context = [CIContext contextWithOptions:@{kCIContextCacheIntermediates:@NO}];
+        if (!colorSpace) return NULL;
         BOOL completed = NO;
         @try {
             CIRenderDestination *destination = [[CIRenderDestination alloc] initWithPixelBuffer:output];
             destination.colorSpace = colorSpace;
+            destination.flipped = coordinator.renderFlipped;
             NSError *error = nil;
             CIRenderTask *task = [coordinator.context startTaskToRender:[image imageByCroppingToRect:target]
                 fromRect:target toDestination:destination atPoint:CGPointZero error:&error];
@@ -687,7 +798,7 @@ CMSampleBufferRef WCGestureVideoCallCreateFrame(id device, CMSampleBufferRef sam
         if (!completed) {
             coordinator.frameFailed = YES;
             coordinator.status = @"视频帧合成失败，已恢复原生画面";
-            WCVideoRefreshRenderers(); WCVideoNotify(); return NULL;
+            WCVideoRefreshCaptureMirroring(); WCVideoNotify(); return NULL;
         }
         if (!coordinator.active || coordinator.suspended || coordinator.generation != generation) return NULL;
         result = WCVideoNewSample(output, sample);
@@ -695,7 +806,7 @@ CMSampleBufferRef WCGestureVideoCallCreateFrame(id device, CMSampleBufferRef sam
         if (result) { CFRelease(result); result = NULL; }
         coordinator.frameFailed = YES;
         coordinator.status = @"视频处理暂不可用，已恢复原生画面";
-        WCVideoRefreshRenderers(); WCVideoNotify();
+        WCVideoRefreshCaptureMirroring(); WCVideoNotify();
     } @finally {
         // MMWeEffectFrame's CF properties are borrowed; clear before releasing our sample.
         @try {
@@ -721,7 +832,7 @@ void WCGestureVideoCallStart(void) {
             [center addObserverForName:UIApplicationWillResignActiveNotification object:nil queue:NSOperationQueue.mainQueue
                 usingBlock:^(__unused NSNotification *note) {
                     coordinator.suspended = YES;
-                    WCVideoRefreshRenderers();
+                    WCVideoRefreshCaptureMirroring();
                     dispatch_async(coordinator.controlQueue, ^{
                         [coordinator.lock lock];
                         @try {
@@ -810,6 +921,12 @@ void WCGestureVideoCallEnded(UIViewController *controller) {
 void WCGestureVideoCallDeviceStopped(id device) {
     WCVideoCallCoordinator *coordinator = WCVideoCoordinator();
     NSUInteger generation = coordinator.generation;
+    NSHashTable *table = WCVideoCaptureConnections(); NSArray *connections;
+    @synchronized (table) { connections = table.allObjects; }
+    for (AVCaptureConnection *connection in connections) {
+        WCVideoCaptureMirrorState *state = objc_getAssociatedObject(connection, &WCVideoCaptureMirrorKey);
+        if (state.device == device) WCVideoCaptureMirrorUpdate(device, connection, YES);
+    }
     // Camera recreation at connection/front-back switch is not call termination.
     dispatch_async(coordinator.controlQueue, ^{
         [coordinator.lock lock];
@@ -829,130 +946,71 @@ void WCGestureVideoCallResourcesChanged(void) {
     }
     dispatch_async(coordinator.controlQueue, ^{
         coordinator.frameFailed = NO;
-        WCVideoRefreshRenderers();
+        WCVideoRefreshCaptureMirroring();
         if (coordinator.beauty) return;
         coordinator.attempted = NO; [coordinator prepare];
     });
 }
-BOOL WCGestureVideoCallRendererMirrorEnabled(void) {
-    WCVideoCallCoordinator *coordinator = WCVideoCoordinator();
-    return coordinator.active && coordinator.mirrorEnabled && !coordinator.suspended && !coordinator.frameFailed;
-}
-BOOL WCGestureVideoCallRendererMirrorValue(id renderer, BOOL requested) {
-    if (renderer) {
-        objc_setAssociatedObject(renderer, &WCVideoRendererRequestedMirrorKey, @(requested), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        NSHashTable *table = WCVideoRenderers();
-        @synchronized (table) { [table addObject:renderer]; }
-    }
-    return WCGestureVideoCallRendererMirrorEnabled() ? NO : requested;
-}
-BOOL WCGestureVideoCallBeginMirrorScope(id device) {
-    BOOL previous = WCVideoMirrorScope;
-    WCVideoMirrorScope = WCGestureVideoCallRendererMirrorEnabled() && WCVideoCoordinator().device == device &&
-        ![WCTweakSafeValue(device, @"m_usingBackCamera") boolValue];
-    return previous;
-}
-void WCGestureVideoCallEndMirrorScope(BOOL previous) { WCVideoMirrorScope = previous; }
-BOOL WCGestureVideoCallRendererFlipX(id renderer, BOOL original) {
-    if (!WCVideoMirrorScope || !WCGestureVideoCallRendererMirrorEnabled()) return original;
-    NSString *name = WCVideoString(renderer, @"name");
-    if ([name containsString:@"Local"] || [name containsString:@"CallerView"] ||
-        [name isEqualToString:@"ReceiveView"] || [name containsString:@"ReceiverView"]) return NO;
-    return original;
-}
-
 void WCGestureVideoCallEditSticker(UIViewController *presenter, UIImage *image) {
     WCVideoCallCoordinator *coordinator = WCVideoCoordinator();
-    if (!coordinator.active || !coordinator.stickerEnabled || coordinator.suspended ||
-        ![coordinator.account isEqualToString:WCCurrentUserWXID() ?: @""]) {
-        WCShowToast(@"请先开启图片贴纸并进入视频通话"); return;
+    NSString *token = WCGestureVideoCallContextToken();
+    UIViewController *host = coordinator.host;
+    if (!NSThread.isMainThread || !token.length || !coordinator.stickerEnabled || !image ||
+        image.size.width <= 0 || image.size.height <= 0 || !host.view.window) {
+        WCShowToast(@"请回到视频通话并开启图片贴纸"); return;
     }
-    Class editorClass = NSClassFromString(@"MMFinderLiveStickerEditingViewController");
-    Class itemClass = NSClassFromString(@"MMFinderLiveImageStickerItem");
-    SEL initializer = NSSelectorFromString(@"initWithLiveTaskId:stickerItem:configuration:reporter:");
-    if (!image || !class_getInstanceMethod(editorClass, initializer) ||
-        !class_getInstanceMethod(itemClass, @selector(initWithInstanceId:))) {
-        WCShowToast(@"当前微信版本缺少贴纸编辑接口"); return;
-    }
-    @try {
-        id item = [(id<WCVideoStickerItem>)[itemClass alloc] initWithInstanceId:NSUUID.UUID.UUIDString];
-        WCVideoSetObject(item, @"setStickerImage:", image);
-        if (WCVideoHas(item, @"setNativeSize:", 1))
-            ((void (*)(id, SEL, CGSize))objc_msgSend)(item, NSSelectorFromString(@"setNativeSize:"), image.size);
-        if (WCVideoHas(item, @"setCanvasSize:", 1))
-            ((void (*)(id, SEL, CGSize))objc_msgSend)(item, NSSelectorFromString(@"setCanvasSize:"), coordinator.host.view.bounds.size);
-        id config = [NSClassFromString(@"MMFinderLiveStickerEditingViewControllerConfiguration") new];
-        WCTweakSetValue(config, @"forceResetTransformation", @YES);
-        if (!item || !config) { WCShowToast(@"贴纸编辑器不可用"); return; }
-        id candidate = [(id<WCVideoStickerEditor>)[editorClass alloc]
-            initWithLiveTaskId:nil stickerItem:item configuration:config reporter:nil];
-        if (![candidate isKindOfClass:UIViewController.class]) return;
-        UIViewController *editor = (UIViewController *)candidate;
-        WCVideoStickerContext *context = [WCVideoStickerContext new];
-        context.generation = coordinator.generation; context.account = coordinator.account; context.presenter = presenter;
-        objc_setAssociatedObject(editor, &WCVideoStickerContextKey, context, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    if (coordinator.editor) return;
+    CIImage *previous = coordinator.sticker;
+    UIImage *previousSource = coordinator.stickerSource;
+    NSDictionary *previousPlacement = coordinator.stickerPlacement;
+    NSDictionary *placement = image == previousSource ? previousPlacement : nil;
+    void (^show)(void) = ^{
+        if (![token isEqualToString:WCGestureVideoCallContextToken()] || coordinator.host != host ||
+            !host.view.window || host.presentedViewController || !coordinator.stickerEnabled) return;
+        __block __weak UIViewController *weakEditor = nil;
+        UIViewController *editor = WCGestureCreateVideoStickerEditor(image, placement, ^(UIImage *canvas, NSDictionary *position) {
+            if (coordinator.editor == weakEditor) coordinator.editor = nil;
+            if (![token isEqualToString:WCGestureVideoCallContextToken()]) return;
+            if (canvas.CGImage && coordinator.stickerEnabled) {
+                coordinator.sticker = [CIImage imageWithCGImage:canvas.CGImage];
+                coordinator.stickerSource = image; coordinator.stickerPlacement = position;
+            } else {
+                coordinator.sticker = previous;
+                coordinator.stickerSource = previousSource; coordinator.stickerPlacement = previousPlacement;
+            }
+            WCVideoNotify();
+        });
+        weakEditor = editor;
         coordinator.editor = editor;
-        editor.modalPresentationStyle = UIModalPresentationFullScreen;
-        [presenter presentViewController:editor animated:YES completion:nil];
-    } @catch (__unused NSException *exception) { WCShowToast(@"微信贴纸编辑器暂不可用"); }
+        coordinator.sticker = nil;
+        [host presentViewController:editor animated:YES completion:nil];
+    };
+    UIViewController *sheet = host.presentedViewController;
+    if (sheet && (sheet == presenter || sheet == presenter.navigationController))
+        [sheet dismissViewControllerAnimated:YES completion:show];
+    else if (!sheet) show();
+    else WCShowToast(@"请先关闭当前弹窗后调整贴纸");
 }
-BOOL WCGestureVideoCallConfirmSticker(id object) {
-    WCVideoStickerContext *context = objc_getAssociatedObject(object, &WCVideoStickerContextKey);
-    if (!context) return NO;
-    WCVideoCallCoordinator *coordinator = WCVideoCoordinator();
-    if (!coordinator.active || !coordinator.stickerEnabled || context.generation != coordinator.generation ||
-        ![context.account isEqualToString:WCCurrentUserWXID() ?: @""]) {
-        WCGestureVideoCallCancelSticker(object); return YES;
-    }
-    @try {
-        UIView *canvas = WCVideoGet(object, @"editingCanvasView");
-        UIView *manipulation = WCVideoGet(object, @"manipulationView");
-        id item = WCVideoGet(manipulation, @"stickerItem") ?: WCVideoGet(object, @"stickerItem");
-        UIImage *image = WCVideoGet(item, @"stickerImage");
-        if (![canvas isKindOfClass:UIView.class] || ![manipulation isKindOfClass:UIView.class] ||
-            ![image isKindOfClass:UIImage.class] || image.size.width <= 0 || image.size.height <= 0 ||
-            CGRectIsEmpty(canvas.bounds)) { WCShowToast(@"贴纸图片尚未准备好"); return YES; }
-        CGRect bounds = manipulation.bounds;
-        CGPoint p0 = [manipulation convertPoint:CGPointMake(CGRectGetMinX(bounds), CGRectGetMinY(bounds)) toView:canvas];
-        CGPoint p1 = [manipulation convertPoint:CGPointMake(CGRectGetMaxX(bounds), CGRectGetMinY(bounds)) toView:canvas];
-        CGPoint p3 = [manipulation convertPoint:CGPointMake(CGRectGetMinX(bounds), CGRectGetMaxY(bounds)) toView:canvas];
-        CGSize size = canvas.bounds.size;
-        CGFloat scale = MIN(1, 1536 / MAX(size.width, size.height));
-        CGSize output = CGSizeMake(ceil(size.width * scale), ceil(size.height * scale));
-        UIGraphicsImageRendererFormat *format = [UIGraphicsImageRendererFormat defaultFormat];
-        format.scale = 1; format.opaque = NO;
-        UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:output format:format];
-        UIImage *baked = [renderer imageWithActions:^(UIGraphicsImageRendererContext *drawing) {
-            CGContextRef cg = drawing.CGContext;
-            CGContextScaleCTM(cg, output.width / size.width, output.height / size.height);
-            CGContextTranslateCTM(cg, -canvas.bounds.origin.x, -canvas.bounds.origin.y);
-            CGContextConcatCTM(cg, CGAffineTransformMake((p1.x-p0.x)/image.size.width, (p1.y-p0.y)/image.size.width,
-                (p3.x-p0.x)/image.size.height, (p3.y-p0.y)/image.size.height, p0.x, p0.y));
-            [image drawInRect:CGRectMake(0, 0, image.size.width, image.size.height)];
-        }];
-        if (!baked.CGImage) { WCShowToast(@"贴纸生成失败"); return YES; }
-        coordinator.sticker = [CIImage imageWithCGImage:baked.CGImage];
-        WCGestureVideoCallCancelSticker(object);
-        WCVideoNotify();
-    } @catch (__unused NSException *exception) { WCShowToast(@"微信贴纸接口暂不可用"); }
-    return YES;
+void WCGestureVideoCallRepositionSticker(UIViewController *presenter) {
+    UIImage *source = WCVideoCoordinator().stickerSource;
+    if (source) WCGestureVideoCallEditSticker(presenter, source);
 }
 BOOL WCGestureVideoCallCancelSticker(id editor) {
-    if (!objc_getAssociatedObject(editor, &WCVideoStickerContextKey)) return NO;
-    WCVideoCall(editor, @"cancelAutomaticConfirm");
-    objc_setAssociatedObject(editor, &WCVideoStickerContextKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    WCVideoCoordinator().editor = nil;
-    [(UIViewController *)editor dismissViewControllerAnimated:YES completion:nil];
-    return YES;
+    return [editor isKindOfClass:UIViewController.class] && WCGestureVideoStickerEditorCancel(editor);
 }
-void WCGestureVideoCallClearSticker(void) { WCVideoCoordinator().sticker = nil; WCVideoNotify(); }
-BOOL WCGestureVideoCallHasSticker(void) { return WCVideoCoordinator().sticker != nil; }
+void WCGestureVideoCallClearSticker(void) {
+    WCVideoCallCoordinator *coordinator = WCVideoCoordinator();
+    if (coordinator.editor) WCGestureVideoCallCancelSticker(coordinator.editor);
+    coordinator.sticker = nil; coordinator.stickerSource = nil; coordinator.stickerPlacement = nil;
+    WCVideoNotify();
+}
+BOOL WCGestureVideoCallHasSticker(void) { return WCVideoCoordinator().stickerSource != nil; }
 
 NSArray<NSDictionary *> *WCGestureVideoCallBeautyItems(void) {
     WCVideoCallCoordinator *coordinator = WCVideoCoordinator();
     return coordinator.active && coordinator.beautyEnabled ? (coordinator.beautyItems ?: @[]) : @[];
 }
-void WCGestureVideoCallSetBeautyValue(NSString *identifier, double value) {
+static void WCVideoApplyBeautyValue(NSString *identifier, double value, BOOL persist) {
     if (!identifier.length || !isfinite(value)) return;
     WCVideoCallCoordinator *coordinator = WCVideoCoordinator();
     NSUInteger generation = coordinator.generation;
@@ -972,20 +1030,24 @@ void WCGestureVideoCallSetBeautyValue(NSString *identifier, double value) {
                 BOOL applied = WCVideoOnEffectThread(session.engine, ^{
                     WCTweakSetValue(item, @"value", @(clamped));
                     WCVideoSetObject(session.logic, @"applyBeautyItem:", item);
-                    WCVideoCall(session.logic, @"saveAllEffectBeautyValues");
+                    if (persist) WCVideoCall(session.logic, @"saveAllEffectBeautyValues");
                 });
                 if (!applied) { coordinator.status = @"美颜参数应用失败"; WCVideoNotify(); return; }
-                NSMutableDictionary *values = [[NSUserDefaults.standardUserDefaults dictionaryForKey:WCGestureVideoCallBeautyValuesKey] mutableCopy]
-                    ?: [NSMutableDictionary dictionary];
-                values[identifier] = @(clamped);
-                [NSUserDefaults.standardUserDefaults setObject:values forKey:WCGestureVideoCallBeautyValuesKey];
+                if (persist) {
+                    NSMutableDictionary *values = [[NSUserDefaults.standardUserDefaults dictionaryForKey:WCGestureVideoCallBeautyValuesKey] mutableCopy]
+                        ?: [NSMutableDictionary dictionary];
+                    values[identifier] = @(clamped);
+                    [NSUserDefaults.standardUserDefaults setObject:values forKey:WCGestureVideoCallBeautyValuesKey];
+                }
                 coordinator.beautyItems = WCVideoDescribeBeauty(session);
-                WCVideoNotify();
+                if (persist) WCVideoNotify();
                 break;
             }
         } @catch (__unused NSException *exception) {} @finally { [coordinator.lock unlock]; }
     });
 }
+void WCGestureVideoCallSetBeautyValue(NSString *identifier, double value) { WCVideoApplyBeautyValue(identifier, value, YES); }
+void WCGestureVideoCallPreviewBeautyValue(NSString *identifier, double value) { WCVideoApplyBeautyValue(identifier, value, NO); }
 void WCGestureVideoCallResetBeauty(void) {
     WCVideoCallCoordinator *coordinator = WCVideoCoordinator();
     NSUInteger generation = coordinator.generation;

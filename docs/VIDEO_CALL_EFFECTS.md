@@ -1,48 +1,31 @@
-# 视频通话增强接入记录
+# 视频通话增强
 
-日期：2026-10-27。主体已提交；当前镜像轴修正未提交。未本地 Theos 编译或真机验证，构建状态以用户提供日志为准。
+更新：2026-10-27。当前有镜像、滑杆和贴纸编辑器重做，未提交；未本地编译或真机验证。不主动查询 CI。
 
-接通修正（未提交）：相机 stopSession 仅解绑设备，不结束通话；原生接通/挂断回调与实际 VoIPTalkingView、VideoVoipCSTalkingView 补充入口迁移和清理。调节按钮挂在当前可见通话视图，保留相机重建时的贴纸/美颜状态，结束标记阻止晚到布局重新激活。美颜资源服务在主线程按当前 MMContext 获取，异步工作保留服务与代次，接通后重试。旧预检把服务为空和方法缺失合并为“版本缺少接口”，现分别报告检查阶段，手动检查显示本次异步结果。头文件核对只证明这些声明存在，设备实际服务/方法和效果仍需运行验证。
+## 当前交互
 
-镜像轴修正：原来的固定采集 X 轴反射，在原生后续旋转 90/270 度时会变成上下镜像。现使用同帧 AVVideoDevice.rotation 换算：0/180 度反射缓冲 X，90/270 度反射缓冲 Y，使显示坐标左右反射；不额外旋转像素或修改 capture connection，方向不可用则恢复原生。四种尺寸、八种正负角度的 160 点数学检查通过，原生 rotation 的实际语义和双方显示仍待设备确认。系统数据输出可能已经物理旋转像素，不能仅凭竖屏/横屏猜其方向，参见 [Apple 的视频方向说明](https://developer.apple.com/documentation/avfoundation/avcaptureconnection/videoorientation?language=objc)。
+聊天类功能 → 视频通话增强，视频美颜/图片贴纸/前摄视频镜像三个开关默认关闭。原生接通与实际通话视图负责挂载“通话调节”，相机 stopSession 不视为整场挂断。入口以可见原生麦克风/扬声器/视频/翻转/挂断控件的坐标并集为锚，放在操作区上方右侧；等待/接通重新解析，不再固定右上角。原生控件不可用时退到底部操作区上方。黄白静态审计确认其按原生控件几何布局，但具体邻接控件及精确偏移未还原，本实现只采用相近区域布局。
 
-## 本轮范围
+iOS14+ 通话调节使用自有 UIKit presentation：底部圆角半透明超薄材质模糊、透明导航栏和低不透明度分组背景，文字/滑杆保持不透明，默认约320pt。拖动导航栏调整高度，快速下拉关闭；正常设置页仍保留原背景。美颜列表直接拖动滑杆，最多20Hz预览，松手保存；不弹逐项数字框，拖动中不重建控件。参数名、范围仍取微信原生当前资源方案。
 
-入口为“聊天类功能 → 视频通话增强”，包含视频美颜、图片贴纸、前摄视频镜像，三个开关默认关闭。通话页显示蓝色“通话调节”按钮；iOS 15 以上默认半屏调节，背景保留真实通话画面；iOS 14 使用系统 page sheet。没有新增独立说明小字、假相机预览或未实现的动态素材开关。
+图片由系统 PHPicker 选择、ImageIO 最长边2048解码；随后关闭调节面板，在透明全屏通话画布中单指拖动、双指缩放和旋转。工具条提供取消/居中/完成，图片边框仅用于编辑，不写入最终贴纸。完成时烘焙最长边1536的透明画布；取消恢复原图案。原图与归一化位置仅保留本次通话，可再次点击“移动、缩放贴纸”编辑。编辑期间暂停旧贴纸，避免重影。自有编辑器取代原 Finder Live 编辑器，原生编辑器的确认/取消 Hook 已移除。
 
-- 美颜使用微信 `MMLiveResUpdateMgr`、`MMLivePathUtil`、`MMLiveBeautyPackage`、`MMWeEffectManager`、`MMLiveBeautyLogic` 和 `MMWeEffectFrame`。资源类型 184、子类型 3，版本取原生 latest-ready 查询，配置文件为 `contents.json`。参数名、范围与当前默认方案的参数项取自微信资源包，不硬编码“磨皮/瘦脸”范围。自有 MemoryMappedKV 命名空间按账号隔离，不修改微信原生美颜存储。
-- 图片贴纸限一张静态图片，保留透明通道。系统 PHPicker 选择后用 ImageIO 限制解码尺寸，再进入微信原生图片贴纸编辑器；支持其拖动、缩放与旋转。仅处理本插件创建的编辑器的确认/取消，不拦截其他直播编辑器。确认时按 manipulation view 的三个转换角点生成仿射矩阵，烘焙整张透明画布位图；不是在本地视频上盖 UIImageView。画布最长边限 1536，源图片解码最长边限 2048。这些尺寸限制是 One Wx 自有内存策略。
-- 镜像对前摄输出帧处理；相机镜像后再合成贴纸，使图片内文字和编辑位置保持一致。原生 renderer 两处 mirror 参数覆盖及 `XImageViewRenderer.name` 四项过滤沿用已确认规则；标记改成调用作用域的线程局部值，保存并恢复原值。原生 renderer 的最新请求值单独记录，关闭/离开/后台/帧处理故障后重新同步，不永久强制 NO。
+## 镜像与方向
 
-文字模板、在线素材目录、PAG 手势动画、妆容和滤镜资源不在本轮已实现范围。未把头文件中存在的 Finder Live 审核或 lower-third API 当作普通通话所需依赖。
+旧的私有 rotation 换轴代码未解决用户实测问题，现已删除。镜像改用系统 AVCaptureConnection.videoMirrored，按原生基准值切换左右翻转，不修改旋转角。每个连接记录原 mirroring/automatic 状态，设置在自有 controlQueue 串行合并，关闭/后台/停止设备/挂断恢复；设备/代次/账号隔离旧任务。单独镜像不生成替换帧、不进入 Core Image。原 WCVideoSampleBufferRender 和 XImageViewRenderer 覆盖全部移除，保留微信渲染器行为。
 
-## 管线与资源所有权
+Apple 明确描述该属性为水平镜像，AVCaptureVideoDataOutput 会把效果应用到回调像素：[videoMirrored](https://developer.apple.com/documentation/avfoundation/avcaptureconnection/isvideomirrored?language=objc)。这与读取不明私有 rotation 后手动翻帧不同；微信后续实际处理、本端和对端仍需设备验证。
 
-`AVVideoDevice.captureOutput:didOutputSampleBuffer:fromConnection:` 接入处理，继续交给原生 IMP 完成后续管线。仅跟踪已进入的视频通话控制器，音频通话和关闭状态直接使用原帧。通话控制器在 `viewWillAppear:` 开始绑定，布局只补按钮/模式同步。
+美颜/贴纸的 Core Image 输出首次使用时，会创建四角颜色不同的2×2缓冲，实际渲染并读回，校准 destination.flipped，使行列顺序与输入保持一致。若两种行向均不匹配，停止当前合成并回退原帧。该运行时自检尚未在本机执行，不能当作编译/设备验证已通过。贴纸画布按显示 aspect-fill 的逆比例映射进入输出帧，避免旧 MAX 比例把编辑结果裁掉。
 
-美颜资源准备在独立串行队列进行，不在每帧查询磁盘或初始化引擎。帧使用 tryLock；争用、资源未就绪或池分配失败使用原帧。输入先复制到独立像素缓冲，交给原生美颜引擎的 sample 不引用原始输入像素；效果线程内同步渲染。输出对象须为原生帧类型，像素缓冲 retain 后才离开效果线程。
+## 原生美颜与所有权
 
-Core Image 使用有错误返回的 CIRenderTask，并等待完成；成功后才创建 sample。输出保留源像素格式和尺寸，复制传播附件及 sample 附件、PTS/DTS/duration；不修改源 sample。原生输出宽高比变化时不猜旋转、不强行拉伸，恢复原生画面。所有本地 CF 对象统一在 finally 清理，借用的 frame.sampleBuffer 在释放 sample 前清空。
+资源服务 MMLiveResUpdateMgr 在主线程通过当前 MMContext 获取，再保留给串行资源工作；资源 type184/subtype3，版本取 latest-ready，配置 contents.json，使用 MMLivePathUtil/MMLiveBeautyPackage/MMWeEffectManager/MMLiveBeautyLogic/MMWeEffectFrame。MemoryMappedKV 使用 One Wx 命名空间并按账号隔离。接通可重试准备，预检区分资源服务、引擎与资源文件失败。
 
-挂断/离开会递增通话代次、清除图片、注销当前设备、保存并停止自有引擎、释放像素池和 CIContext。后台暂停处理并保存参数；前台重查账号。准备结果、参数编辑、照片异步加载和贴纸确认分别校验通话代次/账号，防止旧操作影响新通话。UI 只读取不可变参数快照，不等待帧锁或效果线程。
+输入像素先复制再交原生美颜引擎，不写原 sample。帧处理 tryLock，争用/未就绪/分配失败走原帧；原生效果线程同步工作。成功输出保留时间戳和附件，格式/尺寸沿用输入，宽高比不兼容时回退。所有CF对象在finally释放，借用的原生 sample 属性先清空。后台暂停、挂断清理引擎/图片/池/CIContext；异步参数、照片、贴纸确认核对当前代次和账号。
 
-以上失败回退、资源限额、线程作用域和所有权结构是 One Wx 的适配设计，不声称逐分支复原黄白助手。尚未闭合的 capture 内部方向码不直接当作系统 videoOrientation 使用；本轮保留输入方向，由原生帧/引擎处理自身 rotation，不另加猜测旋转。
+## 配置与验证
 
-## 配置
+沿用 com.qiu7c.onewx.chat.video-call.beauty.enabled / sticker.enabled / mirror.enabled，默认均NO，beauty.values为空字典。无新增持久 key。图片、位置、连接快照不持久化或导出口令。
 
-四个键均在 Core 声明/定义/默认注册并加入原配置口令别名，不改旧动作编号或别名：
-
-| 后缀（前缀 `com.qiu7c.onewx.chat.video-call.`） | 默认 | 含义 |
-|---|---|---|
-| beauty.enabled | NO | 视频美颜 |
-| sticker.enabled | NO | 本次通话图片贴纸 |
-| mirror.enabled | NO | 前摄视频镜像 |
-| beauty.values | 空字典 | One Wx 参数覆盖值，按微信 itemId 保存 |
-
-图片/通话状态/缓冲不持久化、不进入口令。参数覆盖值是插件配置；原生缓存按账号隔离。导入参数会校验类型、有限数值与当前资源包范围后应用。
-
-## 验证状态
-
-已做括号、唯一项目 import、Hook 去重、每个 x 的 ctor/init、API 定义、配置 defaults/share、私有类运行时引用、部分 8.0.79 ABI 和 git diff --check 静态核对。系统附件传播和 Core Image 渲染接口参考 [Apple Core Video](https://developer.apple.com/documentation/corevideo/cvbufferpropagateattachments(_:_:))、[Apple Core Image](https://developer.apple.com/documentation/coreimage/cicontext)。静态检查不代表编译或通话发送验证通过。
-
-设备重点：呼入/呼出；首次资源准备/缺失/下载后重试；前后摄与四个方向；双方画面、贴纸文字方向与落点；原生已有美颜是否叠加；像素格式/分辨率切换；确认/取消/关闭开关；参数导入；后台返回；最小化恢复；挂断重拨和切号。仍需确认当前微信构建的 render 返回类型、GPU 输出支持，以及后续原生处理是否改变已合成的效果。
+已做静态括号/import、API定义、自有类实现、Hook去重/单ctor-init、配置与git diff --check；不等于真实编译。设备重点：仅镜像/仅美颜/仅贴纸及组合；前后摄与四方向；双方画面与贴纸文字/位置；运行时四角测试；连续拖动与松手保存；编辑取消/居中/重进；控制面板大小；相机重建、最小化、后台、挂断重拨、切号和原状态恢复。
