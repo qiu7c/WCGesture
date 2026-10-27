@@ -792,6 +792,10 @@ static NSDictionary<NSString *, NSString *> *WCConfigShareKeys(void) {
         WCGestureMessageRepeatMenuEnabledKey,
         WCGestureMomentsTimeEnabledKey,
         WCGestureMomentsFeedEnabledKey,
+        WCGestureMomentsForwardEnabledKey,
+        WCGestureServicePageLockEnabledKey,
+        WCGestureFavoritesPageLockEnabledKey,
+        WCGestureMomentsAlbumPageLockEnabledKey,
         WCGestureMomentsFeedSpacingKey,
         WCGestureMomentsFeedLocationKey,
         WCGestureMomentsFeedActionsKey,
@@ -1694,6 +1698,8 @@ static NSString *WCRowDetailText(WCRow *row) {
         [sections addObject:moments];
         [collapsible addObject:@YES];
         [collapseKeys addObject:[prefix stringByAppendingString:@".other.moments"]];
+        [sections addObject:@[WCSwitchRow(@"朋友圈转发", WCGestureMomentsForwardEnabledKey)]];
+        [collapsible addObject:@NO]; [collapseKeys addObject:[prefix stringByAppendingString:@".moments.forward"]];
         WCRow *timeFormat = WCPlainRow(@"朋友圈日期格式", WCRowKindChatOption);
         timeFormat.chatOption = @{ @"title": timeFormat.title, @"type": @"format", @"key": WCGestureMomentsTimeFormatKey };
         [sections addObject:@[WCSwitchRow(@"朋友圈精确发布时间", WCGestureMomentsTimeEnabledKey), timeFormat]];
@@ -1775,6 +1781,11 @@ static NSString *WCRowDetailText(WCRow *row) {
         [collapsible addObject:@NO];
         [collapseKeys addObject:[prefix stringByAppendingString:@".enhance.separators"]];
     } else if (self.category == WCGestureCategoryEnhancements) {
+        [sections addObject:@[WCPlainRow(@"页面上锁", WCRowKindSectionTitle),
+            WCSwitchRow(@"服务页上锁", WCGestureServicePageLockEnabledKey),
+            WCSwitchRow(@"收藏页上锁", WCGestureFavoritesPageLockEnabledKey),
+            WCSwitchRow(@"朋友圈相册上锁", WCGestureMomentsAlbumPageLockEnabledKey)]];
+        [collapsible addObject:@YES]; [collapseKeys addObject:[prefix stringByAppendingString:@".privacy.page-lock"]];
         [sections addObject:@[WCSwitchRow(@"自动确认登录", WCGestureAutoDeviceLoginEnabledKey)]];
         [collapsible addObject:@NO];
         [collapseKeys addObject:[prefix stringByAppendingString:@".automation.device-login"]];

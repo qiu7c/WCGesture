@@ -138,6 +138,7 @@ static BOOL WCVideoApplySavedValues(id logic, id suite, NSDictionary *values) {
 
 static char WCVideoStickerContextKey;
 static char WCVideoRendererRequestedMirrorKey;
+static char WCVideoEndedKey;
 static __thread BOOL WCVideoMirrorScope;
 static NSHashTable *WCVideoRenderers(void) {
     static NSHashTable *renderers;
@@ -171,6 +172,7 @@ static void WCVideoRefreshRenderers(void) {
 @property (nonatomic, strong) CIContext *context;
 @property (nonatomic, strong) WCVideoBeautySession *beauty;
 @property (atomic, weak) UIViewController *host;
+@property (nonatomic, weak) UIView *talkingView;
 @property (atomic, weak) id device;
 @property (atomic, weak) UIViewController *editor;
 @property (nonatomic, weak) UIButton *button;
@@ -201,20 +203,37 @@ static WCVideoCallCoordinator *WCVideoCoordinator(void) {
     return coordinator;
 }
 
-static WCVideoBeautySession *WCVideoBuildBeauty(NSString *account, NSString **failure) {
+static WCVideoBeautySession *WCVideoBuildBeauty(NSString *account, id service, NSString **failure) {
     Class managerClass = NSClassFromString(@"MMWeEffectManager");
     Class packageClass = NSClassFromString(@"MMLiveBeautyPackage");
     Class logicClass = NSClassFromString(@"MMLiveBeautyLogic");
     Class pathClass = NSClassFromString(@"MMLivePathUtil");
-    id service = WCServiceForClass(NSClassFromString(@"MMLiveResUpdateMgr"));
+    if (!service) {
+        *failure = @"微信美颜资源服务尚未就绪，请接通后重试";
+        return nil;
+    }
     NSString *initializer = @"initWithSceneType:roleType:energyController:dataReportCallback:isAllowFp16:enableRci:beautyAssetsDirectory:";
-    if (!class_getInstanceMethod(managerClass, NSSelectorFromString(initializer)) ||
-        !class_getInstanceMethod(managerClass, @selector(runSyncOnWeEffectThread:)) ||
-        !class_getInstanceMethod(managerClass, @selector(renderEffectImp:pixelBufferFlipX:)) ||
-        !WCVideoHas(service, @"latestReadyResVersion:subResType:", 2) ||
-        !WCVideoHas(pathClass, @"liveStaticResourcesPathWithType:subType:version:", 3) ||
-        !WCVideoHas(packageClass, @"beautyPackageInLocalDirectory:withConfigurationPath:capabilities:", 3)) {
-        *failure = @"当前微信版本缺少美颜接口";
+    NSArray<NSDictionary *> *requirements = @[
+        @{@"class":@"MMWeEffectManager", @"selector":initializer, @"message":@"美颜引擎初始化接口不可用"},
+        @{@"class":@"MMWeEffectManager", @"selector":@"runSyncOnWeEffectThread:", @"message":@"美颜效果线程接口不可用"},
+        @{@"class":@"MMWeEffectManager", @"selector":@"renderEffectImp:pixelBufferFlipX:", @"message":@"美颜帧渲染接口不可用"}];
+    for (NSDictionary *requirement in requirements) {
+        Class cls = NSClassFromString(requirement[@"class"]);
+        if (!class_getInstanceMethod(cls, NSSelectorFromString(requirement[@"selector"]))) {
+            NSLog(@"[One Wx] Beauty missing instance method %@ %@", requirement[@"class"], requirement[@"selector"]);
+            *failure = requirement[@"message"]; return nil;
+        }
+    }
+    if (!WCVideoHas(service, @"latestReadyResVersion:subResType:", 2)) {
+        *failure = @"微信美颜资源版本查询不可用";
+        return nil;
+    }
+    if (!WCVideoHas(pathClass, @"liveStaticResourcesPathWithType:subType:version:", 3)) {
+        *failure = @"微信美颜资源目录查询不可用";
+        return nil;
+    }
+    if (!WCVideoHas(packageClass, @"beautyPackageInLocalDirectory:withConfigurationPath:capabilities:", 3)) {
+        *failure = @"微信美颜资源包加载接口不可用";
         return nil;
     }
     unsigned int version = ((unsigned int (*)(id, SEL, unsigned int, unsigned int))objc_msgSend)(
@@ -223,7 +242,7 @@ static WCVideoBeautySession *WCVideoBuildBeauty(NSString *account, NSString **fa
         pathClass, NSSelectorFromString(@"liveStaticResourcesPathWithType:subType:version:"), 184, 3, version);
     if (![directory isKindOfClass:NSString.class] || !directory.length ||
         ![NSFileManager.defaultManager fileExistsAtPath:[directory stringByAppendingPathComponent:@"contents.json"]]) {
-        WCVideoCall(service, @"checkResourcesOnInitialization");
+        dispatch_async(dispatch_get_main_queue(), ^{ WCVideoCall(service, @"checkResourcesOnInitialization"); });
         *failure = @"微信美颜资源尚未就绪，可稍后重新检查";
         return nil;
     }
@@ -341,8 +360,19 @@ static WCVideoBeautySession *WCVideoBuildBeauty(NSString *account, NSString **fa
     }
 }
 - (void)prepare {
+    if (!NSThread.isMainThread) {
+        dispatch_async(dispatch_get_main_queue(), ^{ [self prepare]; }); return;
+    }
+    // MMContext/service resolution follows the UI/account context. Resolve here,
+    // then retain that service for the asynchronous resource work below.
+    if (!self.active || !self.host || self.suspended || !self.beautyEnabled) return;
+    id service = nil;
+    @try { service = WCServiceForClass(NSClassFromString(@"MMLiveResUpdateMgr")); }
+    @catch (__unused NSException *exception) {}
+    NSUInteger requestedGeneration = self.generation;
     dispatch_async(self.controlQueue, ^{
-        if (!self.active || !self.host || self.suspended || !self.beautyEnabled || self.preparing || self.attempted) return;
+        if (requestedGeneration != self.generation || !self.active || !self.host || self.suspended ||
+            !self.beautyEnabled || self.preparing || self.attempted) return;
         self.preparing = YES; self.attempted = YES;
         NSUInteger generation = self.generation;
         NSString *account = self.account;
@@ -353,7 +383,7 @@ static WCVideoBeautySession *WCVideoBuildBeauty(NSString *account, NSString **fa
         WCVideoNotify();
         WCVideoBeautySession *candidate = nil;
         NSString *failure = nil;
-        @try { candidate = WCVideoBuildBeauty(account, &failure); }
+        @try { candidate = WCVideoBuildBeauty(account, service, &failure); }
         @catch (__unused NSException *exception) { failure = @"微信美颜接口暂不可用"; }
         [self.lock lock];
         @try {
@@ -383,6 +413,7 @@ static WCVideoBeautySession *WCVideoBuildBeauty(NSString *account, NSString **fa
     self.frameFailed = NO;
     NSUInteger retirement = self.generation;
     self.device = nil; self.sticker = nil;
+    self.talkingView = nil;
     WCVideoRefreshRenderers();
     self.status = @"请在视频通话中调节";
     dispatch_async(self.controlQueue, ^{
@@ -412,12 +443,17 @@ static WCVideoBeautySession *WCVideoBuildBeauty(NSString *account, NSString **fa
 - (void)layoutButton {
     UIViewController *host = self.host;
     BOOL enabled = self.beautyEnabled || self.stickerEnabled || self.mirrorEnabled;
-    BOOL video = [WCTweakSafeValue(host, @"isVideoMode") boolValue];
-    if (!enabled || !host.isViewLoaded || !host.view.window || !video || !self.active) {
+    UIView *talking = self.talkingView;
+    BOOL talkingVisible = talking.window && !talking.hidden && ![WCTweakSafeValue(talking, @"isEnding") boolValue];
+    BOOL video = talkingVisible ? [WCTweakSafeValue(talking, @"isAllowVideo") boolValue] :
+        [WCTweakSafeValue(host, @"isVideoMode") boolValue];
+    UIView *container = talkingVisible ? talking : (host.isViewLoaded ? host.view : nil);
+    if (!enabled || !container.window || !video || !self.active ||
+        CGRectGetWidth(container.bounds) < 180 || CGRectGetHeight(container.bounds) < 180) {
         [self.button removeFromSuperview]; self.button = nil; return;
     }
     UIButton *button = self.button;
-    if (button && button.superview != host.view) {
+    if (button && button.superview != container) {
         [button removeFromSuperview]; self.button = nil; button = nil;
     }
     if (!button) {
@@ -444,11 +480,12 @@ static WCVideoBeautySession *WCVideoBuildBeauty(NSString *account, NSString **fa
             }
             [presenter presentViewController:navigation animated:YES completion:nil];
         }] forControlEvents:UIControlEventTouchUpInside];
-        [host.view addSubview:button]; self.button = button;
+        [container addSubview:button]; self.button = button;
     }
-    UIEdgeInsets safe = host.view.safeAreaInsets;
-    button.frame = CGRectMake(MAX(safe.left + 12, CGRectGetWidth(host.view.bounds) - safe.right - 104), safe.top + 12, 92, 36);
-    [host.view bringSubviewToFront:button];
+    UIEdgeInsets safe = container.safeAreaInsets;
+    CGRect frame = CGRectMake(MAX(safe.left + 12, CGRectGetWidth(container.bounds) - safe.right - 104), safe.top + 12, 92, 36);
+    if (!CGRectEqualToRect(button.frame, frame)) button.frame = frame;
+    if (container.subviews.lastObject != button) [container bringSubviewToFront:button];
 }
 - (CVPixelBufferRef)newPixelsLike:(CVPixelBufferRef)pixels {
     size_t width = CVPixelBufferGetWidth(pixels), height = CVPixelBufferGetHeight(pixels);
@@ -520,6 +557,14 @@ static CMSampleBufferRef WCVideoNewSample(CVPixelBufferRef pixels, CMSampleBuffe
     return result;
 }
 
+static CGAffineTransform WCVideoHorizontalMirrorTransform(CGSize size, int rotation) {
+    // Reflect horizontally in the final display coordinates, then map back to
+    // the capture buffer. A quarter-turn swaps its horizontal/vertical axes.
+    if (rotation % 180 != 0)
+        return CGAffineTransformMake(1, 0, 0, -1, 0, size.height);
+    return CGAffineTransformMake(-1, 0, 0, 1, size.width, 0);
+}
+
 CMSampleBufferRef WCGestureVideoCallCreateFrame(id device, CMSampleBufferRef sample, __unused id connection) {
     WCVideoCallCoordinator *coordinator = WCVideoCoordinator();
     if (!coordinator.active || !coordinator.host || coordinator.suspended || coordinator.frameFailed ||
@@ -542,6 +587,15 @@ CMSampleBufferRef WCGestureVideoCallCreateFrame(id device, CMSampleBufferRef sam
         if (beauty.generation != generation || ![beauty.account isEqualToString:coordinator.account]) beauty = nil;
         BOOL front = ![WCTweakSafeValue(device, @"m_usingBackCamera") boolValue];
         if (!beauty && !(coordinator.stickerEnabled && coordinator.sticker) && !(front && coordinator.mirrorEnabled)) return NULL;
+        id rotationValue = WCTweakSafeValue(device, @"rotation");
+        BOOL knownRotation = [rotationValue isKindOfClass:NSNumber.class] && isfinite([rotationValue doubleValue]) &&
+            fmod([rotationValue doubleValue], 90) == 0;
+        if (front && coordinator.mirrorEnabled && !knownRotation) {
+            coordinator.frameFailed = YES;
+            coordinator.status = @"视频镜像方向不可用，已恢复原生画面";
+            WCVideoRefreshRenderers(); WCVideoNotify(); return NULL;
+        }
+        int rotation = [rotationValue intValue];
         image = [CIImage imageWithCVPixelBuffer:input];
         if (beauty) {
             scratch = [coordinator newPixelsLike:input];
@@ -553,12 +607,12 @@ CMSampleBufferRef WCGestureVideoCallCreateFrame(id device, CMSampleBufferRef sam
             if (!scratchSample || !WCVideoHas(frame, @"setSampleBuffer:", 1) ||
                 !WCVideoHas(frame, @"setIsFront:", 1) || !WCVideoHas(frame, @"setRenderRotation:", 1)) return NULL;
             frame.sampleBuffer = scratchSample; frame.isFront = front;
-            frame.renderRotation = [WCTweakSafeValue(device, @"rotation") intValue];
+            frame.renderRotation = rotation;
             BOOL effectCompleted = WCVideoOnEffectThread(beauty.engine, ^{
                 id manager = WCVideoGet(beauty.engine, @"wevisEffectMgr");
                 if (WCVideoHas(manager, @"setRotationForTrackFace:", 1))
                     ((void (*)(id, SEL, int))objc_msgSend)(manager, NSSelectorFromString(@"setRotationForTrackFace:"),
-                        [WCTweakSafeValue(device, @"rotation") intValue]);
+                        rotation);
                 if (WCVideoHas(manager, @"setNeedMirror:", 1))
                     ((void (*)(id, SEL, BOOL))objc_msgSend)(manager, NSSelectorFromString(@"setNeedMirror:"), NO);
                 id produced = [beauty.engine renderEffectImp:frame pixelBufferFlipX:NO];
@@ -599,7 +653,7 @@ CMSampleBufferRef WCGestureVideoCallCreateFrame(id device, CMSampleBufferRef sam
         // Mirror the camera before compositing: the sticker stays where it was edited,
         // including readable text inside the selected image.
         if (front && coordinator.mirrorEnabled) {
-            image = [image imageByApplyingTransform:CGAffineTransformMake(-1, 0, 0, 1, target.size.width, 0)];
+            image = [image imageByApplyingTransform:WCVideoHorizontalMirrorTransform(target.size, rotation)];
             changed = YES;
         }
         CIImage *sticker = coordinator.stickerEnabled ? coordinator.sticker : nil;
@@ -691,14 +745,19 @@ void WCGestureVideoCallStart(void) {
 void WCGestureVideoCallViewChanged(UIViewController *controller, BOOL visible) {
     if (!NSThread.isMainThread) return;
     WCVideoCallCoordinator *coordinator = WCVideoCoordinator();
+    if ([objc_getAssociatedObject(controller, &WCVideoEndedKey) boolValue]) return;
     if (!visible) {
+        BOOL inCall = [WCTweakSafeValue(controller, @"isTalking") boolValue] ||
+            [WCTweakSafeValue(controller, @"isCalling") boolValue];
         if (coordinator.host == controller && (controller.isBeingDismissed || controller.isMovingFromParentViewController ||
-            (!controller.presentedViewController && !controller.view.window)))
+            (!controller.presentedViewController && !controller.view.window)) && !inCall)
             [coordinator retire];
         return;
     }
     if (!controller.isViewLoaded) return;
-    BOOL video = [WCTweakSafeValue(controller, @"isVideoMode") boolValue];
+    id talking = WCTweakSafeValue(controller, @"m_talkingView");
+    BOOL video = [talking isKindOfClass:UIView.class] && ((UIView *)talking).window && WCVideoHas(talking, @"isAllowVideo", 0)
+        ? [WCTweakSafeValue(talking, @"isAllowVideo") boolValue] : [WCTweakSafeValue(controller, @"isVideoMode") boolValue];
     if (!video) {
         if (coordinator.host == controller && coordinator.active) [coordinator retire];
         return;
@@ -713,15 +772,61 @@ void WCGestureVideoCallViewChanged(UIViewController *controller, BOOL visible) {
     }
     [coordinator layoutButton];
 }
+void WCGestureVideoCallTalkingViewChanged(UIView *view) {
+    if (!NSThread.isMainThread) return;
+    WCVideoCallCoordinator *coordinator = WCVideoCoordinator();
+    if (!view.window) {
+        if (coordinator.talkingView == view) { coordinator.talkingView = nil; [coordinator layoutButton]; }
+        return;
+    }
+    Class hostClass = NSClassFromString(@"VoIPViewController");
+    UIViewController *host = WCViewControllerForResponder(view);
+    if (!hostClass || ![host isKindOfClass:hostClass]) {
+        id delegate = WCTweakSafeValue(view, @"delegate");
+        host = hostClass && [delegate isKindOfClass:hostClass] ? delegate : nil;
+    }
+    if (!host) return;
+    if ([WCTweakSafeValue(view, @"isEnding") boolValue]) { WCGestureVideoCallEnded(host); return; }
+    WCGestureVideoCallViewChanged(host, YES);
+    if (coordinator.host != host || !coordinator.active) return;
+    coordinator.talkingView = view;
+    [coordinator layoutButton];
+}
+void WCGestureVideoCallConnected(UIViewController *controller) {
+    WCGestureVideoCallViewChanged(controller, YES);
+    id talking = WCTweakSafeValue(controller, @"m_talkingView");
+    if ([talking isKindOfClass:UIView.class]) WCGestureVideoCallTalkingViewChanged(talking);
+    if (WCVideoCoordinator().host == controller && WCVideoCoordinator().active)
+        WCGestureVideoCallResourcesChanged();
+}
+void WCGestureVideoCallEnded(UIViewController *controller) {
+    if (!NSThread.isMainThread) {
+        dispatch_async(dispatch_get_main_queue(), ^{ WCGestureVideoCallEnded(controller); }); return;
+    }
+    objc_setAssociatedObject(controller, &WCVideoEndedKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    WCVideoCallCoordinator *coordinator = WCVideoCoordinator();
+    if (coordinator.host == controller) [coordinator retire];
+}
 void WCGestureVideoCallDeviceStopped(id device) {
     WCVideoCallCoordinator *coordinator = WCVideoCoordinator();
     NSUInteger generation = coordinator.generation;
-    dispatch_async(dispatch_get_main_queue(), ^{
-        if (coordinator.generation == generation && coordinator.device == device) [coordinator retire];
+    // Camera recreation at connection/front-back switch is not call termination.
+    dispatch_async(coordinator.controlQueue, ^{
+        [coordinator.lock lock];
+        @try {
+            if (coordinator.generation == generation && coordinator.device == device) coordinator.device = nil;
+        } @finally { [coordinator.lock unlock]; }
     });
 }
 void WCGestureVideoCallResourcesChanged(void) {
+    if (!NSThread.isMainThread) {
+        dispatch_async(dispatch_get_main_queue(), ^{ WCGestureVideoCallResourcesChanged(); }); return;
+    }
     WCVideoCallCoordinator *coordinator = WCVideoCoordinator();
+    if (coordinator.active && coordinator.beautyEnabled) {
+        coordinator.status = coordinator.beauty ? @"微信美颜已就绪" : @"正在检查微信美颜资源";
+        WCVideoNotify();
+    }
     dispatch_async(coordinator.controlQueue, ^{
         coordinator.frameFailed = NO;
         WCVideoRefreshRenderers();

@@ -71,3 +71,5 @@
 #import "Sources/API/WCGestureVideoCallAPI.h"
 
 #import "Sources/API/WCGestureMomentsFeedAPI.h"
+#import "Sources/API/WCGestureMomentsForwardAPI.h"
+#import "Sources/API/WCGestureServicePageLockAPI.h"

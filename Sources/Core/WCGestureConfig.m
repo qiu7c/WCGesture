@@ -1,6 +1,10 @@
 #import "Sources/API/WCGestureInternal.h"
 
 NSString *const WCGestureMomentsFeedEnabledKey = @"com.qiu7c.onewx.moments.feed-layout.enabled";
+NSString *const WCGestureServicePageLockEnabledKey = @"com.qiu7c.onewx.privacy.service-page-lock.enabled";
+NSString *const WCGestureFavoritesPageLockEnabledKey = @"com.qiu7c.onewx.privacy.favorites-page-lock.enabled";
+NSString *const WCGestureMomentsAlbumPageLockEnabledKey = @"com.qiu7c.onewx.privacy.moments-album-page-lock.enabled";
+NSString *const WCGestureMomentsForwardEnabledKey = @"com.qiu7c.onewx.moments.forward.enabled";
 NSString *const WCGestureMomentsFeedSpacingKey = @"com.qiu7c.onewx.moments.feed-layout.extra-spacing";
 NSString *const WCGestureMomentsFeedLocationKey = @"com.qiu7c.onewx.moments.feed-layout.full-location";
 NSString *const WCGestureMomentsFeedActionsKey = @"com.qiu7c.onewx.moments.feed-layout.direct-actions";
@@ -335,6 +339,10 @@ void WCGestureRegisterDefaults(void) {
             WCGestureMessageRepeatMenuEnabledKey: @NO,
             WCGestureMomentsTimeEnabledKey: @NO,
             WCGestureMomentsFeedEnabledKey: @NO,
+            WCGestureMomentsForwardEnabledKey: @NO,
+            WCGestureServicePageLockEnabledKey: @NO,
+            WCGestureFavoritesPageLockEnabledKey: @NO,
+            WCGestureMomentsAlbumPageLockEnabledKey: @NO,
             WCGestureMomentsFeedSpacingKey: @8.0,
             WCGestureMomentsFeedLocationKey: @YES,
             WCGestureMomentsFeedActionsKey: @YES,

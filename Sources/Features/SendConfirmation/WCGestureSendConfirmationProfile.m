@@ -31,7 +31,8 @@ void WCGestureSendConfirmationProfileApply(id owner, BOOL group) {
     NSString *target = WCSendProfileUsername(owner, group);
     NSString *account = WCRefreshCachedCurrentUser() ? WCCurrentUserWXID() : nil;
     BOOL enabled = account.length && target.length && WCGestureEnabled(WCGestureSendConfirmationEnabledKey) &&
-        WCGestureEnabled(WCGestureSendConfirmationProfileSwitchEnabledKey);
+        WCGestureEnabled(WCGestureSendConfirmationProfileSwitchEnabledKey) &&
+        !WCGestureEnabled(WCGestureContactInfoCardEnabledKey);
     BOOL selected = [WCGestureSendConfirmationProtectedConversations() containsObject:target ?: @""];
     NSString *fingerprint = [NSString stringWithFormat:@"%@\n%@\n%d", account ?: @"", target ?: @"", selected];
     objc_setAssociatedObject(owner, &WCSendProfileAccountKey, account, OBJC_ASSOCIATION_COPY_NONATOMIC);

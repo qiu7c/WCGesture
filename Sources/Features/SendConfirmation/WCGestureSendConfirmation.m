@@ -569,6 +569,9 @@ void WCGestureSendConfirmationChatLeaving(UIViewController *controller) {
     }
 }
 void WCGestureSendConfirmationSettingsChanged(NSString *key) {
+    if ([key isEqualToString:WCGestureContactInfoCardEnabledKey]) {
+        WCGestureSendConfirmationRefreshProfiles(); return;
+    }
     if (key && ![@[WCGestureSendConfirmationEnabledKey, WCGestureSendConfirmationUsersKey,
         WCGestureSendConfirmationPauseSecondsKey, WCGestureSendConfirmationProfileSwitchEnabledKey] containsObject:key]) return;
     WCSendGeneration++;

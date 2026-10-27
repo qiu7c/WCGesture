@@ -5,6 +5,9 @@ NS_ASSUME_NONNULL_BEGIN
 FOUNDATION_EXPORT NSString *const WCGestureVideoCallStateDidChangeNotification;
 void WCGestureVideoCallStart(void);
 void WCGestureVideoCallViewChanged(UIViewController *controller, BOOL visible);
+void WCGestureVideoCallTalkingViewChanged(UIView *view);
+void WCGestureVideoCallConnected(UIViewController *controller);
+void WCGestureVideoCallEnded(UIViewController *controller);
 void WCGestureVideoCallDeviceStopped(id device);
 void WCGestureVideoCallResourcesChanged(void);
 /// NULL means use the original frame. A returned sample is owned by the caller.

@@ -2,7 +2,11 @@
 
 Current package version: 1.0.0.
 
-- 朋友圈功能 → 朋友圈排版: adjustable extra spacing (0–48pt, default 8), wrapping location and timestamp text, and direct native Like/Comment actions alongside the More button. Disabled by default; source integrated, awaiting compilation and device validation.
+- 增强类功能 → 页面上锁: independent locks for Me → Services, Favorites and personal Moments album entries, using system biometrics with device-passcode fallback. Each entry needs a new verification; canceled, failed or stale requests do not navigate, and authorization is scoped to that page. All disabled by default; compilation/device verification pending. See docs/SERVICE_PAGE_LOCK.md.
+
+- 朋友圈功能 → 朋友圈转发: a compact right-aligned action opens WeChat's native Moments composer for text, up to nine photos, video, or supported structured shares. Media are downloaded through WCMediaDownloader when needed; publication remains manual. Independent of 朋友圈排版 and disabled by default. Live Photos follow WCAtlas's static-image forwarding path. Compilation/device verification pending.
+
+- 朋友圈功能 → 朋友圈排版: adjustable extra spacing (0–48pt, default 8), wrapping native location labels and timestamp text, and compact right-aligned Like/Comment buttons replacing More. Location text, color and taps remain native; action icons use the system label color (black in light mode). Disabled by default; source integrated, awaiting compilation and device validation.
 
 One Wx is a WeChat enhancement plugin that grew out of WCGesture (originally extracted from [WCAtlas](https://github.com/qiu7c/WCAtlas)). It covers gestures, the keyboard strip, AI, translation, global actions, layout and interface tweaks.
 

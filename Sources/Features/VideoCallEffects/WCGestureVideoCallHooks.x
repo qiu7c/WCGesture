@@ -32,6 +32,48 @@
     %orig(animated);
     WCGestureVideoCallViewChanged((UIViewController *)self, NO);
 }
+- (void)switchToTalkingView {
+    %orig;
+    WCGestureVideoCallConnected((UIViewController *)self);
+}
+- (void)layoutTalkingView {
+    %orig;
+    WCGestureVideoCallViewChanged((UIViewController *)self, YES);
+}
+- (void)forceEndCall {
+    WCGestureVideoCallEnded((UIViewController *)self);
+    %orig;
+}
+- (void)onVideoVoipTalkingViewEndCall {
+    WCGestureVideoCallEnded((UIViewController *)self);
+    %orig;
+}
+- (void)onVideoVoipTalkingViewHangUp {
+    WCGestureVideoCallEnded((UIViewController *)self);
+    %orig;
+}
+%end
+
+%hook VoIPTalkingView
+- (void)layoutSubviews {
+    %orig;
+    WCGestureVideoCallTalkingViewChanged((UIView *)self);
+}
+- (void)didMoveToWindow {
+    %orig;
+    WCGestureVideoCallTalkingViewChanged((UIView *)self);
+}
+%end
+
+%hook VideoVoipCSTalkingView
+- (void)layoutSubviews {
+    %orig;
+    WCGestureVideoCallTalkingViewChanged((UIView *)self);
+}
+- (void)didMoveToWindow {
+    %orig;
+    WCGestureVideoCallTalkingViewChanged((UIView *)self);
+}
 %end
 
 %hook WCVideoSampleBufferRender

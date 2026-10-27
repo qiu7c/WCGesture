@@ -403,7 +403,13 @@ FOUNDATION_EXPORT NSString *const WCGestureVideoCallMirrorEnabledKey;
 FOUNDATION_EXPORT NSString *const WCGestureVideoCallBeautyValuesKey;
 
 
+// Me-page entry privacy authentication.
+FOUNDATION_EXPORT NSString *const WCGestureServicePageLockEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureFavoritesPageLockEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureMomentsAlbumPageLockEnabledKey;
+
 // Native Moments feed rows and direct actions.
+FOUNDATION_EXPORT NSString *const WCGestureMomentsForwardEnabledKey;
 FOUNDATION_EXPORT NSString *const WCGestureMomentsFeedEnabledKey;
 FOUNDATION_EXPORT NSString *const WCGestureMomentsFeedSpacingKey;
 FOUNDATION_EXPORT NSString *const WCGestureMomentsFeedLocationKey;

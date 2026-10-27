@@ -8,6 +8,7 @@
 @property (nonatomic, copy) NSArray<NSArray<NSDictionary *> *> *rows;
 @property (nonatomic, copy) NSString *selectionToken;
 @property (nonatomic) BOOL loadingImage;
+@property (nonatomic) BOOL checkingResources;
 @end
 
 static NSDictionary *WCVideoSettingsRow(NSString *title, NSString *kind, NSString *key) {
@@ -33,9 +34,18 @@ static NSDictionary *WCVideoSettingsRow(NSString *title, NSString *kind, NSStrin
     [self rebuild];
 }
 - (void)dealloc { [NSNotificationCenter.defaultCenter removeObserver:self]; }
-- (void)settingsChanged:(__unused NSNotification *)notification {
-    if (NSThread.isMainThread) [self rebuild];
-    else dispatch_async(dispatch_get_main_queue(), ^{ [self rebuild]; });
+- (void)settingsChanged:(NSNotification *)notification {
+    if (!NSThread.isMainThread) {
+        dispatch_async(dispatch_get_main_queue(), ^{ [self settingsChanged:notification]; }); return;
+    }
+    [self rebuild];
+    if (self.checkingResources && [notification.name isEqualToString:WCGestureVideoCallStateDidChangeNotification]) {
+        NSString *status = WCGestureVideoCallStatus();
+        if (status.length && ![status hasPrefix:@"正在"]) {
+            self.checkingResources = NO;
+            if (self.view.window) WCShowToast(status);
+        }
+    }
 }
 - (void)close { [self.navigationController dismissViewControllerAnimated:YES completion:nil]; }
 - (void)viewWillAppear:(BOOL)animated { [super viewWillAppear:animated]; [self rebuild]; }
@@ -101,6 +111,8 @@ static NSDictionary *WCVideoSettingsRow(NSString *title, NSString *kind, NSStrin
     NSDictionary *row = self.rows[indexPath.section][indexPath.row];
     NSString *kind = row[@"kind"];
     if ([kind isEqualToString:@"prepare"]) {
+        if (!WCGestureVideoCallContextToken().length) { WCShowToast(@"请在视频通话中检查美颜资源"); return; }
+        self.checkingResources = YES;
         WCGestureVideoCallResourcesChanged();
         WCShowToast(WCGestureVideoCallStatus());
     } else if ([kind isEqualToString:@"reset"]) {

@@ -73,11 +73,13 @@
                 WCGestureMomentsImageCornerSettingsChanged(note.object);
                 WCGestureMomentsTimeSettingsChanged(note.object);
                 WCGestureMomentsFeedSettingsChanged(note.object);
+                WCGestureMomentsForwardSettingsChanged(note.object);
                 WCGestureMomentsMonitoringSettingsChanged(note.object);
                 WCGestureAutoStatusSettingsChanged(note.object);
                 WCGestureSettingsEntrySettingsChanged(note.object);
                 WCGestureImageQuickSendSettingsChanged(note.object);
                 WCGestureSendConfirmationSettingsChanged(note.object);
+                WCGestureServicePageLockSettingsChanged(note.object);
                 WCGestureChatUtilitiesSettingsChanged(note.object);
                 WCGestureChatTopBarSettingsChanged(note.object);
                 WCGestureContactInfoCardSettingsChanged(note.object);
