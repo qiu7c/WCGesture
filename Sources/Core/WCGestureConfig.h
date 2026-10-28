@@ -435,7 +435,6 @@ FOUNDATION_EXPORT NSString *const WCGestureVirtualLocationLongitudeKey;
 FOUNDATION_EXPORT NSString *const WCGestureVirtualLocationNameKey;
 FOUNDATION_EXPORT NSString *const WCGestureVirtualLocationPresetsKey;
 
-NS_ASSUME_NONNULL_END
 
 FOUNDATION_EXPORT NSString *const WCGestureRecordCardEditEnabledKey;
 
@@ -492,3 +491,5 @@ FOUNDATION_EXPORT NSString *const WCGestureHomeGroupsBadgeColorKey;
 FOUNDATION_EXPORT NSString *const WCGestureHomeGroupsBadgeTextColorKey;
 
 FOUNDATION_EXPORT NSString *const WCGestureHomeGroupsButtonHapticKey;
+
+NS_ASSUME_NONNULL_END
