@@ -11,7 +11,7 @@
     self.tableView.rowHeight=UITableViewAutomaticDimension;self.tableView.estimatedRowHeight=64;
     self.tableView.allowsSelection=NO;
     self.updates=@[
-        @"首页精简为六类，同页设置合并到一张圆角卡片。",
+        @"首页精简为六类，同页设置合并到一张圆角卡片，修正箭头和按压高亮越出卡片的问题。",
         @"新增主页分组，支持自定义分组、成员管理和横滑切换。",
         @"新增主页右滑扩展，支持备注、朋友圈、勿扰和置顶等操作。",
         @"新增图片编辑圆形、箭头工具，支持颜色和线宽调节。",

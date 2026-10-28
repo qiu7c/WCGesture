@@ -12,6 +12,20 @@
 
 本轮提交说明：用户已授权提交推送当前全部修正，包括单张圆角卡片恢复、卡片绝对位置布局、分组默认灰色/统一改色默认白色、分组按钮均分布局及聊天系统提示颜色隔离。以下各节的未提交/未获授权为实施时记录，统一纳入本次提交。215文件结构/import、290唯一Hook、421规则一致性/ABI、API/default/share、34旧别名与diff静态检查通过；未编译/真机验证，不查询CI，版本仍1.0.0。首次显示闪色、偶发分组挤压和聊天提示颜色是否实际消除仍待设备验收，不能以静态检查视为已确认修复。
 
+本轮提交说明：用户已明确授权提交推送当前全部灰色色差、箭头越界和按压高亮越界修正及简短更新日志。以下各节“未提交/未获授权”为实施时记录，统一纳入本次提交。215文件结构/import、290唯一Hook、421规则一致性/ABI、API/default/share、34旧别名与diff静态检查通过；未进行iOS编译或真机验收，不查询CI，版本仍1.0.0。截图取色用于验证色差，源码仍需真机确认显示一致性与首次闪色。
+
+## 2026-10-28 卡片按压高亮越界（当前未提交）
+
+用户反馈部分卡片按压高亮超出外框。共享 WCSettingsCardCell 新增透明 selectedBackgroundView，其内部按压 surface 与普通卡片 surface 共用16pt左右内缩和首尾 corner mask；系统仍处理高亮/取消选中动画，但着色仅发生在卡片范围。展开、折叠与复用后按当前卡片首尾状态重新布局，不移除按压反馈、不扩大到原生微信页面。插件内日志同步简短修正说明。215文件结构/import、290唯一Hook、API/default/share与diff静态检查通过，未编译或真机验证，未获本轮提交推送授权。此前默认灰色色差和箭头越界修正仍未提交，一并保留。
+
+## 2026-10-28 设置跳转箭头超出卡片（当前未提交）
+
+用户反馈很多跳转箭头在卡片外。共享卡片 cell 原来只对 accessoryView 绝对内缩，原生 accessoryType=DisclosureIndicator 的箭头仍由全宽 Plain cell 定位。现共享 cell 的 setAccessoryType 保留原类型，用公开 SF chevron.right 作为 custom accessory 替代原生跳转箭头，复用已有绝对定位使其右边距为卡片内16pt；改成无箭头时清理自己的 accessory，开关、折叠箭头和分段控件保持原逻辑。覆盖分类页/圆角页/主页分组卡片，不扫描/操作UIKit私有子视图。不增 key/Hook。插件内日志同步简短修复说明。结构/import/290唯一Hook/API与diff静态检查通过，未编译/真机验证，未获本轮提交推送授权。
+
+## 2026-10-28 截图确认分组灰色不匹配（当前未提交）
+
+用户提供截图，System.Drawing 只读取样：分组空白 RGB242,242,246，设备横条237,237,237，置顶空白239,239,239。证实分组仍落到 systemGroupedBackgroundColor 偏蓝灰。现浅色 fallback 使用截图可核实的置顶239中性灰，默认不改原生区域；深色仍取原生色，缺失时系统深灰。优先从实际 NewMainFrameCell.m_cellData.m_sessionInfo 判断置顶，避免只按投影 indexPath 判断而跳过真实置顶cell。原生置顶背景图片取色改为先填充原生底色再叠加图片再取中心像素，处理半透明图片（此前只接受alpha255会忽略此路径）；已验证 ivar m_cellBkgImageWithTop，缺图时读 m_backGroundViewOfCell.image。未执行样本或新增私有关键字。设备横条与置顶原生本身存在2级灰度差，默认对齐置顶239。静态结构/import/Hook/API/default/share与diff检查通过，未编译或真机验收；无本轮提交推送授权。首次显示与原生动态主题仍需设备确认。
+
 ## 2026-10-28 聊天灰色提示变深排查（当前未提交）
 
 用户明确变深发生于聊天界面。静态发现 AntiRevokeSystemCellLayout 对所有 SystemMessageCellView 都缓存首次 textColor，并在非防撤回状态也把该缓存写回 textColor/oTextColor；这会覆盖原生更新/复用后的颜色，不能视作已确认唯一真机根因。现仅防撤回本地提示进入改色分支，分别保存 textColor/oTextColor 原值；普通提示没有插件记录则完全不写，有记录时仅在当前颜色仍等于插件上次应用色时恢复对应属性，原生已改色则保留并清理记录；连续改色遇到原生新值重新取基准。无新增 key/Hook。215文件结构/import、290 Hook去重/API/default/share及diff检查通过，未编译或真机验收，未获本轮提交推送授权。

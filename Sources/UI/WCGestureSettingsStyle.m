@@ -91,7 +91,9 @@ UIView *WCGestureSettingsSearchHeader(UITextField *field, CGFloat width) {
 // All sections on a settings page form one continuous inset card.
 @interface WCSettingsCardCell : UITableViewCell
 @property (nonatomic, strong) UIView *surface;
+@property (nonatomic, strong) UIView *pressedSurface;
 @property (nonatomic) CACornerMask cardCorners;
+@property (nonatomic, strong) UIImageView *disclosure;
 @end
 @implementation WCSettingsCardCell
 - (instancetype)initWithStyle:(UITableViewCellStyle)style reuseIdentifier:(NSString *)identifier {
@@ -100,15 +102,35 @@ UIView *WCGestureSettingsSearchHeader(UITextField *field, CGFloat width) {
         self.surface=[UIView new];self.surface.backgroundColor=UIColor.secondarySystemGroupedBackgroundColor;
         self.surface.layer.cornerCurve=kCACornerCurveContinuous;self.surface.clipsToBounds=YES;
         [self.backgroundView addSubview:self.surface];
+        self.selectedBackgroundView=[UIView new];self.selectedBackgroundView.backgroundColor=UIColor.clearColor;
+        self.pressedSurface=[UIView new];self.pressedSurface.backgroundColor=UIColor.tertiarySystemFillColor;
+        self.pressedSurface.layer.cornerCurve=kCACornerCurveContinuous;self.pressedSurface.clipsToBounds=YES;
+        [self.selectedBackgroundView addSubview:self.pressedSurface];
     }
     return self;
+}
+- (void)setAccessoryType:(UITableViewCellAccessoryType)type {
+    [super setAccessoryType:type];
+    if (type==UITableViewCellAccessoryDisclosureIndicator) {
+        if (!self.disclosure) {
+            self.disclosure=[[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"chevron.right"
+                withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:12 weight:UIImageSymbolWeightRegular]]];
+            self.disclosure.tintColor=UIColor.tertiaryLabelColor;
+            self.disclosure.contentMode=UIViewContentModeScaleAspectFit;
+            self.disclosure.frame=CGRectMake(0,0,12,16);
+        }
+        // A custom accessory uses the same absolute inset as switches/fold arrows.
+        self.accessoryView=self.disclosure;
+    } else if (self.accessoryView==self.disclosure) self.accessoryView=nil;
 }
 - (void)layoutSubviews {
     [super layoutSubviews];
     CGFloat inset=16;
-    self.surface.frame=CGRectInset(self.bounds,inset,0);
-    self.surface.layer.cornerRadius=self.cardCorners?16:0;
-    self.surface.layer.maskedCorners=self.cardCorners;
+    for (UIView *surface in @[self.surface,self.pressedSurface]) {
+        surface.frame=CGRectInset(self.bounds,inset,0);
+        surface.layer.cornerRadius=self.cardCorners?16:0;
+        surface.layer.maskedCorners=self.cardCorners;
+    }
     CGFloat trailing=inset;
     if (self.accessoryView) {
         CGRect accessory=self.accessoryView.frame;

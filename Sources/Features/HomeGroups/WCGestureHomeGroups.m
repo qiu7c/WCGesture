@@ -238,7 +238,8 @@ NSIndexPath *WCGestureHomeGroupsFind(id logic, NSString *user) {
     id logic=WCTweakSafeValue(self.controller,@"m_mainFrameLogicController");
     NSArray *entries=WCGestureHomeGroupsSection(logic,path.section);
     id session=path.row<(NSInteger)entries.count?entries[path.row][@"session"]:nil;
-    BOOL pinned=[WCTweakSafeValue(session,@"m_bIsTop") boolValue];
+    id nativeSession=WCTweakSafeValue(WCTweakSafeValue(cell,@"m_cellData"),@"m_sessionInfo");
+    BOOL pinned=[WCTweakSafeValue(nativeSession ?: session,@"m_bIsTop") boolValue];
     BOOL unified=[NSUserDefaults.standardUserDefaults boolForKey:WCGestureHomeGroupsUnifiedColorEnabledKey];
     id header=WCTweakSafeValue(self.controller,@"m_headerLogic");
     UIView *device=WCTweakSafeValue(header,@"m_webMMBtn");
@@ -266,10 +267,12 @@ NSIndexPath *WCGestureHomeGroupsFind(id logic, NSString *user) {
         if (!path) continue;
         NSArray *entries=WCGestureHomeGroupsSection(logic,path.section);
         id session=path.row<(NSInteger)entries.count?entries[path.row][@"session"]:nil;
-        if (![WCTweakSafeValue(session,@"m_bIsTop") boolValue]) continue;
+        id nativeSession=WCTweakSafeValue(WCTweakSafeValue(cell,@"m_cellData"),@"m_sessionInfo");
+        if (![WCTweakSafeValue(nativeSession ?: session,@"m_bIsTop") boolValue]) continue;
         // 8.0.79 NewMainFrameCell draws pinned fill using this native image,
         // so the cell's backgroundColor alone can misleadingly report white.
         UIImage *image=WCTweakSafeValue(cell,@"m_cellBkgImageWithTop");
+        if (!image) image=WCTweakSafeValue(WCTweakSafeValue(cell,@"m_backGroundViewOfCell"),@"image");
         if ([image isKindOfClass:UIImage.class] && image.CGImage && image!=self.nativePinnedImage) {
             self.nativePinnedImage=image;
             unsigned char pixel[4]={0};
@@ -277,6 +280,12 @@ NSIndexPath *WCGestureHomeGroupsFind(id logic, NSString *user) {
             CGContextRef context=CGBitmapContextCreate(pixel,1,1,8,4,space,kCGImageAlphaPremultipliedLast|kCGBitmapByteOrder32Big);
             CGColorSpaceRelease(space);
             if (context) {
+                id saved=[self.nativeBackgrounds objectForKey:cell];
+                UIColor *base=saved?(saved==NSNull.null?nil:saved):cell.backgroundColor;
+                if (!base || CGColorGetAlpha([base resolvedColorWithTraitCollection:self.traitCollection].CGColor)<0.99)
+                    base=UIColor.systemBackgroundColor;
+                CGContextSetFillColorWithColor(context,[base resolvedColorWithTraitCollection:self.traitCollection].CGColor);
+                CGContextFillRect(context,CGRectMake(0,0,1,1));
                 CGFloat w=CGImageGetWidth(image.CGImage),h=CGImageGetHeight(image.CGImage);
                 CGContextDrawImage(context,CGRectMake(0.5-w/2,0.5-h/2,w,h),image.CGImage);
                 CGContextRelease(context);
@@ -304,7 +313,11 @@ NSIndexPath *WCGestureHomeGroupsFind(id logic, NSString *user) {
     }
     // Use a gray placeholder, never the white table surface, until native fill
     // is available. Unified mode has its own white default (including old empty values).
-    if (!color) color=UIColor.systemGroupedBackgroundColor;
+    if (!color) color=[UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *traits) {
+        // Light fallback measured from the supplied native pinned-row screenshot.
+        return traits.userInterfaceStyle==UIUserInterfaceStyleDark?UIColor.systemGroupedBackgroundColor
+            :[UIColor colorWithWhite:239.0/255.0 alpha:1];
+    }];
     UIColor *target=unified?WCGestureColorForDefaultsKey(WCGestureHomeGroupsUnifiedColorKey,UIColor.whiteColor):color;
     if (![target isEqual:self.chromeColor]) [self restoreBackgrounds];
     self.chromeColor=target;self.backgroundColor=target;
