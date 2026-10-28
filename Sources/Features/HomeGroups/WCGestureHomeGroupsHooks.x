@@ -7,7 +7,7 @@
 }
 - (void)viewDidAppear:(BOOL)animated {
     %orig(animated);
-    WCGestureHomeGroupsAttach((UIViewController *)self);
+    WCGestureHomeGroupsDidAppear((UIViewController *)self);
 }
 - (void)viewDidLayoutSubviews {
     %orig;

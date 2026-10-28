@@ -2,6 +2,8 @@
 
 NSString *const WCGestureHomeSwipeEnabledKey = @"com.qiu7c.onewx.home.swipe.enabled";
 NSString *const WCGestureMultiSelectEnabledKey = @"com.qiu7c.onewx.chat.multi-select.enabled";
+NSString *const WCGestureHomeGroupsUnifiedColorEnabledKey = @"com.qiu7c.onewx.home.groups.unified-color.enabled";
+NSString *const WCGestureHomeGroupsUnifiedColorKey = @"com.qiu7c.onewx.home.groups.unified-color.color";
 NSString *const WCGestureHomeGroupsEnabledKey = @"com.qiu7c.onewx.home.groups.enabled";
 NSString *const WCGestureHomeGroupsListKey = @"com.qiu7c.onewx.home.groups.list";
 NSString *const WCGestureHomeGroupsSelectedKey = @"com.qiu7c.onewx.home.groups.selected";
@@ -405,6 +407,8 @@ void WCGestureRegisterDefaults(void) {
             WCGestureVirtualVideoRotationKey: @0,
             WCGestureHomeSwipeEnabledKey: @NO,
             WCGestureMultiSelectEnabledKey: @NO,
+            WCGestureHomeGroupsUnifiedColorEnabledKey: @NO,
+            WCGestureHomeGroupsUnifiedColorKey: @"",
             WCGestureHomeGroupsEnabledKey: @NO,
             WCGestureHomeGroupsListKey: @[@{@"id":@"builtin.friend",@"type":@"friend",@"title":@"好友"},@{@"id":@"builtin.group",@"type":@"group",@"title":@"群聊"},@{@"id":@"builtin.other",@"type":@"other",@"title":@"其他"},@{@"id":@"builtin.instant",@"type":@"instant",@"title":@"即时消息"}],
             WCGestureHomeGroupsSelectedKey: @"builtin.friend",

@@ -875,6 +875,8 @@ static NSDictionary<NSString *, NSString *> *WCConfigShareKeys(void) {
         WCGestureHomeGroupsSliderSizeKey,
         WCGestureHomeGroupsSliderRadiusKey,
         WCGestureHomeGroupsSliderAnimationKey,
+        WCGestureHomeGroupsUnifiedColorEnabledKey,
+        WCGestureHomeGroupsUnifiedColorKey,
         WCGestureHomeGroupsSliderColorKey,
         WCGestureHomeGroupsUnderlineKey,
         WCGestureHomeGroupsUnderlineLengthKey,
@@ -1521,16 +1523,15 @@ static NSString *WCRowDetailText(WCRow *row) {
 @implementation WCGestureDetailController
 
 - (instancetype)initWithCategory:(NSInteger)category {
-    self = [super initWithStyle:UITableViewStyleInsetGrouped];
+    self = [super initWithStyle:UITableViewStylePlain];
     if (self) {
-        _category = category;
+        _category = category == WCGestureCategoryDisabled ? WCGestureCategoryInterface : category;
         _openMenus = [NSMutableSet set];
-        switch (category) {
+        switch (_category) {
             case WCGestureCategoryChat: self.title = @"聊天类功能"; break;
             case WCGestureCategoryGestures: self.title = @"手势类功能"; break;
             case WCGestureCategoryMoments: self.title = @"朋友圈功能"; break;
             case WCGestureCategoryInterface: self.title = @"界面类功能"; break;
-            case WCGestureCategoryDisabled: self.title = @"禁用类功能"; break;
             case WCGestureCategoryEnhancements: self.title = @"增强类功能"; break;
             default: self.title = @"插件类配置"; break;
         }
@@ -1543,7 +1544,8 @@ static NSString *WCRowDetailText(WCRow *row) {
     [super viewDidLoad];
     WCGestureSettingsConfigureNavigation(self);
     if (@available(iOS 15.0, *)) self.tableView.sectionHeaderTopPadding = 0;
-    self.tableView.backgroundColor = [UIColor systemGroupedBackgroundColor];
+    self.tableView.backgroundColor = UIColor.secondarySystemGroupedBackgroundColor;
+    self.tableView.sectionHeaderHeight = 0; self.tableView.sectionFooterHeight = 0;
     self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
     self.tableView.rowHeight = UITableViewAutomaticDimension;
     self.tableView.estimatedRowHeight = 48;
@@ -1558,6 +1560,7 @@ static NSString *WCRowDetailText(WCRow *row) {
 + (NSArray<NSDictionary *> *)searchEntries {
     NSMutableArray *entries = [NSMutableArray array];
     for (NSInteger category = WCGestureCategoryChat; category < WCGestureCategoryCount; category++) {
+        if (category == WCGestureCategoryDisabled) continue;
         WCGestureDetailController *detail = [[self alloc] initWithCategory:category];
         detail.searchIndexMode = YES;
         [detail rebuildRows];
@@ -1689,6 +1692,11 @@ static NSString *WCRowDetailText(WCRow *row) {
             WCSwitchRow(@"忽略私聊语音", WCGestureVoiceTranscriptionIgnorePrivateKey),
             WCSwitchRow(@"忽略自己发送", WCGestureVoiceTranscriptionIgnoreSelfKey)]];
         [collapsible addObject:@YES]; [collapseKeys addObject:[prefix stringByAppendingString:@".chat.voice-transcription"]];
+        WCRow *menu = WCPlainRow(@"隐藏、排序与重命名", WCRowKindChatOption);
+        menu.chatOption = @{ @"title": menu.title, @"type": @"long-press-menu", @"key": @"" };
+        [sections addObject:@[WCSwitchRow(@"长按菜单管理", WCGestureLongPressMenuEnabledKey), menu]];
+        [collapsible addObject:@YES];
+        [collapseKeys addObject:[prefix stringByAppendingString:@".chat.long-press-menu"]];
     } else if (self.category == WCGestureCategoryGestures) {
         NSMutableArray *msg = [NSMutableArray array];
         [msg addObject:WCSwitchRow(@"消息手势", WCReplySwipeEnabledKey)];
@@ -1871,9 +1879,6 @@ static NSString *WCRowDetailText(WCRow *row) {
         corners.chatOption = @{ @"title":corners.title, @"type":@"corner-settings", @"key":@"" };
         [sections addObject:@[corners]]; [collapsible addObject:@NO];
         [collapseKeys addObject:[prefix stringByAppendingString:@".interface.corners"]];
-    } else if (self.category == WCGestureCategoryDisabled) {
-        [sections addObject:@[WCSwitchRow(@"去除广告", WCGestureAdBlockerEnabledKey)]];
-        [collapsible addObject:@NO]; [collapseKeys addObject:[prefix stringByAppendingString:@".interface.ad-blocker"]];
         [sections addObject:@[WCSwitchRow(@"隐藏群标题尾部", WCGestureHideGroupTitleTailKey)]];
         [collapsible addObject:@NO]; [collapseKeys addObject:[prefix stringByAppendingString:@".interface.group-title"]];
         [sections addObject:@[WCSwitchRow(@"隐藏截屏分享浮层", WCGestureHideScreenshotForwardKey)]];
@@ -1883,15 +1888,12 @@ static NSString *WCRowDetailText(WCRow *row) {
             WCSwitchRow(@"隐藏小店与卡包", WCGestureHideMeCardsKey),
             WCSwitchRow(@"隐藏表情入口", WCGestureHideMeEmoticonsKey)]];
         [collapsible addObject:@YES]; [collapseKeys addObject:[prefix stringByAppendingString:@".interface.me-menu"]];
-        WCRow *menu = WCPlainRow(@"隐藏、排序与重命名", WCRowKindChatOption);
-        menu.chatOption = @{ @"title": menu.title, @"type": @"long-press-menu", @"key": @"" };
-        [sections addObject:@[WCSwitchRow(@"长按菜单管理", WCGestureLongPressMenuEnabledKey), menu]];
-        [collapsible addObject:@YES];
-        [collapseKeys addObject:[prefix stringByAppendingString:@".chat.long-press-menu"]];
         [sections addObject:@[WCSwitchRow(@"去除所有分割线", WCHideSeparatorLinesKey)]];
         [collapsible addObject:@NO];
         [collapseKeys addObject:[prefix stringByAppendingString:@".enhance.separators"]];
     } else if (self.category == WCGestureCategoryEnhancements) {
+        [sections addObject:@[WCSwitchRow(@"去除广告", WCGestureAdBlockerEnabledKey)]];
+        [collapsible addObject:@NO]; [collapseKeys addObject:[prefix stringByAppendingString:@".interface.ad-blocker"]];
         WCRow *avatars = WCPlainRow(@"设置替换头像", WCRowKindChatOption);
         avatars.chatOption = @{@"title":avatars.title,@"type":@"custom-avatar",@"key":@""};
         [sections addObject:@[WCSwitchRow(@"替换头像",WCGestureCustomAvatarEnabledKey),avatars]];
@@ -2016,6 +2018,8 @@ static NSString *WCRowDetailText(WCRow *row) {
 
 #pragma mark - Table view
 
+- (CGFloat)tableView:(UITableView *)table heightForHeaderInSection:(NSInteger)section { return 0; }
+- (CGFloat)tableView:(UITableView *)table heightForFooterInSection:(NSInteger)section { return 0; }
 - (NSInteger)numberOfSectionsInTableView:(__unused UITableView *)tableView {
     return self.sections.count;
 }

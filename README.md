@@ -24,7 +24,7 @@ One Wx is a WeChat enhancement plugin that grew out of WCGesture (originally ext
 
 ## Features
 
-The home page has seven categories: 聊天类功能 / 手势类功能 / 朋友圈功能 / 界面类功能 / 禁用类功能 / 增强类功能 / 插件类配置.
+The home page has six categories: 聊天类功能 / 手势类功能 / 朋友圈功能 / 界面类功能 / 增强类功能 / 插件类配置. Hidden-entry and cleanup options are under 界面类, menu management under 聊天类, and ad filtering under 增强类.
 The search bar lists first-level feature entries only, including disabled features, and opens their group without enabling them. Nested settings stay inside their feature pages.
 
 **聊天工具 (Chat tools)**:
@@ -109,7 +109,7 @@ The search bar lists first-level feature entries only, including disabled featur
 
 ## Ad cleanup (device validation pending)
 
-“禁用类功能 → 广告精简” is off by default. It covers the ported Moments ad-list, public-account ad insertion/push, mini-app splash and known ad-resource URL paths. Private signatures are adapted to 8.0.79. Following a reported Moments crash, native ad-update inputs and model metadata are preserved; list reads return separate mutable empty lists when enabled. The crash fix still needs device verification. This does not establish complete coverage of video-channel ads; refresh/reopen affected pages when testing.
+“增强类功能 → 去除广告” is off by default. It covers the ported Moments ad-list, public-account ad insertion/push, mini-app splash and known ad-resource URL paths. Private signatures are adapted to 8.0.79. Following a reported Moments crash, native ad-update inputs and model metadata are preserved; list reads return separate mutable empty lists when enabled. The crash fix still needs device verification. This does not establish complete coverage of video-channel ads; refresh/reopen affected pages when testing.
 
 ## Code layout
 
@@ -260,4 +260,4 @@ Home-group member and custom-avatar pickers use native avatars in inset cards, w
 
 When custom avatars are enabled, friend/group information cards include a direct avatar-change action with restore support. It shares the avatar manager’s picker and storage, and refreshes the card after saving or restoring. Official accounts are excluded.
 
-The homepage group strip removes its extra vertical gap and shares the native logged-in-device banner background with pinned-session surfaces. Native controls and actions remain in place; disabling groups restores managed backgrounds. Light/dark appearance and cell reuse are handled, with device verification pending.
+The homepage group strip removes its extra vertical gap and follows the native device-banner/pinned-session background by default. Native surfaces keep their original colors. 主页分组 → 分组外观 → 统一改色 optionally applies a chosen background to the strip, pinned sessions and device banner together; it defaults off and restores native backgrounds when disabled. Device verification remains pending.

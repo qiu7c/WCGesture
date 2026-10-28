@@ -200,6 +200,7 @@ NSIndexPath *WCGestureHomeGroupsFind(id logic, NSString *user) {
 @property (nonatomic) UIViewAutoresizing originalMask;
 @property (nonatomic, strong) NSMutableArray<UIView *> *badges;
 @property (nonatomic) BOOL nativeBadgeMode;
+@property (nonatomic) BOOL initialPresentationFinished;
 @property (nonatomic, strong) NSMapTable<UIView *, id> *nativeBackgrounds;
 @property (nonatomic, strong) UIColor *chromeColor;
 - (void)update;
@@ -235,11 +236,12 @@ NSIndexPath *WCGestureHomeGroupsFind(id logic, NSString *user) {
     NSArray *entries=WCGestureHomeGroupsSection(logic,path.section);
     id session=path.row<(NSInteger)entries.count?entries[path.row][@"session"]:nil;
     BOOL pinned=[WCTweakSafeValue(session,@"m_bIsTop") boolValue];
+    BOOL unified=[NSUserDefaults.standardUserDefaults boolForKey:WCGestureHomeGroupsUnifiedColorEnabledKey];
     id header=WCTweakSafeValue(self.controller,@"m_headerLogic");
     UIView *device=WCTweakSafeValue(header,@"m_webMMBtn");
     BOOL deviceRow=device && [device isDescendantOfView:cell];
-    for (UIView *view in @[cell,cell.contentView]) {
-        if (pinned || deviceRow) [self setChromeBackground:view];
+    for (UIView *view in @[cell,cell.contentView,cell.backgroundView ?: cell]) {
+        if (unified && (pinned || deviceRow)) [self setChromeBackground:view];
         else {
             id color=[self.nativeBackgrounds objectForKey:view];
             if (color) {
@@ -250,6 +252,8 @@ NSIndexPath *WCGestureHomeGroupsFind(id logic, NSString *user) {
     }
 }
 - (void)updateBackground {
+    BOOL unified=[NSUserDefaults.standardUserDefaults boolForKey:WCGestureHomeGroupsUnifiedColorEnabledKey];
+    if (!unified) [self restoreBackgrounds];
     id header=WCTweakSafeValue(self.controller,@"m_headerLogic");
     UIView *device=WCTweakSafeValue(header,@"m_webMMBtn");
     UIColor *color=nil;
@@ -258,9 +262,29 @@ NSIndexPath *WCGestureHomeGroupsFind(id logic, NSString *user) {
         UIColor *candidate=native?(native==NSNull.null?nil:native):view.backgroundColor;
         if (candidate && CGColorGetAlpha([candidate resolvedColorWithTraitCollection:self.traitCollection].CGColor)>0.99) { color=candidate;break; }
     }
+    // Without a device banner, match an actual pinned row before falling back
+    // to the table's color. Read native colors; only the opt-in path writes them.
+    if (!color) {
+        id logic=WCTweakSafeValue(self.controller,@"m_mainFrameLogicController");
+        for (UITableViewCell *cell in self.table.visibleCells) {
+            NSIndexPath *path=[self.table indexPathForCell:cell];
+            if (!path) continue;
+            NSArray *entries=WCGestureHomeGroupsSection(logic,path.section);
+            id session=path.row<(NSInteger)entries.count?entries[path.row][@"session"]:nil;
+            if (![WCTweakSafeValue(session,@"m_bIsTop") boolValue]) continue;
+            for (UIView *view in @[cell.backgroundView ?: cell,cell.contentView,cell]) {
+                id native=[self.nativeBackgrounds objectForKey:view];
+                UIColor *candidate=native?(native==NSNull.null?nil:native):view.backgroundColor;
+                if (candidate && CGColorGetAlpha([candidate resolvedColorWithTraitCollection:self.traitCollection].CGColor)>0.99) { color=candidate;break; }
+            }
+            if (color) break;
+        }
+    }
     if (!color) color=self.table.backgroundColor ?: UIColor.systemGroupedBackgroundColor;
-    self.chromeColor=color;self.backgroundColor=color;
-    [self setChromeBackground:self.originalHeader];
+    UIColor *target=unified?WCGestureColorForDefaultsKey(WCGestureHomeGroupsUnifiedColorKey,color):color;
+    if (![target isEqual:self.chromeColor]) [self restoreBackgrounds];
+    self.chromeColor=target;self.backgroundColor=target;
+    if (!unified) return;
     [self setChromeBackground:device];
     UIView *fold=WCTweakSafeValue(self.controller,@"topSessionFoldView");
     [self setChromeBackground:fold];
@@ -421,7 +445,10 @@ void WCGestureHomeGroupsAttach(UIViewController *controller) {
         [table.panGestureRecognizer requireGestureRecognizerToFail:banner.left];[table.panGestureRecognizer requireGestureRecognizerToFail:banner.right];
         objc_setAssociatedObject(controller,&WCGroupBannerKey,banner,OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
-    if (table.tableHeaderView!=banner) {
+    CGPoint previousOffset=table.contentOffset;
+    CGFloat previousInset=table.adjustedContentInset.top;
+    BOOL replacesHeader=table.tableHeaderView!=banner;
+    if (replacesHeader) {
         UIView *nativeHeader=table.tableHeaderView;
         // Detach through UITableView first; otherwise its setter would remove
         // the old header after it had already become a child of our wrapper.
@@ -433,7 +460,31 @@ void WCGestureHomeGroupsAttach(UIViewController *controller) {
     }
     [banner updateBackground];
     CGFloat oldHeight=banner.bounds.size.height;[banner update];
-    if (table.tableHeaderView!=banner || oldHeight!=banner.bounds.size.height) table.tableHeaderView=banner;
+    if (table.tableHeaderView!=banner || oldHeight!=banner.bounds.size.height) {
+        table.tableHeaderView=banner;
+        // UIKit can preserve the first row by shifting past our added header.
+        // Preserve the viewport's distance from the adjusted top instead.
+        if (!table.tracking && !table.dragging && !table.decelerating) {
+            CGPoint offset=CGPointMake(previousOffset.x,previousOffset.y+previousInset-table.adjustedContentInset.top);
+            if (!CGPointEqualToPoint(table.contentOffset,offset)) [table setContentOffset:offset animated:NO];
+        }
+    }
+}
+void WCGestureHomeGroupsDidAppear(UIViewController *controller) {
+    WCGestureHomeGroupsAttach(controller);
+    WCHomeGroupBanner *banner=objc_getAssociatedObject(controller,&WCGroupBannerKey);
+    if (!WCGestureHomeGroupsEnabled() || !banner || banner.initialPresentationFinished) return;
+    banner.initialPresentationFinished=YES;
+    // One initial correction after the native appearance/layout work, never on
+    // ordinary returns to the homepage or while the user is scrolling.
+    dispatch_async(dispatch_get_main_queue(),^{
+        UITableView *table=banner.table;
+        if (!WCGestureHomeGroupsEnabled() || !controller.view.window || table.tableHeaderView!=banner
+            || table.tracking || table.dragging || table.decelerating) return;
+        CGFloat groupTop=CGRectGetMinY(banner.stack.frame)-table.adjustedContentInset.top;
+        if (table.contentOffset.y>groupTop)
+            [table setContentOffset:CGPointMake(table.contentOffset.x,groupTop) animated:NO];
+    });
 }
 void WCGestureHomeGroupsStyleCell(UIViewController *controller, UITableViewCell *cell, NSIndexPath *path) {
     WCHomeGroupBanner *banner=objc_getAssociatedObject(controller,&WCGroupBannerKey);

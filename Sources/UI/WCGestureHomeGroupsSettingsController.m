@@ -80,7 +80,9 @@
     [super viewDidLoad];self.title=@"主页分组";WCGestureSettingsConfigureNavigation(self);
     self.navigationItem.rightBarButtonItem=self.editButtonItem;
     self.openSections=[NSMutableIndexSet indexSet];
-    self.tableView.backgroundColor=UIColor.systemGroupedBackgroundColor;
+    self.tableView.backgroundColor=UIColor.secondarySystemGroupedBackgroundColor;
+    self.tableView.sectionHeaderHeight=0;self.tableView.sectionFooterHeight=0;
+    self.tableView.separatorStyle=UITableViewCellSeparatorStyleNone;
     self.tableView.rowHeight=50*WCGestureSettingsScaleFactor();
     // Each number row contains its actual storage key and allowed UI range.
     self.rows=@[
@@ -94,7 +96,9 @@
         @{@"title":@"横滑震感",@"key":WCGestureHomeGroupsHapticKey,@"type":@"switch"},
         @{@"title":@"按钮震感",@"key":WCGestureHomeGroupsButtonHapticKey,@"type":@"switch"},
         @{@"title":@"两侧手势范围",@"key":WCGestureHomeGroupsGestureRatioKey,@"type":@"number",@"min":@0.02,@"max":@1}],
-      @[@{@"title":@"字号",@"key":WCGestureHomeGroupsFontSizeKey,@"type":@"number",@"min":@10,@"max":@24},
+      @[@{@"title":@"统一改色",@"key":WCGestureHomeGroupsUnifiedColorEnabledKey,@"type":@"switch"},
+        @{@"title":@"统一背景颜色",@"key":WCGestureHomeGroupsUnifiedColorKey,@"type":@"color"},
+        @{@"title":@"字号",@"key":WCGestureHomeGroupsFontSizeKey,@"type":@"number",@"min":@10,@"max":@24},
         @{@"title":@"字重",@"key":WCGestureHomeGroupsFontWeightKey,@"type":@"number",@"min":@100,@"max":@900},
         @{@"title":@"选中滑块",@"key":WCGestureHomeGroupsSliderKey,@"type":@"switch"},
         @{@"title":@"滑块大小 (%)",@"key":WCGestureHomeGroupsSliderSizeKey,@"type":@"number",@"min":@0,@"max":@100},
@@ -115,6 +119,8 @@
         @{@"title":@"角标文字",@"key":WCGestureHomeGroupsBadgeTextColorKey,@"type":@"color"}]];
 }
 - (void)viewWillAppear:(BOOL)animated { [super viewWillAppear:animated];[self.openSections removeAllIndexes];[self.tableView reloadData]; }
+- (CGFloat)tableView:(UITableView *)table heightForHeaderInSection:(NSInteger)section { return 0; }
+- (CGFloat)tableView:(UITableView *)table heightForFooterInSection:(NSInteger)section { return 0; }
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)table { return self.rows.count; }
 - (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section { if (section==0) return 1;
     if (![self.openSections containsIndex:section]) return 1;
@@ -217,6 +223,6 @@
 }
 @end
 
-UIViewController *WCGestureCreateHomeGroupsSettingsController(void) { WCHomeGroupsSettings *controller=[[WCHomeGroupsSettings alloc] initWithStyle:UITableViewStyleInsetGrouped];controller.hidesBottomBarWhenPushed=YES;return controller; }
+UIViewController *WCGestureCreateHomeGroupsSettingsController(void) { WCHomeGroupsSettings *controller=[[WCHomeGroupsSettings alloc] initWithStyle:UITableViewStylePlain];controller.hidesBottomBarWhenPushed=YES;return controller; }
 
 UIViewController *WCGestureCreateHomeGroupsPendingController(void) { WCHomeGroupMembers *picker=[[WCHomeGroupMembers alloc] initWithStyle:UITableViewStyleInsetGrouped];picker.instant=YES;picker.hidesBottomBarWhenPushed=YES;picker.selected=[NSMutableSet setWithArray:WCGestureHomeGroupsPendingNames()];return picker; }

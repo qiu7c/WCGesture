@@ -8,10 +8,11 @@
 static NSDictionary *WCCornerSwitch(NSString *title, NSString *key) { return @{@"title":title,@"key":key,@"switch":@YES}; }
 static NSDictionary *WCCornerNumber(NSString *title, NSString *key, double maximum) { return @{@"title":title,@"key":key,@"maximum":@(maximum)}; }
 @implementation WCCornerSettingsController
-- (instancetype)init { return [super initWithStyle:UITableViewStyleInsetGrouped]; }
+- (instancetype)init { return [super initWithStyle:UITableViewStylePlain]; }
 - (void)viewDidLoad {
     [super viewDidLoad]; self.title = @"圆角设置"; WCGestureSettingsConfigureNavigation(self);
-    self.tableView.backgroundColor = UIColor.systemGroupedBackgroundColor; self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
+    self.tableView.sectionHeaderHeight = 0; self.tableView.sectionFooterHeight = 0;
+    self.tableView.backgroundColor = UIColor.secondarySystemGroupedBackgroundColor; self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
     self.sections = @[
         @[WCCornerSwitch(@"全局头像圆角",WCGestureGlobalAvatarRoundingEnabledKey),WCCornerNumber(@"头像圆角程度 (%)",WCGestureGlobalAvatarCornerPercentKey,100),@{@"title":@"整页头像预览与调节",@"previewKind":@(WCGesturePreviewAvatarRounding)}],
         @[WCCornerSwitch(@"聊天输入栏圆角",WCGestureChatInputRoundingEnabledKey),WCCornerSwitch(@"输入框内部圆角",WCGestureChatInputInnerRoundingKey),WCCornerNumber(@"内部圆角程度",WCGestureChatInputInnerRadiusKey,40),WCCornerSwitch(@"外部工具栏圆角",WCGestureChatInputOuterRoundingKey),WCCornerNumber(@"外部圆角程度",WCGestureChatInputOuterRadiusKey,40),@{@"title":@"整页圆角预览与调节",@"previewKind":@(WCGesturePreviewInputRounding)}],
@@ -32,6 +33,8 @@ static NSDictionary *WCCornerNumber(NSString *title, NSString *key, double maxim
     for (UITableViewCell *cell in self.tableView.visibleCells) if (((UISlider *)[cell.contentView viewWithTag:9550]).isTracking) return;
     [self.tableView reloadData];
 }
+- (CGFloat)tableView:(UITableView *)table heightForHeaderInSection:(NSInteger)section { return 0; }
+- (CGFloat)tableView:(UITableView *)table heightForFooterInSection:(NSInteger)section { return 0; }
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView { return self.sections.count; }
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section { return [self.collapsed containsIndex:section] ? 1 : self.sections[section].count; }
 - (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)path { return self.sections[path.section][path.row][@"maximum"] ? 84 : 50; }

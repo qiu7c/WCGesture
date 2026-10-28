@@ -7,7 +7,7 @@ typedef NS_ENUM(NSInteger, WCGestureCategory) {
     WCGestureCategoryGestures,
     WCGestureCategoryMoments,
     WCGestureCategoryInterface,
-    WCGestureCategoryDisabled,
+    WCGestureCategoryDisabled, // Retired identifier; maps to Interface for compatibility.
     WCGestureCategoryPlugin,
     WCGestureCategoryEnhancements,
     WCGestureCategoryCount,
@@ -37,7 +37,7 @@ NSArray<NSDictionary *> *WCGestureChatOptions(BOOL antiRevoke, BOOL includeHidde
 NSString *WCGestureChatOptionDetail(NSDictionary *option);
 void WCGestureEditChatOption(UIViewController *presenter, NSDictionary *option);
 
-/// Searchable home with seven feature categories.
+/// Searchable home with six feature categories.
 /// Used by all entry locations; plugin managers instantiate it by class name.
 @interface WCGestureSettingsController : UITableViewController
 @end

@@ -14,6 +14,7 @@ NSIndexPath *WCGestureHomeGroupsNativePath(id logic, NSIndexPath *path);
 NSIndexPath *WCGestureHomeGroupsFind(id logic, NSString *user);
 void WCGestureHomeGroupsInvalidate(id logic);
 void WCGestureHomeGroupsAttach(UIViewController *controller);
+void WCGestureHomeGroupsDidAppear(UIViewController *controller);
 void WCGestureHomeGroupsSettingsChanged(NSString *key);
 void WCGestureHomeGroupsMessageAdded(id target, id wrap, BOOL localMessage);
 void WCGestureHomeGroupsChatEntered(id controller);

@@ -11,6 +11,7 @@
     self.tableView.rowHeight=UITableViewAutomaticDimension;self.tableView.estimatedRowHeight=64;
     self.tableView.allowsSelection=NO;
     self.updates=@[
+        @"首页精简为六类，分类设置改为连续列表，减少卡片分隔。",
         @"新增主页分组，支持自定义分组、成员管理和横滑切换。",
         @"新增主页右滑扩展，支持备注、朋友圈、勿扰和置顶等操作。",
         @"新增图片编辑圆形、箭头工具，支持颜色和线宽调节。",
@@ -18,8 +19,8 @@
         @"新增虚拟视频、文字贴纸，扩展钱包金额和聊天记录卡片的本机显示修改。",
         @"扩展多选上限与广告过滤。",
         @"优化分组和头像选择列表，好友、群聊分开展示。",
-        @"设置页标题加粗，菜单默认收起；统一主页分组、设备横幅和置顶区域背景。",
-        @"修复分组角标显示异常及置顶会话短暂出现在其他分组的问题。"];
+        @"设置页标题加粗，菜单默认收起；分组栏默认跟随微信原色，支持开启统一改色。",
+        @"修复分组角标、置顶闪现及启动时分组栏被自动滚动隐藏的问题。"];
 }
 - (NSString *)tableView:(UITableView *)table titleForHeaderInSection:(NSInteger)section { return @"1.0.0 · 2026-10-28"; }
 - (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section { return self.updates.count; }

@@ -3,7 +3,7 @@
 // Keep stored category identifiers stable; enhancements precede plugin config visually.
 static NSArray<NSNumber *> *WCHomeCategoryOrder(void) {
     return @[@(WCGestureCategoryChat), @(WCGestureCategoryGestures), @(WCGestureCategoryMoments),
-        @(WCGestureCategoryInterface), @(WCGestureCategoryDisabled), @(WCGestureCategoryEnhancements), @(WCGestureCategoryPlugin)];
+        @(WCGestureCategoryInterface), @(WCGestureCategoryEnhancements), @(WCGestureCategoryPlugin)];
 }
 
 @interface WCSettingsHomeCard : UITableViewCell
@@ -145,7 +145,7 @@ static NSArray<NSNumber *> *WCHomeCategoryOrder(void) {
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     WCSettingsHomeCard *cell = [tableView dequeueReusableCellWithIdentifier:@"OneWxHome"];
     if (!cell) cell = [[WCSettingsHomeCard alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:@"OneWxHome"];
-    NSArray *titles = @[@"聊天类功能", @"手势类功能", @"朋友圈功能", @"界面类功能", @"禁用类功能", @"插件类配置", @"增强类功能"];
+    NSArray *titles = @[@"聊天类功能", @"手势类功能", @"朋友圈功能", @"界面类功能", @"", @"插件类配置", @"增强类功能"];
     NSArray *symbols = @[@"bubble.left.and.bubble.right", @"hand.tap", @"heart", @"rectangle.3.offgrid", @"nosign", @"gearshape", @"sparkles"];
     NSArray *colors = @[UIColor.systemBlueColor, UIColor.systemGreenColor, UIColor.systemPinkColor, UIColor.systemPurpleColor, UIColor.systemRedColor, UIColor.systemOrangeColor, UIColor.systemTealColor];
     NSInteger category = self.isSearching ? [self.results[indexPath.row][@"category"] integerValue] : [WCHomeCategoryOrder()[indexPath.section] integerValue];

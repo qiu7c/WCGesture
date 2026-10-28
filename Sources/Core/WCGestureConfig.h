@@ -492,4 +492,7 @@ FOUNDATION_EXPORT NSString *const WCGestureHomeGroupsBadgeTextColorKey;
 
 FOUNDATION_EXPORT NSString *const WCGestureHomeGroupsButtonHapticKey;
 
+FOUNDATION_EXPORT NSString *const WCGestureHomeGroupsUnifiedColorEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureHomeGroupsUnifiedColorKey;
+
 NS_ASSUME_NONNULL_END
