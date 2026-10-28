@@ -29,8 +29,10 @@
     if ((type == 1 || WCGestureSendConfirmationIsAppEmoticon(wrap)) &&
         WCGestureSendConfirmationHoldMessage(target, wrap, ^{
         %orig(target, wrap);
+        WCGestureHomeGroupsMessageAdded(target,wrap,NO);
     })) return;
     %orig(target, wrap);
+    WCGestureHomeGroupsMessageAdded(target,wrap,NO);
 }
 - (void)AddEmoticonMsg:(NSString *)target MsgWrap:(id)wrap {
     if (WCGestureSendConfirmationHoldMessage(target, wrap, ^{

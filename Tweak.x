@@ -72,6 +72,11 @@
                 WCGestureChatMediaSettingsChanged(note.object);
                 WCGestureChatSortSettingsChanged(note.object);
                 WCGestureWalletDisplaySettingsChanged(note.object);
+                WCGestureCustomAvatarSettingsChanged(note.object);
+                WCGestureImageAnnotationSettingsChanged(note.object);
+                WCGestureVirtualVideoSettingsChanged(note.object);
+                WCGestureHomeGroupsSettingsChanged(note.object);
+                WCGestureAdBlockerSettingsChanged(note.object);
                 WCGestureInputVoiceSettingsChanged();
                 WCGestureChatInputRoundingSettingsChanged(note.object);
                 WCGestureRefreshTrackedGlobalAvatarViews();

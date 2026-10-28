@@ -94,6 +94,7 @@ static void WCPresentTriggerDistanceEditor(__unused UIViewController *presenter)
 static void WCPresentKeyboardNumberEditor(__unused UIViewController *presenter,
                                          NSString *title, NSString *defaultsKey) {
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    BOOL isAnnotationWidth = [defaultsKey isEqualToString:WCGestureImageAnnotationWidthKey];
     BOOL isWidth = [defaultsKey isEqualToString:WCKeyboardStripWidthKey]
         || [defaultsKey isEqualToString:WCKeyboardStripWidthKeyThirdParty];
     BOOL isOffset = [defaultsKey isEqualToString:WCKeyboardStripOffsetXKey]
@@ -121,8 +122,11 @@ static void WCPresentKeyboardNumberEditor(__unused UIViewController *presenter,
     if (isAvatarCorner) { minValue = 0; maxValue = 100; }
     if (isTimeSize) { minValue = 8.0; maxValue = 18.0; }
     if (isRounding || isMomentsCorner) { minValue = 0.0; maxValue = 40.0; }
+    if (isAnnotationWidth) { minValue = 1; maxValue = 16; }
     NSString *placeholder;
-    if (isFeedButton) {
+    if (isAnnotationWidth) {
+        placeholder = @"1 - 16（默认 4）";
+    } else if (isFeedButton) {
         placeholder = @"60 - 180（默认 100）";
     } else if (isFeedSpacing) {
         placeholder = @"0 - 48（默认 8）";
@@ -844,6 +848,50 @@ static NSDictionary<NSString *, NSString *> *WCConfigShareKeys(void) {
         WCGesturePageScaleEnabledKey,
         WCGestureGlobalAvatarRoundingEnabledKey,
         WCGestureGlobalAvatarCornerPercentKey,
+        WCGestureRecordCardEditEnabledKey,
+        WCGestureImageAnnotationEnabledKey,
+        WCGestureImageAnnotationWidthKey,
+        WCGestureImageAnnotationOvalColorKey,
+        WCGestureImageAnnotationArrowColorKey,
+        WCGestureVirtualVideoEnabledKey,
+        WCGestureVirtualVideoAudioKey,
+        WCGestureVirtualVideoMixMicKey,
+        WCGestureVirtualVideoMirrorKey,
+        WCGestureVirtualVideoRotationKey,
+        WCGestureHomeSwipeEnabledKey,
+        WCGestureMultiSelectEnabledKey,
+        WCGestureHomeGroupsEnabledKey,
+        WCGestureHomeGroupsListKey,
+        WCGestureHomeGroupsSelectedKey,
+        WCGestureHomeGroupsBurnAfterReadingKey,
+        WCGestureHomeGroupsPinnedPersistentKey,
+        WCGestureHomeGroupsGestureKey,
+        WCGestureHomeGroupsContinuousKey,
+        WCGestureHomeGroupsReverseKey,
+        WCGestureHomeGroupsHapticKey,
+        WCGestureHomeGroupsButtonHapticKey,
+        WCGestureHomeGroupsGestureRatioKey,
+        WCGestureHomeGroupsSliderKey,
+        WCGestureHomeGroupsSliderSizeKey,
+        WCGestureHomeGroupsSliderRadiusKey,
+        WCGestureHomeGroupsSliderAnimationKey,
+        WCGestureHomeGroupsSliderColorKey,
+        WCGestureHomeGroupsUnderlineKey,
+        WCGestureHomeGroupsUnderlineLengthKey,
+        WCGestureHomeGroupsUnderlineThicknessKey,
+        WCGestureHomeGroupsUnderlineOffsetKey,
+        WCGestureHomeGroupsUnderlineColorKey,
+        WCGestureHomeGroupsFontSizeKey,
+        WCGestureHomeGroupsFontWeightKey,
+        WCGestureHomeGroupsHideBadgesKey,
+        WCGestureHomeGroupsHideRedDotsKey,
+        WCGestureHomeGroupsNativeBadgeKey,
+        WCGestureHomeGroupsBadgeXKey,
+        WCGestureHomeGroupsBadgeYKey,
+        WCGestureHomeGroupsBadgeColorKey,
+        WCGestureHomeGroupsBadgeTextColorKey,
+
+        WCGestureCustomAvatarEnabledKey,
         WCGestureTextEditEnabledKey,
         WCGestureTimeEditEnabledKey,
         WCGestureTransferDisplayEditEnabledKey,
@@ -851,6 +899,8 @@ static NSDictionary<NSString *, NSString *> *WCConfigShareKeys(void) {
         WCGestureChatSortEnabledKey,
         WCGestureWalletDisplayEnabledKey,
         WCGestureWalletDisplayFenKey,
+        WCGestureWalletLQTFenKey,
+        WCGestureWalletMerchantFenKey,
         WCInputLongPressActionKey,
         WCGestureChatInputRoundingEnabledKey,
         WCGestureChatInputInnerRoundingKey,
@@ -1579,6 +1629,7 @@ static NSString *WCRowDetailText(WCRow *row) {
         }
         [sections addObject:@[WCPlainRow(@"本地聊天编辑", WCRowKindSectionTitle),
             WCSwitchRow(@"文字修改", WCGestureTextEditEnabledKey),
+            WCSwitchRow(@"记录卡片修改", WCGestureRecordCardEditEnabledKey),
             WCSwitchRow(@"时间标签修改", WCGestureTimeEditEnabledKey),
             WCSwitchRow(@"聊天媒体替换", WCGestureChatMediaReplacementEnabledKey),
             WCSwitchRow(@"当前聊天排序", WCGestureChatSortEnabledKey),
@@ -1587,6 +1638,8 @@ static NSString *WCRowDetailText(WCRow *row) {
         [sections addObject:@[WCSwitchRow(@"通知直达聊天", WCGestureNotificationDirectChatEnabledKey)]];
         [collapsible addObject:@NO];
         [collapseKeys addObject:[prefix stringByAppendingString:@".chat.notification-direct-chat"]];
+        [sections addObject:@[WCSwitchRow(@"突破多选限制", WCGestureMultiSelectEnabledKey)]];
+        [collapsible addObject:@NO]; [collapseKeys addObject:[prefix stringByAppendingString:@".chat.multi-select"]];
         [sections addObject:@[WCSwitchRow(@"语音转发", WCGestureVoiceForwardEnabledKey)]];
         [collapsible addObject:@NO];
         [collapseKeys addObject:[prefix stringByAppendingString:@".chat.voice-forward"]];
@@ -1604,6 +1657,12 @@ static NSString *WCRowDetailText(WCRow *row) {
             WCNumberRow(@"临时放行时长", WCGestureSendConfirmationPauseSecondsKey),
             WCSwitchRow(@"资料页快捷开关", WCGestureSendConfirmationProfileSwitchEnabledKey)]];
         [collapsible addObject:@YES]; [collapseKeys addObject:[prefix stringByAppendingString:@".chat.send-confirmation"]];
+        WCRow *ovalColor = WCPlainRow(@"圆圈颜色", WCRowKindChatOption);
+        ovalColor.chatOption = @{@"title":ovalColor.title,@"type":@"color",@"key":WCGestureImageAnnotationOvalColorKey};
+        WCRow *arrowColor = WCPlainRow(@"箭头颜色", WCRowKindChatOption);
+        arrowColor.chatOption = @{@"title":arrowColor.title,@"type":@"color",@"key":WCGestureImageAnnotationArrowColorKey};
+        [sections addObject:@[WCSwitchRow(@"图片编辑增强",WCGestureImageAnnotationEnabledKey),WCNumberRow(@"线宽",WCGestureImageAnnotationWidthKey),ovalColor,arrowColor]];
+        [collapsible addObject:@YES];[collapseKeys addObject:[prefix stringByAppendingString:@".chat.image-annotation"]];
         [sections addObject:@[WCSwitchRow(@"图片编辑快捷发送", WCGestureImageEditQuickSendEnabledKey)]];
         [collapsible addObject:@NO]; [collapseKeys addObject:[prefix stringByAppendingString:@".chat.image-edit-quick-send"]];
         [sections addObject:@[WCPlainRow(@"视频通话增强", WCRowKindVideoCallSettings)]];
@@ -1765,6 +1824,12 @@ static NSString *WCRowDetailText(WCRow *row) {
         [collapsible addObject:@YES]; [collapseKeys addObject:[prefix stringByAppendingString:@".moments.interaction-reminder"]];
 
     } else if (self.category == WCGestureCategoryInterface) {
+        WCRow *homeGroups = WCPlainRow(@"主页分组", WCRowKindChatOption);
+        homeGroups.chatOption = @{@"title":homeGroups.title,@"type":@"home-groups",@"key":@""};
+        [sections addObject:@[homeGroups]]; [collapsible addObject:@NO];
+        [collapseKeys addObject:[prefix stringByAppendingString:@".interface.home-groups"]];
+        [sections addObject:@[WCSwitchRow(@"主页右滑扩展",WCGestureHomeSwipeEnabledKey)]]; [collapsible addObject:@NO];
+        [collapseKeys addObject:[prefix stringByAppendingString:@".interface.home-swipe"]];
         NSMutableArray *enhance = [NSMutableArray array];
         [enhance addObject:WCSwitchRow(@"界面大小", WCGesturePageScaleEnabledKey)];
         [enhance addObject:WCNumberRow(@"界面比例 (%)", WCGesturePageScalePercentKey)];
@@ -1796,7 +1861,7 @@ static NSString *WCRowDetailText(WCRow *row) {
         [sections addObject:@[corners]]; [collapsible addObject:@NO];
         [collapseKeys addObject:[prefix stringByAppendingString:@".interface.corners"]];
     } else if (self.category == WCGestureCategoryDisabled) {
-        [sections addObject:@[WCSwitchRow(@"广告精简", WCGestureAdBlockerEnabledKey)]];
+        [sections addObject:@[WCSwitchRow(@"去除广告", WCGestureAdBlockerEnabledKey)]];
         [collapsible addObject:@NO]; [collapseKeys addObject:[prefix stringByAppendingString:@".interface.ad-blocker"]];
         [sections addObject:@[WCSwitchRow(@"隐藏群标题尾部", WCGestureHideGroupTitleTailKey)]];
         [collapsible addObject:@NO]; [collapseKeys addObject:[prefix stringByAppendingString:@".interface.group-title"]];
@@ -1816,6 +1881,10 @@ static NSString *WCRowDetailText(WCRow *row) {
         [collapsible addObject:@NO];
         [collapseKeys addObject:[prefix stringByAppendingString:@".enhance.separators"]];
     } else if (self.category == WCGestureCategoryEnhancements) {
+        WCRow *avatars = WCPlainRow(@"设置替换头像", WCRowKindChatOption);
+        avatars.chatOption = @{@"title":avatars.title,@"type":@"custom-avatar",@"key":@""};
+        [sections addObject:@[WCSwitchRow(@"替换头像",WCGestureCustomAvatarEnabledKey),avatars]];
+        [collapsible addObject:@YES];[collapseKeys addObject:[prefix stringByAppendingString:@".enhance.custom-avatar"]];
         WCRow *location = WCPlainRow(@"虚拟定位", WCRowKindChatOption);
         location.chatOption = @{@"title": location.title, @"type": @"virtual-location", @"key": @""};
         [sections addObject:@[location]]; [collapsible addObject:@NO];
@@ -1838,7 +1907,11 @@ static NSString *WCRowDetailText(WCRow *row) {
         [collapseKeys addObject:[prefix stringByAppendingString:@".background.keep-alive"]];
         WCRow *wallet = WCPlainRow(@"余额显示金额", WCRowKindChatOption);
         wallet.chatOption = @{@"title":wallet.title, @"type":@"wallet-display", @"key":WCGestureWalletDisplayFenKey};
-        [sections addObject:@[WCSwitchRow(@"钱包余额本机显示", WCGestureWalletDisplayEnabledKey), wallet]];
+        WCRow *lqt = WCPlainRow(@"零钱通显示金额", WCRowKindChatOption);
+        lqt.chatOption = @{@"title":lqt.title,@"type":@"wallet-lqt",@"key":WCGestureWalletLQTFenKey};
+        WCRow *merchant = WCPlainRow(@"经营账户显示金额", WCRowKindChatOption);
+        merchant.chatOption = @{@"title":merchant.title,@"type":@"wallet-merchant",@"key":WCGestureWalletMerchantFenKey};
+        [sections addObject:@[WCSwitchRow(@"钱包金额本机显示", WCGestureWalletDisplayEnabledKey), wallet,lqt,merchant]];
         [collapsible addObject:@YES]; [collapseKeys addObject:[prefix stringByAppendingString:@".enhance.wallet-display"]];
         WCRow *clearProfile = WCPlainRow(@"清空地区与性别信息", WCRowKindChatOption);
         clearProfile.chatOption = @{@"title":clearProfile.title, @"type":@"clear-profile", @"key":@""};

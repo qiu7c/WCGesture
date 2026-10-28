@@ -1,5 +1,40 @@
 #import "Sources/API/WCGestureInternal.h"
 
+NSString *const WCGestureHomeSwipeEnabledKey = @"com.qiu7c.onewx.home.swipe.enabled";
+NSString *const WCGestureMultiSelectEnabledKey = @"com.qiu7c.onewx.chat.multi-select.enabled";
+NSString *const WCGestureHomeGroupsEnabledKey = @"com.qiu7c.onewx.home.groups.enabled";
+NSString *const WCGestureHomeGroupsListKey = @"com.qiu7c.onewx.home.groups.list";
+NSString *const WCGestureHomeGroupsSelectedKey = @"com.qiu7c.onewx.home.groups.selected";
+NSString *const WCGestureHomeGroupsPendingKey = @"com.qiu7c.onewx.home.groups.pending-by-account";
+NSString *const WCGestureHomeGroupsBurnAfterReadingKey = @"com.qiu7c.onewx.home.groups.burn-after-reading";
+NSString *const WCGestureHomeGroupsPinnedPersistentKey = @"com.qiu7c.onewx.home.groups.pinned-persistent";
+NSString *const WCGestureHomeGroupsGestureKey = @"com.qiu7c.onewx.home.groups.gesture";
+NSString *const WCGestureHomeGroupsContinuousKey = @"com.qiu7c.onewx.home.groups.continuous";
+NSString *const WCGestureHomeGroupsReverseKey = @"com.qiu7c.onewx.home.groups.reverse";
+NSString *const WCGestureHomeGroupsButtonHapticKey = @"com.qiu7c.onewx.home.groups.button-haptic";
+NSString *const WCGestureHomeGroupsHapticKey = @"com.qiu7c.onewx.home.groups.haptic";
+NSString *const WCGestureHomeGroupsGestureRatioKey = @"com.qiu7c.onewx.home.groups.gesture-ratio";
+NSString *const WCGestureHomeGroupsSliderKey = @"com.qiu7c.onewx.home.groups.slider";
+NSString *const WCGestureHomeGroupsSliderSizeKey = @"com.qiu7c.onewx.home.groups.slider-size";
+NSString *const WCGestureHomeGroupsSliderRadiusKey = @"com.qiu7c.onewx.home.groups.slider-radius";
+NSString *const WCGestureHomeGroupsSliderAnimationKey = @"com.qiu7c.onewx.home.groups.slider-animation";
+NSString *const WCGestureHomeGroupsSliderColorKey = @"com.qiu7c.onewx.home.groups.slider-color";
+NSString *const WCGestureHomeGroupsUnderlineKey = @"com.qiu7c.onewx.home.groups.underline";
+NSString *const WCGestureHomeGroupsUnderlineLengthKey = @"com.qiu7c.onewx.home.groups.underline-length";
+NSString *const WCGestureHomeGroupsUnderlineThicknessKey = @"com.qiu7c.onewx.home.groups.underline-thickness";
+NSString *const WCGestureHomeGroupsUnderlineOffsetKey = @"com.qiu7c.onewx.home.groups.underline-offset";
+NSString *const WCGestureHomeGroupsUnderlineColorKey = @"com.qiu7c.onewx.home.groups.underline-color";
+NSString *const WCGestureHomeGroupsFontSizeKey = @"com.qiu7c.onewx.home.groups.font-size";
+NSString *const WCGestureHomeGroupsFontWeightKey = @"com.qiu7c.onewx.home.groups.font-weight";
+NSString *const WCGestureHomeGroupsHideBadgesKey = @"com.qiu7c.onewx.home.groups.hide-badges";
+NSString *const WCGestureHomeGroupsHideRedDotsKey = @"com.qiu7c.onewx.home.groups.hide-red-dots";
+NSString *const WCGestureHomeGroupsNativeBadgeKey = @"com.qiu7c.onewx.home.groups.native-badge";
+NSString *const WCGestureHomeGroupsBadgeXKey = @"com.qiu7c.onewx.home.groups.badge-x";
+NSString *const WCGestureHomeGroupsBadgeYKey = @"com.qiu7c.onewx.home.groups.badge-y";
+NSString *const WCGestureHomeGroupsBadgeColorKey = @"com.qiu7c.onewx.home.groups.badge-color";
+NSString *const WCGestureHomeGroupsBadgeTextColorKey = @"com.qiu7c.onewx.home.groups.badge-text-color";
+
+
 NSString *const WCGestureVirtualLocationEnabledKey = @"com.qiu7c.onewx.enhance.virtual-location.enabled";
 NSString *const WCGestureVirtualLocationMomentsEnabledKey = @"com.qiu7c.onewx.enhance.virtual-location.moments-enabled";
 NSString *const WCGestureVirtualLocationLatitudeKey = @"com.qiu7c.onewx.enhance.virtual-location.latitude";
@@ -332,6 +367,26 @@ NSString *const WCGestureWalletDisplayEnabledKey = @"com.qiu7c.onewx.local-displ
 NSString *const WCGestureWalletDisplayFenKey = @"com.qiu7c.onewx.local-display.wallet.fen";
 NSString *const WCInputLongPressActionKey = @"com.qiu7c.onewx.input.long-press.action";
 
+NSString *const WCGestureRecordCardEditEnabledKey = @"com.qiu7c.onewx.local-chat.record-card.enabled";
+
+NSString *const WCGestureCustomAvatarEnabledKey = @"com.qiu7c.onewx.custom-avatar.enabled";
+NSString *const WCGestureCustomAvatarUsersKey = @"com.qiu7c.onewx.custom-avatar.saved-users";
+
+NSString *const WCGestureWalletLQTFenKey = @"com.qiu7c.onewx.local-display.wallet.lqt-fen";
+NSString *const WCGestureWalletMerchantFenKey = @"com.qiu7c.onewx.local-display.wallet.merchant-fen";
+
+NSString *const WCGestureImageAnnotationEnabledKey = @"com.qiu7c.onewx.image-annotation.enabled";
+NSString *const WCGestureImageAnnotationWidthKey = @"com.qiu7c.onewx.image-annotation.width";
+NSString *const WCGestureImageAnnotationOvalColorKey = @"com.qiu7c.onewx.image-annotation.oval-color";
+NSString *const WCGestureImageAnnotationArrowColorKey = @"com.qiu7c.onewx.image-annotation.arrow-color";
+
+NSString *const WCGestureVirtualVideoEnabledKey = @"com.qiu7c.onewx.virtual-video.enabled";
+NSString *const WCGestureVirtualVideoAudioKey = @"com.qiu7c.onewx.virtual-video.file-audio";
+NSString *const WCGestureVirtualVideoMixMicKey = @"com.qiu7c.onewx.virtual-video.mix-mic";
+NSString *const WCGestureVirtualVideoMirrorKey = @"com.qiu7c.onewx.virtual-video.mirror";
+NSString *const WCGestureVirtualVideoRotationKey = @"com.qiu7c.onewx.virtual-video.rotation";
+NSString *const WCGestureVirtualVideoSourcesKey = @"com.qiu7c.onewx.virtual-video.sources";
+
 void WCGestureRegisterDefaults(void) {
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
@@ -343,6 +398,57 @@ void WCGestureRegisterDefaults(void) {
             [stored setBool:NO forKey:WCGestureMessageTimeBelowAvatarKey];
         }
         NSDictionary *defaults = @{
+            WCGestureVirtualVideoEnabledKey: @NO,
+            WCGestureVirtualVideoAudioKey: @NO,
+            WCGestureVirtualVideoMixMicKey: @NO,
+            WCGestureVirtualVideoMirrorKey: @NO,
+            WCGestureVirtualVideoRotationKey: @0,
+            WCGestureHomeSwipeEnabledKey: @NO,
+            WCGestureMultiSelectEnabledKey: @NO,
+            WCGestureHomeGroupsEnabledKey: @NO,
+            WCGestureHomeGroupsListKey: @[@{@"id":@"builtin.friend",@"type":@"friend",@"title":@"好友"},@{@"id":@"builtin.group",@"type":@"group",@"title":@"群聊"},@{@"id":@"builtin.other",@"type":@"other",@"title":@"其他"},@{@"id":@"builtin.instant",@"type":@"instant",@"title":@"即时消息"}],
+            WCGestureHomeGroupsSelectedKey: @"builtin.friend",
+            WCGestureHomeGroupsPendingKey: @{},
+            WCGestureHomeGroupsBurnAfterReadingKey: @NO,
+            WCGestureHomeGroupsPinnedPersistentKey: @NO,
+            WCGestureHomeGroupsGestureKey: @YES,
+            WCGestureHomeGroupsContinuousKey: @NO,
+            WCGestureHomeGroupsReverseKey: @NO,
+            WCGestureHomeGroupsHapticKey: @YES,
+            WCGestureHomeGroupsButtonHapticKey: @NO,
+            WCGestureHomeGroupsGestureRatioKey: @0.125,
+            WCGestureHomeGroupsSliderKey: @YES,
+            WCGestureHomeGroupsSliderSizeKey: @100,
+            WCGestureHomeGroupsSliderRadiusKey: @7,
+            WCGestureHomeGroupsSliderAnimationKey: @YES,
+            WCGestureHomeGroupsSliderColorKey: @"",
+            WCGestureHomeGroupsUnderlineKey: @NO,
+            WCGestureHomeGroupsUnderlineLengthKey: @30,
+            WCGestureHomeGroupsUnderlineThicknessKey: @1.5,
+            WCGestureHomeGroupsUnderlineOffsetKey: @5,
+            WCGestureHomeGroupsUnderlineColorKey: @"",
+            WCGestureHomeGroupsFontSizeKey: @14,
+            WCGestureHomeGroupsFontWeightKey: @400,
+            WCGestureHomeGroupsHideBadgesKey: @NO,
+            WCGestureHomeGroupsHideRedDotsKey: @NO,
+            WCGestureHomeGroupsNativeBadgeKey: @NO,
+            WCGestureHomeGroupsBadgeXKey: @0,
+            WCGestureHomeGroupsBadgeYKey: @0,
+            WCGestureHomeGroupsBadgeColorKey: @"",
+            WCGestureHomeGroupsBadgeTextColorKey: @"",
+
+            WCGestureVirtualVideoSourcesKey: @{},
+
+            WCGestureImageAnnotationEnabledKey: @NO,
+            WCGestureImageAnnotationWidthKey: @4,
+            WCGestureImageAnnotationOvalColorKey: @"#FF3B30",
+            WCGestureImageAnnotationArrowColorKey: @"#FF3B30",
+
+            WCGestureWalletLQTFenKey: @0,
+            WCGestureWalletMerchantFenKey: @0,
+            WCGestureCustomAvatarEnabledKey: @NO,
+            WCGestureCustomAvatarUsersKey: @{},
+            WCGestureRecordCardEditEnabledKey: @NO,
             WCGestureTextEditEnabledKey: @NO,
             WCGestureTimeEditEnabledKey: @NO,
             WCGestureTransferDisplayEditEnabledKey: @NO,

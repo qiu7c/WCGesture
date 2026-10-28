@@ -230,3 +230,24 @@ NS_ASSUME_NONNULL_END
 @end
 @interface WCPayWalletEntryHeaderView : UIView
 @end
+
+@interface MMHeadImageMgr : NSObject
+@end
+
+@interface WCPayWalletViewController : UIViewController
+@end
+@interface WCPayLQTDetailViewController : UIViewController
+@end
+@interface WCPayBalanceDetailViewController : UIViewController
+@end
+
+@interface WCEditImageLayoutView : UIView
+@end
+@interface EditImageIntialView : UIView
+@end
+@interface WCEditImageScrollView : UIScrollView
+@end
+@interface EditImageScrollView : UIScrollView
+@end
+@interface EditImageEmotionTool : UIView
+@end

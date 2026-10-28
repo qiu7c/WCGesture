@@ -5,10 +5,12 @@
 #import <QuartzCore/QuartzCore.h>
 #import "Sources/API/WCGestureInternal.h"
 
-@interface WCVideoCallSettingsController : UITableViewController <PHPickerViewControllerDelegate>
+@interface WCVideoCallSettingsController : UITableViewController <PHPickerViewControllerDelegate, UIDocumentPickerDelegate>
 @property (nonatomic, copy) NSArray<NSArray<NSDictionary *> *> *rows;
 @property (nonatomic, copy) NSString *selectionToken;
 @property (nonatomic) BOOL loadingImage;
+@property (nonatomic) BOOL loadingVideo;
+@property (nonatomic,copy) NSString *videoPickerAccount;
 @property (nonatomic) BOOL checkingResources;
 @property (nonatomic) BOOL adjusting;
 @property (nonatomic, copy) NSString *sliderToken;
@@ -77,10 +79,21 @@ static NSDictionary *WCVideoSettingsRow(NSString *title, NSString *kind, NSStrin
 - (void)rebuild {
     NSMutableArray *sections = [NSMutableArray arrayWithObject:@[
         WCVideoSettingsRow(@"视频美颜", @"switch", WCGestureVideoCallBeautyEnabledKey),
-        WCVideoSettingsRow(@"图片贴纸", @"switch", WCGestureVideoCallStickerEnabledKey),
+        WCVideoSettingsRow(@"贴纸", @"switch", WCGestureVideoCallStickerEnabledKey),
         WCVideoSettingsRow(@"前摄视频镜像", @"switch", WCGestureVideoCallMirrorEnabledKey)]];
+    NSMutableArray *virtualVideo=[NSMutableArray arrayWithObject:WCVideoSettingsRow(@"虚拟视频",@"switch",WCGestureVirtualVideoEnabledKey)];
+    if(WCGestureEnabled(WCGestureVirtualVideoEnabledKey)) {
+        NSString *videoName=WCGestureVirtualVideoSourceName();
+        [virtualVideo addObject:WCVideoSettingsRow([videoName isEqualToString:@"未选择"]?@"选择视频":[@"视频：" stringByAppendingString:videoName],@"virtual-source",nil)];
+        [virtualVideo addObject:WCVideoSettingsRow([NSString stringWithFormat:@"源视频方向（%ld°）",(long)[NSUserDefaults.standardUserDefaults integerForKey:WCGestureVirtualVideoRotationKey]],@"virtual-rotation",nil)];
+        [virtualVideo addObject:WCVideoSettingsRow(@"源视频左右翻转",@"switch",WCGestureVirtualVideoMirrorKey)];
+        [virtualVideo addObject:WCVideoSettingsRow(@"使用文件音轨",@"switch",WCGestureVirtualVideoAudioKey)];
+        if([NSUserDefaults.standardUserDefaults boolForKey:WCGestureVirtualVideoAudioKey])[virtualVideo addObject:WCVideoSettingsRow(@"混入麦克风",@"switch",WCGestureVirtualVideoMixMicKey)];
+        if(![WCGestureVirtualVideoSourceName() isEqualToString:@"未选择"])[virtualVideo addObject:WCVideoSettingsRow(@"移除视频",@"virtual-clear",nil)];
+    }
+    [sections addObject:virtualVideo];
     if (WCGestureEnabled(WCGestureVideoCallStickerEnabledKey)) {
-        NSMutableArray *sticker = [NSMutableArray arrayWithObject:WCVideoSettingsRow(@"选择图片贴纸", @"image", nil)];
+        NSMutableArray *sticker = [NSMutableArray arrayWithObjects:WCVideoSettingsRow(@"选择图片贴纸", @"image", nil), WCVideoSettingsRow(@"文字贴纸", @"text-sticker", nil), nil];
         if (WCGestureVideoCallHasSticker()) [sticker addObject:WCVideoSettingsRow(@"移动、缩放贴纸", @"move", nil)];
         [sticker addObject:WCVideoSettingsRow(@"移除贴纸", @"clear", nil)]; [sections addObject:sticker];
     }
@@ -179,6 +192,21 @@ static NSDictionary *WCVideoSettingsRow(NSString *title, NSString *kind, NSStrin
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
     NSDictionary *row = self.rows[indexPath.section][indexPath.row];
     NSString *kind = row[@"kind"];
+    if ([kind isEqualToString:@"text-sticker"]) { WCGestureVideoCallEditTextSticker(self); return; }
+    if ([kind isEqualToString:@"virtual-source"]) {
+        if(self.loadingVideo || self.presentedViewController)return;
+        self.videoPickerAccount=WCCurrentUserWXID();
+        UIDocumentPickerViewController *picker=[[UIDocumentPickerViewController alloc] initForOpeningContentTypes:@[UTTypeMovie] asCopy:YES];
+        picker.delegate=self;picker.allowsMultipleSelection=NO;[self presentViewController:picker animated:YES completion:nil];return;
+    }
+    if ([kind isEqualToString:@"virtual-clear"]) { WCGestureVirtualVideoClear();[self rebuild];return; }
+    if ([kind isEqualToString:@"virtual-rotation"]) {
+        NSMutableArray *options=[NSMutableArray array];for(NSNumber *angle in @[@0,@90,@180,@270])[options addObject:[WCPopupOption optionWithTitle:[NSString stringWithFormat:@"%@°",angle] value:angle]];
+        [WCPopup showOptionsWithTitle:@"源视频方向" message:nil options:options selected:[NSUserDefaults.standardUserDefaults objectForKey:WCGestureVirtualVideoRotationKey] completion:^(id value){
+            if(![@[@0,@90,@180,@270] containsObject:value])return;[NSUserDefaults.standardUserDefaults setInteger:[value integerValue] forKey:WCGestureVirtualVideoRotationKey];WCGestureSettingsPostChange(WCGestureVirtualVideoRotationKey);
+        }];return;
+    }
+
     if ([kind isEqualToString:@"prepare"]) {
         if (!WCGestureVideoCallContextToken().length) { WCShowToast(@"请在视频通话中检查美颜资源"); return; }
         self.checkingResources = YES;
@@ -233,6 +261,16 @@ static NSDictionary *WCVideoSettingsRow(NSString *title, NSString *kind, NSStrin
         }];
     }];
 }
+- (void)documentPicker:(UIDocumentPickerViewController *)controller didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls {
+    if(self.loadingVideo || !urls.count || ![self.videoPickerAccount isEqualToString:WCCurrentUserWXID() ?: @""])return;
+    self.loadingVideo=YES;__weak WCVideoCallSettingsController *weak=self;
+    WCGestureVirtualVideoImport(urls.firstObject,^(BOOL success){WCVideoCallSettingsController *host=weak;host.loadingVideo=NO;
+        if(!host || ![host.videoPickerAccount isEqualToString:WCCurrentUserWXID() ?: @""])return;
+        [host rebuild];if(host.view.window)WCShowToast(success?@"视频已保存":@"视频导入失败");
+    });
+}
+- (void)documentPickerWasCancelled:(UIDocumentPickerViewController *)controller { self.videoPickerAccount=nil; }
+
 @end
 
 UIViewController *WCGestureCreateVideoCallSettingsController(void) { return [WCVideoCallSettingsController new]; }
@@ -360,4 +398,29 @@ void WCGesturePresentVideoCallSettings(UIViewController *presenter) {
     dispatch_once(&once, ^{ delegate = [WCVideoControlsDelegate new]; });
     navigation.modalPresentationStyle = UIModalPresentationCustom; navigation.transitioningDelegate = delegate;
     [presenter presentViewController:navigation animated:YES completion:nil];
+}
+
+
+// One Wx basic text-to-image adapter. This is not an online/PAG template clone.
+// The verified call compositor accepts the resulting transparent UIImage via
+// the existing sticker editor's affine bake path.
+void WCGestureVideoCallEditTextSticker(UIViewController *presenter) {
+    NSString *token=WCGestureVideoCallContextToken();
+    if(!token.length || !WCGestureEnabled(WCGestureVideoCallStickerEnabledKey)){WCShowToast(@"请在视频通话中开启贴纸");return;}
+    __weak UIViewController *weak=presenter;
+    [WCPopup showInputWithTitle:@"文字贴纸" message:nil text:nil placeholder:@"输入文字，最多 128 字" keyboard:UIKeyboardTypeDefault completion:^(NSString *text){
+        UIViewController *host=weak;if(!host.view.window || ![token isEqualToString:WCGestureVideoCallContextToken()] || !WCGestureEnabled(WCGestureVideoCallStickerEnabledKey))return;
+        if(!text.length || text.length>128){WCShowToast(@"请输入 1–128 字");return;}
+        NSMutableParagraphStyle *paragraph=[NSMutableParagraphStyle new];paragraph.alignment=NSTextAlignmentCenter;paragraph.lineBreakMode=NSLineBreakByWordWrapping;
+        NSDictionary *attributes=@{NSFontAttributeName:[UIFont systemFontOfSize:52 weight:UIFontWeightMedium],NSForegroundColorAttributeName:UIColor.whiteColor,
+            NSStrokeColorAttributeName:UIColor.blackColor,NSStrokeWidthAttributeName:@(-3),NSParagraphStyleAttributeName:paragraph};
+        CGRect bounds=[text boundingRectWithSize:CGSizeMake(960,1200) options:NSStringDrawingUsesLineFragmentOrigin|NSStringDrawingUsesFontLeading attributes:attributes context:nil];
+        CGSize size=CGSizeMake(ceil(bounds.size.width)+32,ceil(bounds.size.height)+32);
+        if(size.width<1 || size.height<1 || size.height>1232)return;
+        UIGraphicsImageRendererFormat *format=[UIGraphicsImageRendererFormat defaultFormat];format.scale=1;format.opaque=NO;
+        UIImage *image=[[[UIGraphicsImageRenderer alloc] initWithSize:size format:format] imageWithActions:^(__unused UIGraphicsImageRendererContext *context){
+            [text drawWithRect:CGRectMake(16,16,size.width-32,size.height-32) options:NSStringDrawingUsesLineFragmentOrigin|NSStringDrawingUsesFontLeading attributes:attributes context:nil];
+        }];
+        WCGestureVideoCallEditSticker(host,image);
+    }];
 }

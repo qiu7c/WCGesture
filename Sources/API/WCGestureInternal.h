@@ -81,3 +81,13 @@
 #import "Sources/API/WCGestureChatMessageOrderingAPI.h"
 #import "Sources/API/WCGestureWalletDisplayAPI.h"
 #import "Sources/API/WCGestureInputVoiceAPI.h"
+
+#import "Sources/API/WCGestureCustomAvatarAPI.h"
+
+#import "Sources/API/WCGestureImageAnnotationAPI.h"
+
+#import "Sources/API/WCGestureVirtualVideoAPI.h"
+
+#import "Sources/API/WCGestureHomeGroupsAPI.h"
+
+#import "Sources/API/WCGestureHomeSwipeAPI.h"

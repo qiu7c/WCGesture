@@ -66,7 +66,7 @@ BOOL WCGestureChatSortAllowsAction(UIView *cell,SEL action){return action==NSSel
 NSArray *WCGestureChatSortMenuItems(UIView *cell,NSArray *items){
     SEL action=NSSelectorFromString(@"wc_toggleChatSort:");if(![items isKindOfClass:NSArray.class] || !WCGestureChatSortAllowsAction(cell,action))return items;
     BOOL sorting=objc_getAssociatedObject(WCViewControllerForResponder(cell),&WCChatSortKey)!=nil;
-    id item=WCGestureLocalChatMenuItem(cell,sorting?@"结束调整顺序":@"调整消息顺序",@"arrow.up.arrow.down",action);return item?[items arrayByAddingObject:item]:items;
+    id item=WCGestureLocalChatMenuItem(cell,sorting?@"结束排序":@"排序",@"arrow.up.arrow.down",action);return item?[items arrayByAddingObject:item]:items;
 }
 void WCGestureChatSortEnd(UIViewController *controller){
     WCChatSortState *state=objc_getAssociatedObject(controller,&WCChatSortKey);if(!state)return;

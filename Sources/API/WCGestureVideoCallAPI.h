@@ -1,5 +1,7 @@
 #import <UIKit/UIKit.h>
 #import <CoreMedia/CoreMedia.h>
+#import <CoreVideo/CoreVideo.h>
+@class CIImage;
 
 NS_ASSUME_NONNULL_BEGIN
 FOUNDATION_EXPORT NSString *const WCGestureVideoCallStateDidChangeNotification;
@@ -14,6 +16,7 @@ void WCGestureVideoCallResourcesChanged(void);
 CMSampleBufferRef _Nullable WCGestureVideoCallCreateFrame(id device, CMSampleBufferRef sample,
                                                         id connection) CF_RETURNS_RETAINED;
 BOOL WCGestureVideoCallCancelSticker(id editor);
+void WCGestureVideoCallEditTextSticker(UIViewController *presenter);
 void WCGestureVideoCallEditSticker(UIViewController *presenter, UIImage *image);
 void WCGestureVideoCallRepositionSticker(UIViewController *presenter);
 UIViewController *WCGestureCreateVideoStickerEditor(UIImage *image, NSDictionary * _Nullable placement,
@@ -29,4 +32,5 @@ NSString *WCGestureVideoCallStatus(void);
 NSString *WCGestureVideoCallContextToken(void);
 UIViewController *WCGestureCreateVideoCallSettingsController(void);
 void WCGesturePresentVideoCallSettings(UIViewController *presenter);
+BOOL WCGestureVideoCallRenderToPixels(CIImage *image,CVPixelBufferRef output);
 NS_ASSUME_NONNULL_END

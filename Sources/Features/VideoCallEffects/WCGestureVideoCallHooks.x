@@ -2,15 +2,18 @@
 
 %hook AVVideoDevice
 - (void)captureOutput:(id)output didOutputSampleBuffer:(CMSampleBufferRef)sample fromConnection:(id)connection {
-    CMSampleBufferRef processed = WCGestureVideoCallCreateFrame(self, sample, connection);
-    CMSampleBufferRef outgoing = processed ? processed : sample;
+    CMSampleBufferRef substituted = WCGestureVirtualVideoCreateSample(output, sample, connection);
+    CMSampleBufferRef processed = WCGestureVideoCallCreateFrame(self, substituted ? substituted : sample, connection);
+    CMSampleBufferRef outgoing = processed ? processed : (substituted ? substituted : sample);
     @try {
         %orig(output, outgoing, connection);
     } @finally {
         if (processed) CFRelease(processed);
+        if (substituted) CFRelease(substituted);
     }
 }
 - (void)stopSession {
+    WCGestureVirtualVideoStop();
     WCGestureVideoCallDeviceStopped(self);
     %orig;
 }
@@ -20,33 +23,41 @@
 - (void)viewWillAppear:(BOOL)animated {
     %orig(animated);
     WCGestureVideoCallViewChanged((UIViewController *)self, YES);
+    WCGestureVirtualVideoContextChanged();
 }
 - (void)viewDidLayoutSubviews {
     %orig;
     UIViewController *controller = (UIViewController *)self;
     if (controller.view.window) WCGestureVideoCallViewChanged(controller, YES);
+    WCGestureVirtualVideoContextChanged();
 }
 - (void)viewDidDisappear:(BOOL)animated {
     %orig(animated);
     WCGestureVideoCallViewChanged((UIViewController *)self, NO);
+    WCGestureVirtualVideoContextChanged();
 }
 - (void)switchToTalkingView {
     %orig;
     WCGestureVideoCallConnected((UIViewController *)self);
+    WCGestureVirtualVideoContextChanged();
 }
 - (void)layoutTalkingView {
     %orig;
     WCGestureVideoCallViewChanged((UIViewController *)self, YES);
+    WCGestureVirtualVideoContextChanged();
 }
 - (void)forceEndCall {
+    WCGestureVirtualVideoStop();
     WCGestureVideoCallEnded((UIViewController *)self);
     %orig;
 }
 - (void)onVideoVoipTalkingViewEndCall {
+    WCGestureVirtualVideoStop();
     WCGestureVideoCallEnded((UIViewController *)self);
     %orig;
 }
 - (void)onVideoVoipTalkingViewHangUp {
+    WCGestureVirtualVideoStop();
     WCGestureVideoCallEnded((UIViewController *)self);
     %orig;
 }

@@ -21,15 +21,15 @@
     WCGestureRepeatMenuPerform(self);
 }
 %new
-- (void)wc_localEditText:(id)sender { WCGestureLocalEditPerform((UIView *)self, NO, NO); }
+- (void)wc_localEditText:(id)sender { WCGestureLocalEditPerform((UIView *)self, NO); }
 %new
-- (void)wc_localEditTransfer:(id)sender { WCGestureLocalEditPerform((UIView *)self, YES, NO); }
+- (void)wc_localEditTransfer:(id)sender { WCGestureLocalEditPerform((UIView *)self, YES); }
 %new
-- (void)wc_localRestoreEdit:(id)sender { WCGestureLocalEditPerform((UIView *)self, NO, YES); }
+- (void)wc_localRestoreEdit:(id)sender { WCGestureLocalEditRestore((UIView *)self); }
 %new
-- (void)wc_replaceLocalMedia:(id)sender { WCGestureChatMediaPick((UIView *)self, NO); }
+- (void)wc_restoreLocalMedia:(id)sender { WCGestureChatMediaRestore((UIView *)self); }
 %new
-- (void)wc_restoreLocalMedia:(id)sender { WCGestureChatMediaPick((UIView *)self, YES); }
+- (void)wc_replaceLocalMedia:(id)sender { WCGestureChatMediaPick((UIView *)self); }
 %new
 - (void)wc_toggleChatSort:(id)sender { WCGestureChatSortToggle((UIView *)self); }
 %end

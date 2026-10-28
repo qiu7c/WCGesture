@@ -6,7 +6,8 @@ id _Nullable WCGestureLocalChatMenuItem(UIView *cell, NSString *title, NSString 
 void WCGestureLocalChatRefreshCell(UIView *cell);
 NSArray * _Nullable WCGestureLocalEditMenuItems(UIView *cell, NSArray * _Nullable items);
 BOOL WCGestureLocalEditAllowsAction(UIView *cell, SEL action);
-void WCGestureLocalEditPerform(UIView *cell, BOOL transfer, BOOL restore);
+void WCGestureLocalEditPerform(UIView *cell, BOOL transfer);
+void WCGestureLocalEditRestore(UIView *cell);
 void WCGestureLocalEditSettingsChanged(NSString * _Nullable key);
 void WCGestureLocalEditLeaving(UIViewController *controller);
 void WCGestureLocalTimeLayout(UIView *cell);

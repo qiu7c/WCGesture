@@ -3,10 +3,12 @@
 %hook MMHeadImageView
 - (void)layoutSubviews {
     %orig;
+    WCGestureCustomAvatarApply((UIView *)self);
     WCGestureApplyGlobalAvatarRoundingToHeadView(self);
 }
 - (void)didMoveToWindow {
     %orig;
+    WCGestureCustomAvatarApply((UIView *)self);
     WCGestureApplyGlobalAvatarRoundingToHeadView(self);
 }
 - (void)setConerSize:(unsigned int)cornerSize {

@@ -40,6 +40,8 @@ NSArray<NSDictionary *> *WCGestureChatOptions(BOOL antiRevoke, BOOL includeHidde
 NSString *WCGestureChatOptionDetail(NSDictionary *option) {
     NSString *type = option[@"type"], *key = option[@"key"];
     NSUserDefaults *d = NSUserDefaults.standardUserDefaults;
+    if ([type isEqualToString:@"wallet-lqt"]) return WCGestureWalletDisplayTextForKind(2);
+    if ([type isEqualToString:@"wallet-merchant"]) return WCGestureWalletDisplayTextForKind(3);
     if ([type isEqualToString:@"wallet-display"]) return WCGestureWalletDisplayText();
     if ([type isEqualToString:@"long-press-menu"]) return [NSString stringWithFormat:@"%lu 项", (unsigned long)WCGestureLongPressMenuTitles().count];
     if ([type isEqualToString:@"prompt-style"]) return [d integerForKey:key] == 1 ? @"气泡旁" : @"消息下方";
@@ -158,8 +160,16 @@ void WCGestureEditChatOption(UIViewController *presenter, NSDictionary *option) 
         [presenter.navigationController pushViewController:WCGestureCreatePositionEditor(previewKind.integerValue) animated:YES];
     } else if ([type isEqualToString:@"moments-feed-preview"]) {
         [presenter.navigationController pushViewController:WCGestureCreateMomentsFeedPreviewController() animated:YES];
+    } else if ([type isEqualToString:@"home-groups"]) {
+        [presenter.navigationController pushViewController:WCGestureCreateHomeGroupsSettingsController() animated:YES];
+    } else if ([type isEqualToString:@"custom-avatar"]) {
+        [presenter.navigationController pushViewController:WCGestureCreateCustomAvatarController() animated:YES];
     } else if ([type isEqualToString:@"virtual-location"]) {
         [presenter.navigationController pushViewController:WCGestureCreateVirtualLocationSettingsController() animated:YES];
+    } else if ([type isEqualToString:@"wallet-lqt"]) {
+        WCGestureWalletDisplayEditKind(2);
+    } else if ([type isEqualToString:@"wallet-merchant"]) {
+        WCGestureWalletDisplayEditKind(3);
     } else if ([type isEqualToString:@"wallet-display"]) {
         WCGestureWalletDisplayEdit();
     } else if ([type isEqualToString:@"clear-profile"]) {

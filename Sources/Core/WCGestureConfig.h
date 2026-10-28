@@ -436,3 +436,59 @@ FOUNDATION_EXPORT NSString *const WCGestureVirtualLocationNameKey;
 FOUNDATION_EXPORT NSString *const WCGestureVirtualLocationPresetsKey;
 
 NS_ASSUME_NONNULL_END
+
+FOUNDATION_EXPORT NSString *const WCGestureRecordCardEditEnabledKey;
+
+FOUNDATION_EXPORT NSString *const WCGestureCustomAvatarEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureCustomAvatarUsersKey;
+
+FOUNDATION_EXPORT NSString *const WCGestureWalletLQTFenKey;
+FOUNDATION_EXPORT NSString *const WCGestureWalletMerchantFenKey;
+
+FOUNDATION_EXPORT NSString *const WCGestureImageAnnotationEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureImageAnnotationWidthKey;
+FOUNDATION_EXPORT NSString *const WCGestureImageAnnotationOvalColorKey;
+FOUNDATION_EXPORT NSString *const WCGestureImageAnnotationArrowColorKey;
+
+FOUNDATION_EXPORT NSString *const WCGestureVirtualVideoEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureVirtualVideoAudioKey;
+FOUNDATION_EXPORT NSString *const WCGestureVirtualVideoMixMicKey;
+FOUNDATION_EXPORT NSString *const WCGestureVirtualVideoMirrorKey;
+FOUNDATION_EXPORT NSString *const WCGestureVirtualVideoRotationKey;
+FOUNDATION_EXPORT NSString *const WCGestureVirtualVideoSourcesKey;
+
+// WeChatX evidence-backed home and selection ports.
+FOUNDATION_EXPORT NSString *const WCGestureHomeSwipeEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureMultiSelectEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureHomeGroupsEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureHomeGroupsListKey;
+FOUNDATION_EXPORT NSString *const WCGestureHomeGroupsSelectedKey;
+FOUNDATION_EXPORT NSString *const WCGestureHomeGroupsPendingKey;
+FOUNDATION_EXPORT NSString *const WCGestureHomeGroupsBurnAfterReadingKey;
+FOUNDATION_EXPORT NSString *const WCGestureHomeGroupsPinnedPersistentKey;
+FOUNDATION_EXPORT NSString *const WCGestureHomeGroupsGestureKey;
+FOUNDATION_EXPORT NSString *const WCGestureHomeGroupsContinuousKey;
+FOUNDATION_EXPORT NSString *const WCGestureHomeGroupsReverseKey;
+FOUNDATION_EXPORT NSString *const WCGestureHomeGroupsHapticKey;
+FOUNDATION_EXPORT NSString *const WCGestureHomeGroupsGestureRatioKey;
+FOUNDATION_EXPORT NSString *const WCGestureHomeGroupsSliderKey;
+FOUNDATION_EXPORT NSString *const WCGestureHomeGroupsSliderSizeKey;
+FOUNDATION_EXPORT NSString *const WCGestureHomeGroupsSliderRadiusKey;
+FOUNDATION_EXPORT NSString *const WCGestureHomeGroupsSliderAnimationKey;
+FOUNDATION_EXPORT NSString *const WCGestureHomeGroupsSliderColorKey;
+FOUNDATION_EXPORT NSString *const WCGestureHomeGroupsUnderlineKey;
+FOUNDATION_EXPORT NSString *const WCGestureHomeGroupsUnderlineLengthKey;
+FOUNDATION_EXPORT NSString *const WCGestureHomeGroupsUnderlineThicknessKey;
+FOUNDATION_EXPORT NSString *const WCGestureHomeGroupsUnderlineOffsetKey;
+FOUNDATION_EXPORT NSString *const WCGestureHomeGroupsUnderlineColorKey;
+FOUNDATION_EXPORT NSString *const WCGestureHomeGroupsFontSizeKey;
+FOUNDATION_EXPORT NSString *const WCGestureHomeGroupsFontWeightKey;
+FOUNDATION_EXPORT NSString *const WCGestureHomeGroupsHideBadgesKey;
+FOUNDATION_EXPORT NSString *const WCGestureHomeGroupsHideRedDotsKey;
+FOUNDATION_EXPORT NSString *const WCGestureHomeGroupsNativeBadgeKey;
+FOUNDATION_EXPORT NSString *const WCGestureHomeGroupsBadgeXKey;
+FOUNDATION_EXPORT NSString *const WCGestureHomeGroupsBadgeYKey;
+FOUNDATION_EXPORT NSString *const WCGestureHomeGroupsBadgeColorKey;
+FOUNDATION_EXPORT NSString *const WCGestureHomeGroupsBadgeTextColorKey;
+
+FOUNDATION_EXPORT NSString *const WCGestureHomeGroupsButtonHapticKey;

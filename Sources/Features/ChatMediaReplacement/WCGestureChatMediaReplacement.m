@@ -30,7 +30,7 @@ BOOL WCGestureChatMediaAllowsAction(UIView *cell,SEL action){
 NSArray *WCGestureChatMediaMenuItems(UIView *cell,NSArray *items){
     if(![items isKindOfClass:NSArray.class] || !WCChatMediaEligible(cell))return items;
     NSMutableArray *result=[items mutableCopy];
-    for(NSArray *row in @[@[@"替换本机媒体",@"photo",@"wc_replaceLocalMedia:"],@[@"恢复原始媒体",@"arrow.uturn.backward",@"wc_restoreLocalMedia:"]]){
+    for(NSArray *row in @[@[@"修改",@"photo",@"wc_replaceLocalMedia:"],@[@"恢复",@"arrow.uturn.backward",@"wc_restoreLocalMedia:"]]){
         SEL action=NSSelectorFromString(row[2]);if(!WCGestureChatMediaAllowsAction(cell,action))continue;
         id item=WCGestureLocalChatMenuItem(cell,row[0],row[1],action);if(item)[result addObject:item];
     }return result;
@@ -90,16 +90,25 @@ static void WCChatMediaDiscard(WCChatMediaRecord *record){if(record.videoURL)[NS
     }];
 }
 @end
-void WCGestureChatMediaPick(UIView *cell,BOOL restore){
+void WCGestureChatMediaPick(UIView *cell){
     if(!cell.window || !WCChatMediaEligible(cell))return;NSString *identity=WCGestureLocalChatIdentity(cell);
     [WCChatMediaRequests() removeObjectForKey:identity];
-    if(restore){WCChatMediaDiscard(WCChatMediaRecords()[identity]);[WCChatMediaRecords() removeObjectForKey:identity];WCGestureChatMediaResetCell(cell);return;}
     UIViewController *presenter=WCViewControllerForResponder(cell);if(!presenter || presenter.presentedViewController)return;
     WCChatMediaPicker *bridge=[WCChatMediaPicker new];bridge.cell=cell;bridge.identity=identity;bridge.account=WCCurrentUserWXID() ?: @"";bridge.video=WCChatMediaVideo(cell);
     bridge.request=@(++WCChatMediaGeneration);bridge.generation=WCChatMediaGeneration;WCChatMediaRequests()[identity]=bridge.request;
     PHPickerConfiguration *config=[[PHPickerConfiguration alloc] init];config.selectionLimit=1;config.filter=bridge.video?PHPickerFilter.videosFilter:PHPickerFilter.imagesFilter;
     PHPickerViewController *picker=[[PHPickerViewController alloc] initWithConfiguration:config];picker.delegate=bridge;
     objc_setAssociatedObject(picker,&WCChatMediaPickerKey,bridge,OBJC_ASSOCIATION_RETAIN_NONATOMIC);[presenter presentViewController:picker animated:YES completion:nil];
+}
+void WCGestureChatMediaRestore(UIView *cell){
+    if(!cell.window || !WCChatMediaEligible(cell))return;
+    NSString *identity=WCGestureLocalChatIdentity(cell);
+    [WCChatMediaRequests() removeObjectForKey:identity];
+    WCChatMediaDiscard(WCChatMediaRecords()[identity]);
+    [WCChatMediaRecords() removeObjectForKey:identity];
+    for(UIView *visible in WCChatMediaCells().allObjects)
+        if([identity isEqualToString:WCGestureLocalChatIdentity(visible)])WCGestureChatMediaResetCell(visible);
+    WCGestureChatMediaResetCell(cell);
 }
 BOOL WCGestureChatMediaPresent(UIView *cell){
     WCChatMediaRecord *record=WCChatMediaEligible(cell)?WCChatMediaRecords()[WCGestureLocalChatIdentity(cell)]:nil;if(!record || !cell.window)return NO;

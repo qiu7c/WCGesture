@@ -957,7 +957,7 @@ void WCGestureVideoCallEditSticker(UIViewController *presenter, UIImage *image) 
     UIViewController *host = coordinator.host;
     if (!NSThread.isMainThread || !token.length || !coordinator.stickerEnabled || !image ||
         image.size.width <= 0 || image.size.height <= 0 || !host.view.window) {
-        WCShowToast(@"请回到视频通话并开启图片贴纸"); return;
+        WCShowToast(@"请回到视频通话并开启贴纸"); return;
     }
     if (coordinator.editor) return;
     CIImage *previous = coordinator.sticker;
@@ -1084,4 +1084,21 @@ NSString *WCGestureVideoCallContextToken(void) {
     if (!coordinator.active || !coordinator.host || coordinator.suspended || !coordinator.account.length ||
         ![coordinator.account isEqualToString:WCCurrentUserWXID() ?: @""]) return @"";
     return [NSString stringWithFormat:@"%@:%lu", coordinator.account, (unsigned long)coordinator.generation];
+}
+
+BOOL WCGestureVideoCallRenderToPixels(CIImage *image,CVPixelBufferRef output) {
+    if(!image || !output)return NO;
+    static NSLock *lock;static CIContext *context;static BOOL ready,flipped;static dispatch_once_t once;
+    dispatch_once(&once,^{lock=[NSLock new];context=[CIContext contextWithOptions:@{kCIContextCacheIntermediates:@NO}];});
+    [lock lock];BOOL completed=NO;CGColorSpaceRef space=CGColorSpaceCreateDeviceRGB();
+    @try {
+        if(!space)return NO;
+        if(!ready){if(!WCVideoCalibrateRenderOrientation(context,&flipped))return NO;ready=YES;}
+        CGRect target=CGRectMake(0,0,CVPixelBufferGetWidth(output),CVPixelBufferGetHeight(output));
+        CIRenderDestination *destination=[[CIRenderDestination alloc] initWithPixelBuffer:output];destination.colorSpace=space;destination.flipped=flipped;
+        NSError *error=nil;CIRenderTask *task=[context startTaskToRender:[image imageByCroppingToRect:target] fromRect:target toDestination:destination atPoint:CGPointZero error:&error];
+        completed=task && !error && [task waitUntilCompletedAndReturnError:&error]!=nil && !error;
+    }@catch(__unused NSException *exception){completed=NO;}
+    @finally{if(space)CGColorSpaceRelease(space);[lock unlock];}
+    return completed;
 }
