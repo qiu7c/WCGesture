@@ -87,3 +87,45 @@ UIView *WCGestureSettingsSearchHeader(UITextField *field, CGFloat width) {
     ]];
     return header;
 }
+
+// All sections on a settings page form one continuous inset card.
+@interface WCSettingsCardCell : UITableViewCell
+@property (nonatomic, strong) UIView *surface;
+@property (nonatomic) CACornerMask cardCorners;
+@end
+@implementation WCSettingsCardCell
+- (instancetype)initWithStyle:(UITableViewCellStyle)style reuseIdentifier:(NSString *)identifier {
+    if ((self=[super initWithStyle:style reuseIdentifier:identifier])) {
+        self.backgroundColor=UIColor.clearColor;self.backgroundView=[UIView new];
+        self.surface=[UIView new];self.surface.backgroundColor=UIColor.secondarySystemGroupedBackgroundColor;
+        self.surface.layer.cornerCurve=kCACornerCurveContinuous;self.surface.clipsToBounds=YES;
+        [self.backgroundView addSubview:self.surface];
+    }
+    return self;
+}
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    CGFloat inset=16;
+    self.surface.frame=CGRectInset(self.bounds,inset,0);
+    self.surface.layer.cornerRadius=self.cardCorners?16:0;
+    self.surface.layer.maskedCorners=self.cardCorners;
+    CGFloat trailing=inset;
+    if (self.accessoryView) {
+        CGRect accessory=self.accessoryView.frame;
+        accessory.origin.x=CGRectGetWidth(self.bounds)-2*inset-CGRectGetWidth(accessory);
+        accessory.origin.y=(CGRectGetHeight(self.bounds)-CGRectGetHeight(accessory))/2;
+        self.accessoryView.frame=accessory;
+        trailing=CGRectGetWidth(accessory)+3*inset;
+    } else if (self.accessoryType!=UITableViewCellAccessoryNone) trailing=3*inset;
+    self.contentView.frame=CGRectMake(inset,0,MAX(0,CGRectGetWidth(self.bounds)-inset-trailing),CGRectGetHeight(self.bounds));
+}
+@end
+UITableViewCell *WCGestureSettingsCardCell(UITableView *table, NSString *identifier, UITableViewCellStyle style, NSIndexPath *path) {
+    WCSettingsCardCell *cell=identifier.length?[table dequeueReusableCellWithIdentifier:identifier]:nil;
+    if (!cell) cell=[[WCSettingsCardCell alloc] initWithStyle:style reuseIdentifier:identifier.length?identifier:nil];
+    BOOL first=path.section==0 && path.row==0;
+    BOOL last=path.section==table.numberOfSections-1 && path.row==[table numberOfRowsInSection:path.section]-1;
+    cell.cardCorners=(first?(kCALayerMinXMinYCorner|kCALayerMaxXMinYCorner):0)
+        |(last?(kCALayerMinXMaxYCorner|kCALayerMaxXMaxYCorner):0);
+    [cell setNeedsLayout];return cell;
+}

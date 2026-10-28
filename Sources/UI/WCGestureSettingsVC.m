@@ -1544,7 +1544,9 @@ static NSString *WCRowDetailText(WCRow *row) {
     [super viewDidLoad];
     WCGestureSettingsConfigureNavigation(self);
     if (@available(iOS 15.0, *)) self.tableView.sectionHeaderTopPadding = 0;
-    self.tableView.backgroundColor = UIColor.secondarySystemGroupedBackgroundColor;
+    self.tableView.backgroundColor = UIColor.systemGroupedBackgroundColor;
+    self.tableView.tableHeaderView=[[UIView alloc] initWithFrame:CGRectMake(0,0,0,12)];
+    self.tableView.tableFooterView=[[UIView alloc] initWithFrame:CGRectMake(0,0,0,12)];
     self.tableView.sectionHeaderHeight = 0; self.tableView.sectionFooterHeight = 0;
     self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
     self.tableView.rowHeight = UITableViewAutomaticDimension;
@@ -2050,13 +2052,8 @@ static NSString *WCRowDetailText(WCRow *row) {
     NSInteger rowIdx = indexPath.row;
     WCRow *row = self.sections[section][rowIdx];
     NSString *cellId = @"WCGestureCell";
-    UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:cellId];
-    if (!cell) {
-        cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleValue1 reuseIdentifier:cellId];
-        cell.selectionStyle = UITableViewCellSelectionStyleNone;
-
-    }
-    cell.backgroundColor = UIColor.secondarySystemGroupedBackgroundColor;
+    UITableViewCell *cell = WCGestureSettingsCardCell(tableView,cellId,UITableViewCellStyleValue1,indexPath);
+    cell.backgroundColor = UIColor.clearColor;
     cell.textLabel.text = row.title;
     cell.textLabel.textColor = UIColor.labelColor;
     cell.textLabel.numberOfLines = 1;

@@ -12,7 +12,9 @@ static NSDictionary *WCCornerNumber(NSString *title, NSString *key, double maxim
 - (void)viewDidLoad {
     [super viewDidLoad]; self.title = @"圆角设置"; WCGestureSettingsConfigureNavigation(self);
     self.tableView.sectionHeaderHeight = 0; self.tableView.sectionFooterHeight = 0;
-    self.tableView.backgroundColor = UIColor.secondarySystemGroupedBackgroundColor; self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
+    self.tableView.tableHeaderView=[[UIView alloc] initWithFrame:CGRectMake(0,0,0,12)];
+    self.tableView.tableFooterView=[[UIView alloc] initWithFrame:CGRectMake(0,0,0,12)];
+    self.tableView.backgroundColor = UIColor.systemGroupedBackgroundColor; self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
     self.sections = @[
         @[WCCornerSwitch(@"全局头像圆角",WCGestureGlobalAvatarRoundingEnabledKey),WCCornerNumber(@"头像圆角程度 (%)",WCGestureGlobalAvatarCornerPercentKey,100),@{@"title":@"整页头像预览与调节",@"previewKind":@(WCGesturePreviewAvatarRounding)}],
         @[WCCornerSwitch(@"聊天输入栏圆角",WCGestureChatInputRoundingEnabledKey),WCCornerSwitch(@"输入框内部圆角",WCGestureChatInputInnerRoundingKey),WCCornerNumber(@"内部圆角程度",WCGestureChatInputInnerRadiusKey,40),WCCornerSwitch(@"外部工具栏圆角",WCGestureChatInputOuterRoundingKey),WCCornerNumber(@"外部圆角程度",WCGestureChatInputOuterRadiusKey,40),@{@"title":@"整页圆角预览与调节",@"previewKind":@(WCGesturePreviewInputRounding)}],
@@ -40,8 +42,8 @@ static NSDictionary *WCCornerNumber(NSString *title, NSString *key, double maxim
 - (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)path { return self.sections[path.section][path.row][@"maximum"] ? 84 : 50; }
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)path {
     NSDictionary *row = self.sections[path.section][path.row];
-    UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleValue1 reuseIdentifier:nil];
-    cell.backgroundColor = UIColor.secondarySystemGroupedBackgroundColor; cell.textLabel.font = [UIFont systemFontOfSize:16]; cell.textLabel.text = row[@"title"];
+    UITableViewCell *cell = WCGestureSettingsCardCell(tableView,nil,UITableViewCellStyleValue1,path);
+    cell.backgroundColor = UIColor.clearColor; cell.textLabel.font = [UIFont systemFontOfSize:16]; cell.textLabel.text = row[@"title"];
     cell.indentationLevel = path.row ? 1 : 0; cell.indentationWidth = 18;
     if (!path.row) {
         cell.imageView.image = [UIImage systemImageNamed:[self.collapsed containsIndex:path.section] ? @"chevron.right" : @"chevron.down"

@@ -4,6 +4,7 @@
 
 static char WCRevokeLabelKey;
 static char WCRevokeOriginalColorKey;
+static char WCRevokeAppliedColorKey;
 
 void WCGestureAntiRevokeStyleLabel(UILabel *label) {
     label.font = [UIFont systemFontOfSize:10.5];
@@ -91,21 +92,35 @@ void WCGestureAntiRevokeLayout(UIView *cell) {
 void WCGestureAntiRevokeSystemCellLayout(UIView *cell) {
     id richText = WCTweakSafeValue(cell, @"m_richTextView");
     if (!richText) return;
-    UIColor *original = objc_getAssociatedObject(richText, &WCRevokeOriginalColorKey);
-    if (!original) {
-        original = WCTweakSafeValue(richText, @"textColor") ?: WCTweakSafeValue(richText, @"oTextColor");
-        if ([original isKindOfClass:UIColor.class]) objc_setAssociatedObject(richText, &WCRevokeOriginalColorKey, original, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        else original = nil;
-    }
     BOOL apply = WCGestureEnabled(WCGestureAntiRevokeEnabledKey) &&
         WCGestureAntiRevokeIsLocalPromptMessage(WCGestureMessageWrapForCell(cell));
-    UIColor *color = apply ? WCGestureDynamicColorForDefaultsKeys(WCGestureAntiRevokeLocalLightTextColorKey,
-        WCGestureAntiRevokeLocalDarkTextColorKey, WCGestureAntiRevokeLocalTextColorKey,
-        UIColor.secondaryLabelColor, UIColor.secondaryLabelColor) : original;
-    if (color) {
-        WCTweakSetValue(richText, @"textColor", color);
-        WCTweakSetValue(richText, @"oTextColor", color);
+    NSDictionary *original = objc_getAssociatedObject(richText, &WCRevokeOriginalColorKey);
+    UIColor *applied = objc_getAssociatedObject(richText, &WCRevokeAppliedColorKey);
+    // Ordinary native tips are untouched unless this label still holds a color
+    // previously applied by us. textColor and oTextColor have separate baselines.
+    if (!apply) {
+        if (!original) return;
+        for (NSString *key in @[@"textColor", @"oTextColor"]) {
+            id saved=original[key];
+            if (saved && [WCTweakSafeValue(richText,key) isEqual:applied])
+                WCTweakSetValue(richText,key,saved==NSNull.null?nil:saved);
+        }
+        objc_setAssociatedObject(richText,&WCRevokeOriginalColorKey,nil,OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        objc_setAssociatedObject(richText,&WCRevokeAppliedColorKey,nil,OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        return;
     }
+    NSMutableDictionary *baseline=[original mutableCopy] ?: [NSMutableDictionary dictionary];
+    for (NSString *key in @[@"textColor", @"oTextColor"]) {
+        id current=WCTweakSafeValue(richText,key);
+        if (!original || ![current isEqual:applied]) baseline[key]=current ?: NSNull.null;
+    }
+    UIColor *color=WCGestureDynamicColorForDefaultsKeys(WCGestureAntiRevokeLocalLightTextColorKey,
+        WCGestureAntiRevokeLocalDarkTextColorKey, WCGestureAntiRevokeLocalTextColorKey,
+        UIColor.secondaryLabelColor, UIColor.secondaryLabelColor);
+    objc_setAssociatedObject(richText,&WCRevokeOriginalColorKey,baseline,OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    objc_setAssociatedObject(richText,&WCRevokeAppliedColorKey,color,OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    WCTweakSetValue(richText,@"textColor",color);
+    WCTweakSetValue(richText,@"oTextColor",color);
 }
 
 void WCGestureAntiRevokeSettingsChanged(NSString *key) {

@@ -408,7 +408,7 @@ void WCGestureRegisterDefaults(void) {
             WCGestureHomeSwipeEnabledKey: @NO,
             WCGestureMultiSelectEnabledKey: @NO,
             WCGestureHomeGroupsUnifiedColorEnabledKey: @NO,
-            WCGestureHomeGroupsUnifiedColorKey: @"",
+            WCGestureHomeGroupsUnifiedColorKey: @"#FFFFFF",
             WCGestureHomeGroupsEnabledKey: @NO,
             WCGestureHomeGroupsListKey: @[@{@"id":@"builtin.friend",@"type":@"friend",@"title":@"好友"},@{@"id":@"builtin.group",@"type":@"group",@"title":@"群聊"},@{@"id":@"builtin.other",@"type":@"other",@"title":@"其他"},@{@"id":@"builtin.instant",@"type":@"instant",@"title":@"即时消息"}],
             WCGestureHomeGroupsSelectedKey: @"builtin.friend",

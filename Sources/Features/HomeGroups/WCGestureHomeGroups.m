@@ -190,7 +190,8 @@ NSIndexPath *WCGestureHomeGroupsFind(id logic, NSString *user) {
 @property (nonatomic, weak) UIViewController *controller;
 @property (nonatomic, weak) UITableView *table;
 @property (nonatomic, strong) UIView *originalHeader;
-@property (nonatomic, strong) UIStackView *stack;
+@property (nonatomic, strong) UIView *stack;
+@property (nonatomic, strong) NSMutableArray<UIButton *> *buttons;
 @property (nonatomic, strong) UIView *indicator;
 @property (nonatomic, strong) UISwipeGestureRecognizer *left;
 @property (nonatomic, strong) UISwipeGestureRecognizer *right;
@@ -203,6 +204,8 @@ NSIndexPath *WCGestureHomeGroupsFind(id logic, NSString *user) {
 @property (nonatomic) BOOL initialPresentationFinished;
 @property (nonatomic, strong) NSMapTable<UIView *, id> *nativeBackgrounds;
 @property (nonatomic, strong) UIColor *chromeColor;
+@property (nonatomic, strong) UIImage *nativePinnedImage;
+@property (nonatomic, strong) UIColor *nativePinnedColor;
 - (void)update;
 - (void)updateBackground;
 - (void)restoreBackgrounds;
@@ -214,7 +217,7 @@ NSIndexPath *WCGestureHomeGroupsFind(id logic, NSString *user) {
     if ((self=[super initWithFrame:frame])) {
         _nativeBackgrounds=[NSMapTable weakToStrongObjectsMapTable];
         _indicator=[UIView new]; _indicator.userInteractionEnabled=NO;[self addSubview:_indicator];
-        _stack=[UIStackView new];_stack.axis=UILayoutConstraintAxisHorizontal;_stack.distribution=UIStackViewDistributionFillEqually;
+        _stack=[UIView new];_buttons=[NSMutableArray array];
         [self addSubview:_stack];
     }return self;
 }
@@ -256,32 +259,53 @@ NSIndexPath *WCGestureHomeGroupsFind(id logic, NSString *user) {
     if (!unified) [self restoreBackgrounds];
     id header=WCTweakSafeValue(self.controller,@"m_headerLogic");
     UIView *device=WCTweakSafeValue(header,@"m_webMMBtn");
-    UIColor *color=nil;
-    for (UIView *view=device;view && view!=self.table;view=view.superview) {
+    UIColor *color=self.nativePinnedColor;
+    id logic=WCTweakSafeValue(self.controller,@"m_mainFrameLogicController");
+    for (UITableViewCell *cell in self.table.visibleCells) {
+        NSIndexPath *path=[self.table indexPathForCell:cell];
+        if (!path) continue;
+        NSArray *entries=WCGestureHomeGroupsSection(logic,path.section);
+        id session=path.row<(NSInteger)entries.count?entries[path.row][@"session"]:nil;
+        if (![WCTweakSafeValue(session,@"m_bIsTop") boolValue]) continue;
+        // 8.0.79 NewMainFrameCell draws pinned fill using this native image,
+        // so the cell's backgroundColor alone can misleadingly report white.
+        UIImage *image=WCTweakSafeValue(cell,@"m_cellBkgImageWithTop");
+        if ([image isKindOfClass:UIImage.class] && image.CGImage && image!=self.nativePinnedImage) {
+            self.nativePinnedImage=image;
+            unsigned char pixel[4]={0};
+            CGColorSpaceRef space=CGColorSpaceCreateDeviceRGB();
+            CGContextRef context=CGBitmapContextCreate(pixel,1,1,8,4,space,kCGImageAlphaPremultipliedLast|kCGBitmapByteOrder32Big);
+            CGColorSpaceRelease(space);
+            if (context) {
+                CGFloat w=CGImageGetWidth(image.CGImage),h=CGImageGetHeight(image.CGImage);
+                CGContextDrawImage(context,CGRectMake(0.5-w/2,0.5-h/2,w,h),image.CGImage);
+                CGContextRelease(context);
+                if (pixel[3]==255) self.nativePinnedColor=[UIColor colorWithRed:pixel[0]/255.0 green:pixel[1]/255.0 blue:pixel[2]/255.0 alpha:1];
+            }
+        }
+        color=self.nativePinnedColor;
+        if (!color) for (UIView *view in @[cell.backgroundView ?: cell,cell.contentView,cell]) {
+            id native=[self.nativeBackgrounds objectForKey:view];
+            UIColor *candidate=native?(native==NSNull.null?nil:native):view.backgroundColor;
+            CGFloat red=0,green=0,blue=0,alpha=0;
+            UIColor *resolved=[candidate resolvedColorWithTraitCollection:self.traitCollection];
+            if ([resolved getRed:&red green:&green blue:&blue alpha:&alpha] && alpha>0.99
+                && (red<0.99 || green<0.99 || blue<0.99)) { color=candidate;break; }
+        }
+        if (color) break;
+    }
+    if (!color) for (UIView *view=device;view && view!=self.table;view=view.superview) {
         id native=[self.nativeBackgrounds objectForKey:view];
         UIColor *candidate=native?(native==NSNull.null?nil:native):view.backgroundColor;
-        if (candidate && CGColorGetAlpha([candidate resolvedColorWithTraitCollection:self.traitCollection].CGColor)>0.99) { color=candidate;break; }
+        CGFloat red=0,green=0,blue=0,alpha=0;
+            UIColor *resolved=[candidate resolvedColorWithTraitCollection:self.traitCollection];
+            if ([resolved getRed:&red green:&green blue:&blue alpha:&alpha] && alpha>0.99
+                && (red<0.99 || green<0.99 || blue<0.99)) { color=candidate;break; }
     }
-    // Without a device banner, match an actual pinned row before falling back
-    // to the table's color. Read native colors; only the opt-in path writes them.
-    if (!color) {
-        id logic=WCTweakSafeValue(self.controller,@"m_mainFrameLogicController");
-        for (UITableViewCell *cell in self.table.visibleCells) {
-            NSIndexPath *path=[self.table indexPathForCell:cell];
-            if (!path) continue;
-            NSArray *entries=WCGestureHomeGroupsSection(logic,path.section);
-            id session=path.row<(NSInteger)entries.count?entries[path.row][@"session"]:nil;
-            if (![WCTweakSafeValue(session,@"m_bIsTop") boolValue]) continue;
-            for (UIView *view in @[cell.backgroundView ?: cell,cell.contentView,cell]) {
-                id native=[self.nativeBackgrounds objectForKey:view];
-                UIColor *candidate=native?(native==NSNull.null?nil:native):view.backgroundColor;
-                if (candidate && CGColorGetAlpha([candidate resolvedColorWithTraitCollection:self.traitCollection].CGColor)>0.99) { color=candidate;break; }
-            }
-            if (color) break;
-        }
-    }
-    if (!color) color=self.table.backgroundColor ?: UIColor.systemGroupedBackgroundColor;
-    UIColor *target=unified?WCGestureColorForDefaultsKey(WCGestureHomeGroupsUnifiedColorKey,color):color;
+    // Use a gray placeholder, never the white table surface, until native fill
+    // is available. Unified mode has its own white default (including old empty values).
+    if (!color) color=UIColor.systemGroupedBackgroundColor;
+    UIColor *target=unified?WCGestureColorForDefaultsKey(WCGestureHomeGroupsUnifiedColorKey,UIColor.whiteColor):color;
     if (![target isEqual:self.chromeColor]) [self restoreBackgrounds];
     self.chromeColor=target;self.backgroundColor=target;
     if (!unified) return;
@@ -296,7 +320,9 @@ NSIndexPath *WCGestureHomeGroupsFind(id logic, NSString *user) {
 }
 - (void)traitCollectionDidChange:(UITraitCollection *)previous {
     [super traitCollectionDidChange:previous];
-    if ([self.traitCollection hasDifferentColorAppearanceComparedToTraitCollection:previous]) [self updateBackground];
+    if ([self.traitCollection hasDifferentColorAppearanceComparedToTraitCollection:previous]) {
+        self.nativePinnedImage=nil;self.nativePinnedColor=nil;[self updateBackground];
+    }
 }
 - (void)chosen:(UIButton *)button {
     WCGestureHomeGroupsSelect(WCGestureHomeGroupsList()[button.tag][@"id"]);
@@ -332,26 +358,37 @@ NSIndexPath *WCGestureHomeGroupsFind(id logic, NSString *user) {
 }
 - (void)update {
     CGFloat width=self.table.bounds.size.width, nativeHeight=self.originalHeader.bounds.size.height;
-    if (self.version==WCGroupVersion && self.lastWidth==width && self.originalHeight==nativeHeight) return;
-    self.version=WCGroupVersion;self.lastWidth=width;self.originalHeight=nativeHeight;
+    if (width<=0) return;
     CGFloat scale=WCGestureLayoutScaleFactor(), height=44*scale;
     self.frame=CGRectMake(0,0,width,nativeHeight+height);
     self.originalHeader.frame=CGRectMake(0,0,width,nativeHeight);
-    self.stack.frame=CGRectMake(12*scale,nativeHeight,width-24*scale,height);
+    self.stack.frame=CGRectMake(12*scale,nativeHeight,MAX(0,width-24*scale),height);
+    // Always restore geometry, even when only the native header was relaid out.
+    for (NSUInteger i=0;i<self.buttons.count;i++) {
+        CGFloat left=self.stack.bounds.size.width*i/self.buttons.count;
+        CGFloat right=self.stack.bounds.size.width*(i+1)/self.buttons.count;
+        self.buttons[i].frame=CGRectMake(left,0,right-left,height);
+    }
+    if (self.version==WCGroupVersion && self.lastWidth==width && self.originalHeight==nativeHeight) return;
+    self.version=WCGroupVersion;self.lastWidth=width;self.originalHeight=nativeHeight;
     NSArray *groups=WCGestureHomeGroupsList();NSUserDefaults *d=NSUserDefaults.standardUserDefaults;
     CGFloat font=MAX(10,MIN(24,[d doubleForKey:WCGestureHomeGroupsFontSizeKey]))*scale;
     CGFloat weight=[d doubleForKey:WCGestureHomeGroupsFontWeightKey];
     UIFontWeight fw=weight<=300?UIFontWeightLight:(weight>=500?UIFontWeightMedium:UIFontWeightRegular);
     NSUInteger selected=0;
-    while(self.stack.arrangedSubviews.count>groups.count) { UIView *button=self.stack.arrangedSubviews.lastObject;[self.stack removeArrangedSubview:button];[button removeFromSuperview]; }
-    while(self.stack.arrangedSubviews.count<groups.count) {
+    while(self.buttons.count>groups.count) { [self.buttons.lastObject removeFromSuperview];[self.buttons removeLastObject]; }
+    while(self.buttons.count<groups.count) {
         UIButton *button=[UIButton buttonWithType:UIButtonTypeCustom];
         [button addTarget:self action:@selector(chosen:) forControlEvents:UIControlEventTouchUpInside];
         [button addGestureRecognizer:[[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(manage:)]];
-        [self.stack addArrangedSubview:button];
+        button.titleLabel.numberOfLines=1;button.titleLabel.lineBreakMode=NSLineBreakByTruncatingTail;
+        [self.stack addSubview:button];[self.buttons addObject:button];
     }
     for (NSUInteger i=0;i<groups.count;i++) {
-        UIButton *button=(UIButton *)self.stack.arrangedSubviews[i];button.tag=i;
+        UIButton *button=self.buttons[i];button.tag=i;
+        CGFloat left=self.stack.bounds.size.width*i/groups.count;
+        CGFloat right=self.stack.bounds.size.width*(i+1)/groups.count;
+        button.frame=CGRectMake(left,0,right-left,height);
         [button setTitle:groups[i][@"title"] forState:UIControlStateNormal];
         [button setTitleColor:UIColor.labelColor forState:UIControlStateNormal];button.titleLabel.font=[UIFont systemFontOfSize:font weight:fw];
         if ([groups[i][@"id"] isEqual:WCGestureHomeGroupsSelected()]) selected=i;
@@ -418,7 +455,7 @@ NSIndexPath *WCGestureHomeGroupsFind(id logic, NSString *user) {
         }
         if (native) [badge sizeToFit];
         badge.hidden=[d boolForKey:WCGestureHomeGroupsHideBadgesKey] || (!unread && (!dot || [d boolForKey:WCGestureHomeGroupsHideRedDotsKey]));
-        UIButton *button=(UIButton *)self.stack.arrangedSubviews[index];
+        UIButton *button=self.buttons[index];
         CGFloat titleWidth=[groups[index][@"title"] sizeWithAttributes:@{NSFontAttributeName:button.titleLabel.font}].width;
         badge.center=CGPointMake(self.stack.frame.origin.x+(index+0.5)*cellWidth+titleWidth/2+badge.bounds.size.width/2+[d doubleForKey:WCGestureHomeGroupsBadgeXKey]*scale,
             self.stack.frame.origin.y+height/2-font/2+[d doubleForKey:WCGestureHomeGroupsBadgeYKey]*scale);

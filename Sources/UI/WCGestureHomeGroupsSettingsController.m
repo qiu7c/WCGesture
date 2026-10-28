@@ -80,7 +80,9 @@
     [super viewDidLoad];self.title=@"主页分组";WCGestureSettingsConfigureNavigation(self);
     self.navigationItem.rightBarButtonItem=self.editButtonItem;
     self.openSections=[NSMutableIndexSet indexSet];
-    self.tableView.backgroundColor=UIColor.secondarySystemGroupedBackgroundColor;
+    self.tableView.backgroundColor=UIColor.systemGroupedBackgroundColor;
+    self.tableView.tableHeaderView=[[UIView alloc] initWithFrame:CGRectMake(0,0,0,12)];
+    self.tableView.tableFooterView=[[UIView alloc] initWithFrame:CGRectMake(0,0,0,12)];
     self.tableView.sectionHeaderHeight=0;self.tableView.sectionFooterHeight=0;
     self.tableView.separatorStyle=UITableViewCellSeparatorStyleNone;
     self.tableView.rowHeight=50*WCGestureSettingsScaleFactor();
@@ -127,9 +129,9 @@
     return 1+(section==1?WCGestureHomeGroupsList().count+1:self.rows[section].count); }
 - (NSString *)tableView:(UITableView *)table titleForHeaderInSection:(NSInteger)section { return nil; }
 - (UITableViewCell *)tableView:(UITableView *)table cellForRowAtIndexPath:(NSIndexPath *)path {
-    UITableViewCell *cell=[[UITableViewCell alloc] initWithStyle:UITableViewCellStyleValue1 reuseIdentifier:nil];
+    UITableViewCell *cell=WCGestureSettingsCardCell(table,nil,UITableViewCellStyleValue1,path);
     cell.textLabel.font=[UIFont systemFontOfSize:15*WCGestureSettingsScaleFactor()];cell.detailTextLabel.font=[UIFont systemFontOfSize:13*WCGestureSettingsScaleFactor()];
-    cell.backgroundColor=UIColor.secondarySystemGroupedBackgroundColor;
+    cell.backgroundColor=UIColor.clearColor;
     if (path.section>0 && path.row==0) {
         cell.textLabel.text=@[@"",@"分组管理",@"切换与置顶",@"分组外观",@"未读角标"][path.section];
         cell.imageView.image=[UIImage systemImageNamed:@[@"",@"rectangle.3.group",@"arrow.left.arrow.right",@"slider.horizontal.3",@"app.badge"][path.section]

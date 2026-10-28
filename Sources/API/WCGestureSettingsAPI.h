@@ -57,4 +57,5 @@ UIViewController *WCGestureCreateCornerSettingsController(void);
 UIViewController *WCGestureCreateAutoStatusSettingsController(void);
 UITableViewCell *WCGestureContactPickerCell(UITableView *table, NSString *username, NSString *title);
 UIViewController *WCGestureCreateChangelogController(void);
+UITableViewCell *WCGestureSettingsCardCell(UITableView *table, NSString * _Nullable identifier, UITableViewCellStyle style, NSIndexPath *path);
 NS_ASSUME_NONNULL_END
