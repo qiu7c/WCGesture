@@ -21,7 +21,7 @@ void WCGestureSettingsConfigureNavigation(UIViewController *controller) {
     for (UINavigationBarAppearance *source in sources) {
         UINavigationBarAppearance *appearance = [source copy];
         NSMutableDictionary *titleAttributes = [appearance.titleTextAttributes mutableCopy] ?: [NSMutableDictionary dictionary];
-        titleAttributes[NSFontAttributeName] = [UIFont systemFontOfSize:17 * WCGestureSettingsScaleFactor() weight:transparentHome ? UIFontWeightSemibold : UIFontWeightRegular];
+        titleAttributes[NSFontAttributeName] = [UIFont systemFontOfSize:17 * WCGestureSettingsScaleFactor() weight:UIFontWeightSemibold];
         appearance.titleTextAttributes = titleAttributes;
         if (transparentHome) {
             [appearance configureWithTransparentBackground];
@@ -42,7 +42,7 @@ void WCGestureSettingsConfigureNavigation(UIViewController *controller) {
     item.scrollEdgeAppearance = appearances[1];
     item.compactAppearance = appearances[2];
     if (@available(iOS 15.0, *)) {
-        if (transparentHome) item.compactScrollEdgeAppearance = appearances[2];
+        item.compactScrollEdgeAppearance = appearances[2];
     }
 }
 

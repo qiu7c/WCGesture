@@ -1,6 +1,10 @@
 #import "Sources/API/WCGestureInternal.h"
 
 %hook NewMainFrameViewController
+- (void)tableView:(UITableView *)table willDisplayCell:(UITableViewCell *)cell forRowAtIndexPath:(NSIndexPath *)path {
+    %orig(table,cell,path);
+    WCGestureHomeGroupsStyleCell((UIViewController *)self,cell,path);
+}
 - (void)viewDidAppear:(BOOL)animated {
     %orig(animated);
     WCGestureHomeGroupsAttach((UIViewController *)self);
@@ -21,9 +25,8 @@
     return %orig;
 }
 - (void)setReadyToLoadData {
-    WCGestureHomeGroupsBeginNative();
+    WCGestureHomeGroupsInvalidate(self);
     %orig;
-    WCGestureHomeGroupsEndNative();
     WCGestureHomeGroupsInvalidate(self);
 }
 - (id)getSessionBaseInfoAtIndexPath:(NSIndexPath *)path {
@@ -77,57 +80,48 @@
     return count;
 }
 - (void)onMainSessionReload {
-    WCGestureHomeGroupsBeginNative();
+    WCGestureHomeGroupsInvalidate(self);
     %orig;
-    WCGestureHomeGroupsEndNative();
     WCGestureHomeGroupsInvalidate(self);
 }
 - (void)onSessionRebuildEnd {
-    WCGestureHomeGroupsBeginNative();
+    WCGestureHomeGroupsInvalidate(self);
     %orig;
-    WCGestureHomeGroupsEndNative();
     WCGestureHomeGroupsInvalidate(self);
 }
 - (void)onNeedRebuild {
-    WCGestureHomeGroupsBeginNative();
+    WCGestureHomeGroupsInvalidate(self);
     %orig;
-    WCGestureHomeGroupsEndNative();
     WCGestureHomeGroupsInvalidate(self);
 }
 - (void)onSessionChanged:(id)session {
-    WCGestureHomeGroupsBeginNative();
+    WCGestureHomeGroupsInvalidate(self);
     %orig(session);
-    WCGestureHomeGroupsEndNative();
     WCGestureHomeGroupsInvalidate(self);
 }
 - (void)onNewMsgArriving:(id)message NotifyFlag:(long long)flag {
-    WCGestureHomeGroupsBeginNative();
+    WCGestureHomeGroupsInvalidate(self);
     %orig(message,flag);
-    WCGestureHomeGroupsEndNative();
     WCGestureHomeGroupsInvalidate(self);
 }
 - (void)onDeleteSession:(unsigned int)index withUser:(id)user {
-    WCGestureHomeGroupsBeginNative();
+    WCGestureHomeGroupsInvalidate(self);
     %orig(index,user);
-    WCGestureHomeGroupsEndNative();
     WCGestureHomeGroupsInvalidate(self);
 }
 - (void)onHideSessionWithUserName:(id)user {
-    WCGestureHomeGroupsBeginNative();
+    WCGestureHomeGroupsInvalidate(self);
     %orig(user);
-    WCGestureHomeGroupsEndNative();
     WCGestureHomeGroupsInvalidate(self);
 }
 - (void)OnChangeGroup:(id)group {
-    WCGestureHomeGroupsBeginNative();
+    WCGestureHomeGroupsInvalidate(self);
     %orig(group);
-    WCGestureHomeGroupsEndNative();
     WCGestureHomeGroupsInvalidate(self);
 }
 - (void)OnChangeNotifyStatus:(id)user withStatus:(BOOL)status {
-    WCGestureHomeGroupsBeginNative();
+    WCGestureHomeGroupsInvalidate(self);
     %orig(user,status);
-    WCGestureHomeGroupsEndNative();
     WCGestureHomeGroupsInvalidate(self);
 }
 %end
@@ -157,21 +151,18 @@
     return %orig;
 }
 - (void)updateMainSessionList {
-    WCGestureHomeGroupsBeginNative();
+    WCGestureHomeGroupsInvalidate(self);
     %orig;
-    WCGestureHomeGroupsEndNative();
     WCGestureHomeGroupsInvalidate(self);
 }
 - (void)updateMainSessionListNotify:(BOOL)notify {
-    WCGestureHomeGroupsBeginNative();
+    WCGestureHomeGroupsInvalidate(self);
     %orig(notify);
-    WCGestureHomeGroupsEndNative();
     WCGestureHomeGroupsInvalidate(self);
 }
 - (void)rebuildMainSessions {
-    WCGestureHomeGroupsBeginNative();
+    WCGestureHomeGroupsInvalidate(self);
     %orig;
-    WCGestureHomeGroupsEndNative();
     WCGestureHomeGroupsInvalidate(self);
 }
 %end

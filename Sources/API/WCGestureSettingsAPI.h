@@ -55,4 +55,6 @@ void WCGesturePresentSettings(UIViewController *presenter);
 
 UIViewController *WCGestureCreateCornerSettingsController(void);
 UIViewController *WCGestureCreateAutoStatusSettingsController(void);
+UITableViewCell *WCGestureContactPickerCell(UITableView *table, NSString *username, NSString *title);
+UIViewController *WCGestureCreateChangelogController(void);
 NS_ASSUME_NONNULL_END

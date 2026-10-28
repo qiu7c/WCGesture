@@ -6,4 +6,6 @@ NSString *WCGesturePrivateNotificationDisplayName(NSString * _Nullable username,
 UIView *WCGestureContactAvatarView(NSString *username);
 UIView *WCGestureContactUnroundedAvatarView(NSString *username);
 UIView *WCGestureContactUncroppedAvatarView(NSString *username);
+// 0: friend, 1: group, NSNotFound: service/official/other contact.
+NSInteger WCGestureContactPickerKind(id _Nullable contact, NSString *username);
 NS_ASSUME_NONNULL_END

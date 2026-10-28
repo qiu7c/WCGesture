@@ -5,17 +5,22 @@
 @property (nonatomic, strong) UIView *source;
 
 - (instancetype)initWithUserName:(NSString *)userName;
+- (void)reloadForUserName:(NSString *)userName;
 @end
 @implementation WCInfoAvatarHost
 - (instancetype)initWithUserName:(NSString *)userName {
     self = [super initWithFrame:CGRectZero];
     if (!self) return nil;
     self.clipsToBounds = YES; self.layer.cornerCurve = kCACornerCurveContinuous;
-    self.source = WCGestureContactUncroppedAvatarView(userName);
-    WCGestureExcludeHeadViewFromGlobalAvatarRounding(self.source);
-    self.source.userInteractionEnabled = NO;
-    [self addSubview:self.source];
+    [self reloadForUserName:userName];
     return self;
+}
+- (void)reloadForUserName:(NSString *)userName {
+    [self.source removeFromSuperview];
+    self.source=WCGestureEnabled(WCGestureCustomAvatarEnabledKey) && [WCGestureCustomAvatarSavedUsers() containsObject:userName]
+        ? WCGestureContactUnroundedAvatarView(userName) : WCGestureContactUncroppedAvatarView(userName);
+    WCGestureExcludeHeadViewFromGlobalAvatarRounding(self.source);self.source.userInteractionEnabled=NO;
+    [self addSubview:self.source];[self setNeedsLayout];
 }
 - (void)layoutSubviews {
     [super layoutSubviews];
@@ -214,6 +219,11 @@
         [self.account isEqualToString:WCCurrentUserWXID()]) {
         [rows addObject:@{@"title":@"发送前确认", @"value":@"", @"action":@"send-confirmation"}];
     }
+    if (WCGestureEnabled(WCGestureCustomAvatarEnabledKey) &&
+        [self.account isEqualToString:WCCurrentUserWXID()] &&
+        WCGestureContactPickerKind(WCPrivateContact(self.userName),self.userName)!=NSNotFound) {
+        [rows addObject:@{@"title":@"替换头像", @"value":[WCGestureCustomAvatarSavedUsers() containsObject:self.userName]?@"已替换":@"选择", @"action":@"custom-avatar"}];
+    }
     return rows;
 }
 - (void)toggleSendConfirmation:(UISwitch *)sender {
@@ -251,7 +261,7 @@
     CGFloat size = MIN(14, MAX(8, self.fieldRowHeight - 6));
     cell.field.font = [UIFont systemFontOfSize:size]; cell.value.font = [UIFont systemFontOfSize:size];
     cell.accessoryType = row[@"action"] ? UITableViewCellAccessoryDisclosureIndicator : UITableViewCellAccessoryNone;
-    cell.accessibilityHint = row[@"action"] ? @"查看共同群聊" : @"复制内容";
+    cell.accessibilityHint = [row[@"action"] isEqualToString:@"custom-avatar"] ? @"修改或恢复当前头像" : (row[@"action"] ? @"查看共同群聊" : @"复制内容");
     return cell;
 }
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)path {
@@ -264,6 +274,16 @@
     } else if ([row[@"action"] isEqualToString:@"groups"]) {
         self.showingGroups = YES; self.heading.text = @"共同群聊"; self.backButton.hidden = NO; self.avatar.hidden = YES;
         [self.view setNeedsLayout]; [self updateGroupStatus]; [self.table reloadData];
+    } else if ([row[@"action"] isEqualToString:@"custom-avatar"]) {
+        if (!WCRefreshCachedCurrentUser() || ![self.account isEqualToString:WCCurrentUserWXID()]) {
+            WCShowToast(@"账号已切换，请重新打开资料卡");return;
+        }
+        __weak typeof(self) weakSelf=self;
+        WCGesturePresentCustomAvatarEditor(self,self.userName,^(BOOL changed){
+            WCContactInfoCardController *card=weakSelf;
+            if (!changed || ![card.account isEqualToString:WCCurrentUserWXID()]) return;
+            [card.avatar reloadForUserName:card.userName];[card.table reloadData];[card.view setNeedsLayout];
+        });
     } else if ([row[@"action"] isEqualToString:@"send-confirmation"]) {
         return;
     } else { UIPasteboard.generalPasteboard.string = row[@"value"]; UIAccessibilityPostNotification(UIAccessibilityAnnouncementNotification, @"已复制"); }

@@ -22,6 +22,11 @@ static NSDictionary *WCCornerNumber(NSString *title, NSString *key, double maxim
     self.collapsed = [NSMutableIndexSet indexSet];
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(changed:) name:WCGestureDidChangeNotification object:nil];
 }
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    self.collapsed=[NSMutableIndexSet indexSetWithIndexesInRange:NSMakeRange(0,self.sections.count)];
+    [self.tableView reloadData];
+}
 - (void)dealloc { [NSNotificationCenter.defaultCenter removeObserver:self]; }
 - (void)changed:(NSNotification *)note {
     for (UITableViewCell *cell in self.tableView.visibleCells) if (((UISlider *)[cell.contentView viewWithTag:9550]).isTracking) return;

@@ -7,21 +7,30 @@
 @property (nonatomic, strong) NSMutableSet *selected;
 @property (nonatomic, copy) NSArray<NSDictionary *> *contacts;
 @property (nonatomic, copy) NSArray<NSDictionary *> *filtered;
+@property (nonatomic, copy) NSArray<NSArray<NSDictionary *> *> *contactSections;
 @property (nonatomic, strong) UITextField *search;
 @end
 @implementation WCHomeGroupMembers
 - (void)viewDidLoad {
     [super viewDidLoad];self.title=self.instant?@"即时消息会话":@"分组成员";WCGestureSettingsConfigureNavigation(self);
     self.navigationItem.rightBarButtonItem=[[UIBarButtonItem alloc] initWithTitle:@"完成" style:UIBarButtonItemStylePlain target:self action:@selector(save)];
+    self.tableView.backgroundColor=UIColor.systemGroupedBackgroundColor;
+    self.tableView.rowHeight=64*WCGestureSettingsScaleFactor();
+    self.tableView.keyboardDismissMode=UIScrollViewKeyboardDismissModeOnDrag;
     NSMutableSet *assigned=[NSMutableSet set];
     for (NSDictionary *group in WCGestureHomeGroupsList()) if (!self.instant && [group[@"type"] isEqual:@"custom"] && ![group[@"id"] isEqual:self.groupID]) [assigned addObjectsFromArray:group[@"members"]];
     NSMutableDictionary *rows=[NSMutableDictionary dictionary];
     for (id contact in WCGesturePrivateContactList()) {
         NSString *user=[contact isKindOfClass:NSString.class]?contact:WCPrivateContactUserName(contact);
-        if (!user.length || [assigned containsObject:user]) continue;
-        rows[user]=@{@"user":user,@"title":WCGesturePrivateContactDisplayName([contact isKindOfClass:NSString.class]?WCPrivateContact(user):contact,user)};
+        id native=[contact isKindOfClass:NSString.class]?WCPrivateContact(user):contact;
+        NSInteger kind=WCGestureContactPickerKind(native,user);
+        if (kind==NSNotFound || [assigned containsObject:user]) continue;
+        rows[user]=@{@"user":user,@"kind":@(kind),@"title":WCGesturePrivateContactDisplayName([contact isKindOfClass:NSString.class]?WCPrivateContact(user):contact,user)};
     }
-    for (NSString *user in self.selected) if (!rows[user]) rows[user]=@{@"user":user,@"title":WCGesturePrivateNotificationDisplayName(user,user)};
+    for (NSString *user in self.selected) if (!rows[user]) {
+        NSInteger kind=WCGestureContactPickerKind(WCPrivateContact(user),user);
+        if (kind!=NSNotFound) rows[user]=@{@"user":user,@"kind":@(kind),@"title":WCGesturePrivateNotificationDisplayName(user,user)};
+    }
     self.contacts=[rows.allValues sortedArrayUsingComparator:^NSComparisonResult(NSDictionary *a,NSDictionary *b){return [a[@"title"] localizedCaseInsensitiveCompare:b[@"title"]];}];
     self.search=[UITextField new];self.search.placeholder=@"搜索联系人或群聊";self.search.delegate=self;
     [self.search addTarget:self action:@selector(filter) forControlEvents:UIControlEventEditingChanged];
@@ -30,17 +39,25 @@
 - (void)filter {
     NSString *q=self.search.text ?: @"";
     self.filtered=q.length?[self.contacts filteredArrayUsingPredicate:[NSPredicate predicateWithBlock:^BOOL(NSDictionary *row,__unused NSDictionary *bindings){return [row[@"title"] localizedCaseInsensitiveContainsString:q] || [row[@"user"] localizedCaseInsensitiveContainsString:q];}]]:self.contacts;
+    NSMutableArray *friends=[NSMutableArray array], *groups=[NSMutableArray array];
+    for (NSDictionary *row in self.filtered) [( [row[@"kind"] integerValue]==0 ? friends : groups ) addObject:row];
+    self.contactSections=@[friends,groups];
     [self.tableView reloadData];
 }
 - (BOOL)textFieldShouldReturn:(UITextField *)field { [field resignFirstResponder];return YES; }
-- (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section { return self.filtered.count; }
+- (NSArray<NSDictionary *> *)rowsInSection:(NSInteger)section {
+    return self.contactSections[section];
+}
+- (NSInteger)numberOfSectionsInTableView:(UITableView *)table { return 2; }
+- (NSString *)tableView:(UITableView *)table titleForHeaderInSection:(NSInteger)section { return section==0?@"好友":@"群聊"; }
+- (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section { return [self rowsInSection:section].count; }
 - (UITableViewCell *)tableView:(UITableView *)table cellForRowAtIndexPath:(NSIndexPath *)path {
-    UITableViewCell *cell=[table dequeueReusableCellWithIdentifier:@"member"] ?: [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:@"member"];
-    NSDictionary *row=self.filtered[path.row];cell.textLabel.text=row[@"title"];cell.textLabel.font=[UIFont systemFontOfSize:15*WCGestureSettingsScaleFactor()];
+    NSDictionary *row=[self rowsInSection:path.section][path.row];
+    UITableViewCell *cell=WCGestureContactPickerCell(table,row[@"user"],row[@"title"]);
     cell.accessoryType=[self.selected containsObject:row[@"user"]]?UITableViewCellAccessoryCheckmark:UITableViewCellAccessoryNone;cell.tintColor=UIColor.systemBlueColor;return cell;
 }
 - (void)tableView:(UITableView *)table didSelectRowAtIndexPath:(NSIndexPath *)path {
-    NSString *user=self.filtered[path.row][@"user"];
+    NSString *user=[self rowsInSection:path.section][path.row][@"user"];
     if ([self.selected containsObject:user]) [self.selected removeObject:user];else [self.selected addObject:user];
     [table deselectRowAtIndexPath:path animated:YES];[table reloadRowsAtIndexPaths:@[path] withRowAnimation:UITableViewRowAnimationNone];
 }
@@ -56,11 +73,15 @@
 
 @interface WCHomeGroupsSettings : UITableViewController
 @property (nonatomic, copy) NSArray<NSArray<NSDictionary *> *> *rows;
+@property (nonatomic, strong) NSMutableIndexSet *openSections;
 @end
 @implementation WCHomeGroupsSettings
 - (void)viewDidLoad {
     [super viewDidLoad];self.title=@"主页分组";WCGestureSettingsConfigureNavigation(self);
     self.navigationItem.rightBarButtonItem=self.editButtonItem;
+    self.openSections=[NSMutableIndexSet indexSet];
+    self.tableView.backgroundColor=UIColor.systemGroupedBackgroundColor;
+    self.tableView.rowHeight=50*WCGestureSettingsScaleFactor();
     // Each number row contains its actual storage key and allowed UI range.
     self.rows=@[
       @[@{@"title":@"启用主页分组",@"key":WCGestureHomeGroupsEnabledKey,@"type":@"switch"}],
@@ -93,20 +114,34 @@
         @{@"title":@"角标背景",@"key":WCGestureHomeGroupsBadgeColorKey,@"type":@"color"},
         @{@"title":@"角标文字",@"key":WCGestureHomeGroupsBadgeTextColorKey,@"type":@"color"}]];
 }
-- (void)viewWillAppear:(BOOL)animated { [super viewWillAppear:animated];[self.tableView reloadData]; }
+- (void)viewWillAppear:(BOOL)animated { [super viewWillAppear:animated];[self.openSections removeAllIndexes];[self.tableView reloadData]; }
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)table { return self.rows.count; }
-- (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section { return section==1?WCGestureHomeGroupsList().count+1:self.rows[section].count; }
-- (NSString *)tableView:(UITableView *)table titleForHeaderInSection:(NSInteger)section { return @[@"",@"分组",@"切换",@"外观",@"角标"][section]; }
+- (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section { if (section==0) return 1;
+    if (![self.openSections containsIndex:section]) return 1;
+    return 1+(section==1?WCGestureHomeGroupsList().count+1:self.rows[section].count); }
+- (NSString *)tableView:(UITableView *)table titleForHeaderInSection:(NSInteger)section { return nil; }
 - (UITableViewCell *)tableView:(UITableView *)table cellForRowAtIndexPath:(NSIndexPath *)path {
     UITableViewCell *cell=[[UITableViewCell alloc] initWithStyle:UITableViewCellStyleValue1 reuseIdentifier:nil];
     cell.textLabel.font=[UIFont systemFontOfSize:15*WCGestureSettingsScaleFactor()];cell.detailTextLabel.font=[UIFont systemFontOfSize:13*WCGestureSettingsScaleFactor()];
+    cell.backgroundColor=UIColor.secondarySystemGroupedBackgroundColor;
+    if (path.section>0 && path.row==0) {
+        cell.textLabel.text=@[@"",@"分组管理",@"切换与置顶",@"分组外观",@"未读角标"][path.section];
+        cell.imageView.image=[UIImage systemImageNamed:@[@"",@"rectangle.3.group",@"arrow.left.arrow.right",@"slider.horizontal.3",@"app.badge"][path.section]
+            withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:17 weight:UIImageSymbolWeightRegular]];
+        cell.imageView.tintColor=UIColor.systemBlueColor;
+        UIImageView *arrow=[[UIImageView alloc] initWithImage:[UIImage systemImageNamed:[self.openSections containsIndex:path.section]?@"chevron.down":@"chevron.right"]];
+        arrow.tintColor=UIColor.tertiaryLabelColor;arrow.frame=CGRectMake(0,0,12,16);arrow.contentMode=UIViewContentModeScaleAspectFit;cell.accessoryView=arrow;return cell;
+    }
+    if (path.section>0) cell.indentationLevel=1;
+    cell.indentationWidth=18*WCGestureSettingsScaleFactor();
+    NSInteger rowIndex=path.row-(path.section>0?1:0);
     if (path.section==1) {
-        if (path.row==(NSInteger)WCGestureHomeGroupsList().count) { cell.textLabel.text=@"添加分组";cell.textLabel.textColor=UIColor.systemBlueColor;return cell; }
-        NSDictionary *group=WCGestureHomeGroupsList()[path.row];cell.textLabel.text=group[@"title"];
-        cell.detailTextLabel.text=[group[@"id"] isEqual:WCGestureHomeGroupsSelected()]?@"当前":nil;
+        if (rowIndex==(NSInteger)WCGestureHomeGroupsList().count) { cell.textLabel.text=@"添加分组";cell.textLabel.textColor=UIColor.systemBlueColor;return cell; }
+        NSDictionary *group=WCGestureHomeGroupsList()[rowIndex];cell.textLabel.text=group[@"title"];
+        cell.detailTextLabel.text=[group[@"id"] isEqual:WCGestureHomeGroupsSelected()]?@"当前":([group[@"type"] isEqual:@"custom"]?[NSString stringWithFormat:@"%lu 位",(unsigned long)[group[@"members"] count]]:nil);
         cell.accessoryType=UITableViewCellAccessoryDisclosureIndicator;return cell;
     }
-    NSDictionary *row=self.rows[path.section][path.row];NSString *key=row[@"key"];cell.textLabel.text=row[@"title"];
+    NSDictionary *row=self.rows[path.section][rowIndex];NSString *key=row[@"key"];cell.textLabel.text=row[@"title"];
     if ([row[@"type"] isEqual:@"switch"]) {
         UISwitch *toggle=[UISwitch new];toggle.onTintColor=UIColor.systemBlueColor;toggle.on=[NSUserDefaults.standardUserDefaults boolForKey:key];
         toggle.accessibilityIdentifier=key;[toggle addTarget:self action:@selector(toggle:) forControlEvents:UIControlEventValueChanged];cell.accessoryView=toggle;
@@ -118,11 +153,16 @@
 }
 - (void)tableView:(UITableView *)table didSelectRowAtIndexPath:(NSIndexPath *)path {
     [table deselectRowAtIndexPath:path animated:YES];
-    if (path.section==1) {
-        if (path.row==(NSInteger)WCGestureHomeGroupsList().count) { [self addGroup];return; }
-        [self editGroup:WCGestureHomeGroupsList()[path.row]];return;
+    if (path.section>0 && path.row==0) {
+        if ([self.openSections containsIndex:path.section]) [self.openSections removeIndex:path.section];else [self.openSections addIndex:path.section];
+        [table reloadSections:[NSIndexSet indexSetWithIndex:path.section] withRowAnimation:UITableViewRowAnimationAutomatic];return;
     }
-    NSDictionary *row=self.rows[path.section][path.row];NSString *key=row[@"key"];
+    NSInteger rowIndex=path.row-(path.section>0?1:0);
+    if (path.section==1) {
+        if (rowIndex==(NSInteger)WCGestureHomeGroupsList().count) { [self addGroup];return; }
+        [self editGroup:WCGestureHomeGroupsList()[rowIndex]];return;
+    }
+    NSDictionary *row=self.rows[path.section][rowIndex];NSString *key=row[@"key"];
     if ([row[@"type"] isEqual:@"color"]) { WCGestureEditChatOption(self,@{@"title":row[@"title"],@"type":@"color",@"key":key});return; }
     if (![row[@"type"] isEqual:@"number"]) return;
     [WCPopup showInputWithTitle:row[@"title"] message:nil text:[[NSUserDefaults.standardUserDefaults objectForKey:key] description]
@@ -162,18 +202,18 @@
         }
     }];
 }
-- (BOOL)tableView:(UITableView *)table canEditRowAtIndexPath:(NSIndexPath *)path { return path.section==1 && path.row<(NSInteger)WCGestureHomeGroupsList().count; }
+- (BOOL)tableView:(UITableView *)table canEditRowAtIndexPath:(NSIndexPath *)path { return path.section==1 && path.row>0 && path.row<=(NSInteger)WCGestureHomeGroupsList().count; }
 - (BOOL)tableView:(UITableView *)table canMoveRowAtIndexPath:(NSIndexPath *)path { return [self tableView:table canEditRowAtIndexPath:path]; }
 - (NSIndexPath *)tableView:(UITableView *)table targetIndexPathForMoveFromRowAtIndexPath:(NSIndexPath *)source toProposedIndexPath:(NSIndexPath *)target {
-    return [NSIndexPath indexPathForRow:MAX(0,MIN((NSInteger)WCGestureHomeGroupsList().count-1,target.row)) inSection:1];
+    return [NSIndexPath indexPathForRow:MAX(1,MIN((NSInteger)WCGestureHomeGroupsList().count,target.row)) inSection:1];
 }
 - (void)tableView:(UITableView *)table moveRowAtIndexPath:(NSIndexPath *)source toIndexPath:(NSIndexPath *)target {
-    NSMutableArray *groups=[WCGestureHomeGroupsList() mutableCopy];id group=groups[source.row];[groups removeObjectAtIndex:source.row];[groups insertObject:group atIndex:target.row];WCGestureHomeGroupsSave(groups);
+    NSMutableArray *groups=[WCGestureHomeGroupsList() mutableCopy];id group=groups[source.row-1];[groups removeObjectAtIndex:source.row-1];[groups insertObject:group atIndex:target.row-1];WCGestureHomeGroupsSave(groups);
 }
 - (void)tableView:(UITableView *)table commitEditingStyle:(UITableViewCellEditingStyle)style forRowAtIndexPath:(NSIndexPath *)path {
     if (style!=UITableViewCellEditingStyleDelete) return;
     if (WCGestureHomeGroupsList().count<2) { WCShowToast(@"至少保留一个分组");return; }
-    NSMutableArray *groups=[WCGestureHomeGroupsList() mutableCopy];[groups removeObjectAtIndex:path.row];WCGestureHomeGroupsSave(groups);[table reloadData];
+    NSMutableArray *groups=[WCGestureHomeGroupsList() mutableCopy];[groups removeObjectAtIndex:path.row-1];WCGestureHomeGroupsSave(groups);[table reloadData];
 }
 @end
 

@@ -1132,6 +1132,7 @@ typedef NS_ENUM(NSInteger, WCRowKind) {
     WCRowKindExport,         // tap → export config
     WCRowKindImport,        // tap → import config
     WCRowKindChatOption,
+    WCRowKindChangelog,
 };
 
 @interface WCRow : NSObject
@@ -1208,8 +1209,7 @@ static WCRow *WCAIPresetRow(NSString *title, NSInteger index) {
     return row;
 }
 
-// A foldable sub-group inside a section. `key` holds YES once expanded, so an
-// untouched install starts folded and the long keyboard section stays compact.
+// Nested menus share controller-local expansion state and reopen folded.
 static WCRow *WCGroupRow(NSString *title, NSString *key) {
     WCRow *row = WCPlainRow(title, WCRowKindGroupToggle);
     row.defaultsKey = key;
@@ -1326,13 +1326,15 @@ static NSString *WCRowDetailText(WCRow *row) {
         case WCRowKindSignatureClear:
             return @"";
         case WCRowKindGroupToggle:
-            return [d boolForKey:row.defaultsKey] ? @"收起" : @"展开";
+            return @"";
         case WCRowKindSendConfirmationUsers:
             return [NSString stringWithFormat:@"%lu 个", (unsigned long)WCGestureSendConfirmationProtectedConversations().count];
         case WCRowKindMomentsReminderUsers:
             return [NSString stringWithFormat:@"%lu 位", (unsigned long)WCGestureMomentsReminderUsers().count];
         case WCRowKindMomentsReminderForwardTarget:
             return [d integerForKey:WCGestureMomentsReminderForwardTargetKey] == 1 ? @"文件传输助手" : @"自己的聊天框";
+        case WCRowKindChangelog:
+            return @"1.0.0";
         case WCRowKindSectionTitle:
             return @"";
         case WCRowKindAIProvider:
@@ -1512,6 +1514,7 @@ static NSString *WCRowDetailText(WCRow *row) {
 @property (nonatomic, copy) NSArray<NSNumber *> *collapsible;
 @property (nonatomic, copy) NSArray<NSString *> *collapseKeys;
 @property (nonatomic, assign) BOOL searchIndexMode;
+@property (nonatomic, strong) NSMutableSet<NSString *> *openMenus;
 @property (nonatomic, copy) NSDictionary *pendingSearchResult;
 @end
 
@@ -1521,6 +1524,7 @@ static NSString *WCRowDetailText(WCRow *row) {
     self = [super initWithStyle:UITableViewStyleInsetGrouped];
     if (self) {
         _category = category;
+        _openMenus = [NSMutableSet set];
         switch (category) {
             case WCGestureCategoryChat: self.title = @"聊天类功能"; break;
             case WCGestureCategoryGestures: self.title = @"手势类功能"; break;
@@ -1574,10 +1578,17 @@ static NSString *WCRowDetailText(WCRow *row) {
 
 - (void)focusSearchResult:(NSDictionary *)result {
     self.pendingSearchResult = result;
-    [NSUserDefaults.standardUserDefaults setBool:NO forKey:result[@"sectionKey"]];
+    [self.openMenus addObject:result[@"sectionKey"]];
     NSString *groupKey = result[@"groupKey"];
-    if (groupKey.length) [NSUserDefaults.standardUserDefaults setBool:YES forKey:groupKey];
+    if (groupKey.length) [self.openMenus addObject:groupKey];
     [self rebuildRows];
+}
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    if (!self.pendingSearchResult) [self.openMenus removeAllObjects];
+    [self rebuildRows];
+    [self.tableView reloadData];
 }
 
 - (void)viewDidAppear:(BOOL)animated {
@@ -1727,7 +1738,7 @@ static NSString *WCRowDetailText(WCRow *row) {
                 // Folded by default for the same reason as the strip geometry.
                 NSString *signatureKey = [prefix stringByAppendingString:@".chat.keyboard.signature.expanded"];
                 [keyboard addObject:WCGroupRow(@"签名参数", signatureKey)];
-                if ((self.searchIndexMode || [d boolForKey:signatureKey])) {
+                if ((self.searchIndexMode || [self.openMenus containsObject:signatureKey])) {
                     [keyboard addObject:WCPlainRow(@"签名字号", WCRowKindSignatureSize)];
                     [keyboard addObject:WCPlainRow(@"签名字体", WCRowKindSignatureFont)];
                     [keyboard addObject:WCPlainRow(@"签名装饰", WCRowKindSignatureDecoration)];
@@ -1744,7 +1755,7 @@ static NSString *WCRowDetailText(WCRow *row) {
             // Two sets: the system keyboard and third-party keyboards.
             NSString *geometryKey = [prefix stringByAppendingString:@".chat.keyboard.geometry.expanded"];
             [keyboard addObject:WCGroupRow(@"触控区参数", geometryKey)];
-            if ((self.searchIndexMode || [d boolForKey:geometryKey])) {
+            if ((self.searchIndexMode || [self.openMenus containsObject:geometryKey])) {
                 // One shared set by default; turn this on to tune the
                 // third-party keyboard separately.
                 [keyboard addObject:WCSwitchRow(@"第三方单独调节", WCKeyboardStripSeparateAdjustKey)];
@@ -1811,7 +1822,7 @@ static NSString *WCRowDetailText(WCRow *row) {
         if (self.searchIndexMode || [d boolForKey:WCGestureMomentsReminderForwardEnabledKey]) {
             NSString *forwardGroup = [prefix stringByAppendingString:@".moments.reminder.forward.expanded"];
             [reminders addObject:WCGroupRow(@"转发选项", forwardGroup)];
-            if (self.searchIndexMode || [d boolForKey:forwardGroup]) {
+            if (self.searchIndexMode || [self.openMenus containsObject:forwardGroup]) {
                 [reminders addObject:WCPlainRow(@"转发目标", WCRowKindMomentsReminderForwardTarget)];
                 [reminders addObject:WCSwitchRow(@"同时转发图片", WCGestureMomentsReminderForwardImagesKey)];
                 [reminders addObject:WCSwitchRow(@"同时转发视频", WCGestureMomentsReminderForwardVideosKey)];
@@ -1922,6 +1933,7 @@ static NSString *WCRowDetailText(WCRow *row) {
         NSMutableArray *plugin = [NSMutableArray array];
         [plugin addObject:WCPlainRow(@"设置入口", WCRowKindEntryLocation)];
         [plugin addObject:WCPlainRow(@"插件名称", WCRowKindPluginName)];
+        [plugin addObject:WCPlainRow(@"更新日志", WCRowKindChangelog)];
         [plugin addObject:WCPlainRow(@"震感强度", WCRowKindHapticStyle)];
         [sections addObject:plugin];
         [collapsible addObject:@NO];
@@ -1999,7 +2011,7 @@ static NSString *WCRowDetailText(WCRow *row) {
 
 - (BOOL)sectionCollapsed:(NSInteger)section {
     if (section < 0 || section >= (NSInteger)self.collapseKeys.count) return NO;
-    return [[NSUserDefaults standardUserDefaults] boolForKey:self.collapseKeys[section]];
+    return ![self.openMenus containsObject:self.collapseKeys[section]];
 }
 
 #pragma mark - Table view
@@ -2023,8 +2035,8 @@ static NSString *WCRowDetailText(WCRow *row) {
 - (void)toggleCollapseForSection:(NSInteger)section {
     if (section < 0 || section >= (NSInteger)self.collapseKeys.count) return;
     NSString *key = self.collapseKeys[section];
-    BOOL now = [[NSUserDefaults standardUserDefaults] boolForKey:key];
-    [[NSUserDefaults standardUserDefaults] setBool:!now forKey:key];
+    if ([self.openMenus containsObject:key]) [self.openMenus removeObject:key];
+    else [self.openMenus addObject:key];
     [self.tableView reloadSections:[NSIndexSet indexSetWithIndex:section]
               withRowAnimation:UITableViewRowAnimationAutomatic];
 }
@@ -2069,7 +2081,7 @@ static NSString *WCRowDetailText(WCRow *row) {
     UIImageView *foldArrow = nil;
     if (isHeaderRow || isGroupRow) {
         BOOL collapsed = isHeaderRow ? [self sectionCollapsed:section]
-            : ![NSUserDefaults.standardUserDefaults boolForKey:row.defaultsKey];
+            : ![self.openMenus containsObject:row.defaultsKey];
         foldArrow = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:collapsed ? @"chevron.right" : @"chevron.down"]];
         foldArrow.tintColor = UIColor.tertiaryLabelColor;
         foldArrow.contentMode = UIViewContentModeScaleAspectFit;
@@ -2161,8 +2173,10 @@ static NSString *WCRowDetailText(WCRow *row) {
         case WCRowKindSectionTitle:
             break;
         case WCRowKindGroupToggle: {
-            BOOL expanded = [[NSUserDefaults standardUserDefaults] boolForKey:row.defaultsKey];
-            WCSetBool(!expanded, row.defaultsKey);
+            if ([self.openMenus containsObject:row.defaultsKey]) [self.openMenus removeObject:row.defaultsKey];
+            else [self.openMenus addObject:row.defaultsKey];
+            [self rebuildRows];
+            [self.tableView reloadData];
             break;
         }
         case WCRowKindActionDetail:
@@ -2173,6 +2187,9 @@ static NSString *WCRowDetailText(WCRow *row) {
             break;
         case WCRowKindGlobalAction:
             WCPresentGlobalActionPicker(self, row.title, row.defaultsKey);
+            break;
+        case WCRowKindChangelog:
+            [self.navigationController pushViewController:WCGestureCreateChangelogController() animated:YES];
             break;
         case WCRowKindPluginName:
             WCPresentPluginNameEditor(self);

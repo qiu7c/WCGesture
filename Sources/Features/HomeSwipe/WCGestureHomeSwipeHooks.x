@@ -1,9 +1,7 @@
 #import "Sources/API/WCGestureInternal.h"
 %hook NewMainFrameViewController
 - (void)viewDidLoad {
-    WCGestureHomeGroupsBeginNative();
     %orig;
-    WCGestureHomeGroupsEndNative();
     WCGestureHomeGroupsAttach((UIViewController *)self);
 }
 %end

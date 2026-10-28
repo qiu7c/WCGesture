@@ -2,6 +2,8 @@
 
 Current package version: 1.0.0.
 
+插件内查看：插件类配置 → 更新日志。文档见 [更新日志](docs/CHANGELOG.md)。
+
 - 2026-10-28 WeChatX 源码接入：界面类新增主页右滑扩展、主页分组；聊天类新增突破多选限制；广告精简扩展为去除广告。包含原生会话动作、9999/999 多选、421 条候选广告规则、分组成员/排序/即时消息/外观调节。新增总开关默认关闭，广告沿用原开关。尚未编译或真机验收，见 [接入记录](docs/WECHATX_PORTS.md)。
 
 - 2026-10-28 源码接入：聊天类 → 图片编辑增强（圆/椭圆、箭头、颜色及线宽）；增强类 → 替换头像（按账号/联系人保存、修改与恢复）；视频通话增强 → 虚拟视频（文件、方向/镜像、文件音轨/麦克风混音）；钱包金额本机显示新增零钱通/经营账户；本地聊天编辑新增记录卡片标题/描述；贴纸新增基础文字。新增能力默认关闭，尚未编译/真机验证。原版证据、One Wx适配和未还原的在线模板/PAG范围见 [接入依据](docs/REVERSE_IMPLEMENTATION_EVIDENCE.md)。
@@ -243,7 +245,7 @@ The shared full-page preview now includes avatar rounding. Its editing toolbar r
 - Manager registration passes the settings controller's class-name string, with deduplication/removal limited to One Wx models. Native page rows are individually marked and rebuilt as needed. The settings-page technique was checked against [Mieing/WCTestHook](https://github.com/Mieing/WCTestHook); its MIT notice is retained in docs/THIRD_PARTY.
 - 清空地区与性别信息 is a confirmed action, not a switch: it clears the native profile's country/province/city, attempts sex=0 and calls WeChat's native Save. The source plugin itself states sex clearing may be unsupported. One Wx reports that the save was invoked, without claiming a server-acknowledged result. No action runs merely from installing the plugin or opening settings.
 
-增强类功能 contains 自动确认登录, 自动更新微信状态, 后台保活 and 清空地区与性别信息. 插件类配置 retains entry location, plugin name, haptics, AI 配置, 翻译配置 and configuration import/export. Existing settings and collapsed states are preserved.
+增强类功能 contains 自动确认登录, 自动更新微信状态, 后台保活 and 清空地区与性别信息. 插件类配置 retains entry location, plugin name, haptics, AI 配置, 翻译配置 and configuration import/export. Existing feature settings are preserved. Foldable settings menus reopen collapsed, including the corner and home-group pages; search navigation expands its target.
 
 Payment/receive-code shortcuts are currently removed. The retired global-action value 11 is reserved and old two-/three-finger assignments are cleared to 不设置 during gesture synchronization. Personal contact QR and scanning remain available.
 
@@ -253,3 +255,9 @@ Payment/receive-code shortcuts are currently removed. The retired global-action 
 聊天类功能 → 视频通话增强：视频美颜、图片贴纸、前摄视频镜像，默认关闭。美颜用微信资源与引擎，列表滑杆实时预览、松手保存；通话调节使用半透明模糊面板，默认约320pt，可拖动导航栏调整高度；入口跟随原生通话操作区。贴纸在透明通话画布上拖动、双指缩放/旋转，可再次调整已有贴纸，完成后才合成到发送帧。镜像改用系统采集连接水平翻转，移除私有旋转换轴和渲染器覆盖；合成链路增加运行时四角颜色方向校验。图片仅保留本次通话，挂断清理；效果仍待真机验证。
 
 本轮不含在线素材、文字模板、PAG动态手势或妆容/滤镜。接口、方向、对端效果与原生美颜叠加仍需设备验证，不能将源码接入视为完整复刻。实现与验证边界见 [接入记录](docs/VIDEO_CALL_EFFECTS.md)。
+
+Home-group member and custom-avatar pickers use native avatars in inset cards, with separate friend/group sections and official accounts excluded. Home-group options are arranged in four collapsible cards. Badge visibility is applied after native value updates; list refreshes keep group filtering active throughout native session-update callbacks. Device validation remains pending.
+
+When custom avatars are enabled, friend/group information cards include a direct avatar-change action with restore support. It shares the avatar manager’s picker and storage, and refreshes the card after saving or restoring. Official accounts are excluded.
+
+The homepage group strip removes its extra vertical gap and shares the native logged-in-device banner background with pinned-session surfaces. Native controls and actions remain in place; disabling groups restores managed backgrounds. Light/dark appearance and cell reuse are handled, with device verification pending.

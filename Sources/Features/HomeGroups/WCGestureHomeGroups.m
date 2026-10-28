@@ -158,12 +158,14 @@ NSArray *WCGestureHomeGroupsSection(id logic, NSInteger section) {
     if (sections[@(section)]) return sections[@(section)];
     NSDictionary *selected=nil;
     for (NSDictionary *group in WCGestureHomeGroupsList()) if ([group[@"id"] isEqual:WCGestureHomeGroupsSelected()]) { selected=group;break; }
-    NSSet *pending=WCGroupPending(), *topNames=WCGroupNativeTopNames();NSMutableArray *entries=[NSMutableArray array];
+    NSSet *pending=WCGroupPending();NSMutableArray *entries=[NSMutableArray array];
     WCGestureHomeGroupsBeginNative();
+    NSSet *topNames=WCGroupNativeTopNames();
     long long count=[(id<WCHomeGroupsNative>)logic getSessionCountForSection:section];
     for (NSInteger row=0;row<count;row++) {
         NSIndexPath *path=[NSIndexPath indexPathForRow:row inSection:section];
         id session=[(id<WCHomeGroupsNative>)logic getSessionInfoAtIndexPath:path];
+        session=WCTweakSafeValue(session,@"m_sessionInfo") ?: session;
         BOOL pinned=[NSUserDefaults.standardUserDefaults boolForKey:WCGestureHomeGroupsPinnedPersistentKey] && ([WCTweakSafeValue(session,@"m_bIsTop") boolValue] || [topNames containsObject:WCGestureHomeGroupsUserName(session)]);
         if (session && (pinned || WCGroupMatches(session,selected,pending))) [entries addObject:@{@"session":session,@"path":path}];
     }
@@ -198,16 +200,79 @@ NSIndexPath *WCGestureHomeGroupsFind(id logic, NSString *user) {
 @property (nonatomic) UIViewAutoresizing originalMask;
 @property (nonatomic, strong) NSMutableArray<UIView *> *badges;
 @property (nonatomic) BOOL nativeBadgeMode;
+@property (nonatomic, strong) NSMapTable<UIView *, id> *nativeBackgrounds;
+@property (nonatomic, strong) UIColor *chromeColor;
 - (void)update;
+- (void)updateBackground;
+- (void)restoreBackgrounds;
+- (void)styleCell:(UITableViewCell *)cell path:(NSIndexPath *)path;
 @end
 
 @implementation WCHomeGroupBanner
 - (instancetype)initWithFrame:(CGRect)frame {
     if ((self=[super initWithFrame:frame])) {
+        _nativeBackgrounds=[NSMapTable weakToStrongObjectsMapTable];
         _indicator=[UIView new]; _indicator.userInteractionEnabled=NO;[self addSubview:_indicator];
         _stack=[UIStackView new];_stack.axis=UILayoutConstraintAxisHorizontal;_stack.distribution=UIStackViewDistributionFillEqually;
         [self addSubview:_stack];
     }return self;
+}
+- (void)setChromeBackground:(UIView *)view {
+    if (!view) return;
+    if (![self.nativeBackgrounds objectForKey:view])
+        [self.nativeBackgrounds setObject:view.backgroundColor ?: NSNull.null forKey:view];
+    if (![view.backgroundColor isEqual:self.chromeColor]) view.backgroundColor=self.chromeColor;
+}
+- (void)restoreBackgrounds {
+    for (UIView *view in self.nativeBackgrounds.keyEnumerator) {
+        id color=[self.nativeBackgrounds objectForKey:view];
+        if ([view.backgroundColor isEqual:self.chromeColor]) view.backgroundColor=color==NSNull.null?nil:color;
+    }
+    [self.nativeBackgrounds removeAllObjects];
+}
+- (void)styleCell:(UITableViewCell *)cell path:(NSIndexPath *)path {
+    id logic=WCTweakSafeValue(self.controller,@"m_mainFrameLogicController");
+    NSArray *entries=WCGestureHomeGroupsSection(logic,path.section);
+    id session=path.row<(NSInteger)entries.count?entries[path.row][@"session"]:nil;
+    BOOL pinned=[WCTweakSafeValue(session,@"m_bIsTop") boolValue];
+    id header=WCTweakSafeValue(self.controller,@"m_headerLogic");
+    UIView *device=WCTweakSafeValue(header,@"m_webMMBtn");
+    BOOL deviceRow=device && [device isDescendantOfView:cell];
+    for (UIView *view in @[cell,cell.contentView]) {
+        if (pinned || deviceRow) [self setChromeBackground:view];
+        else {
+            id color=[self.nativeBackgrounds objectForKey:view];
+            if (color) {
+                if ([view.backgroundColor isEqual:self.chromeColor]) view.backgroundColor=color==NSNull.null?nil:color;
+                [self.nativeBackgrounds removeObjectForKey:view];
+            }
+        }
+    }
+}
+- (void)updateBackground {
+    id header=WCTweakSafeValue(self.controller,@"m_headerLogic");
+    UIView *device=WCTweakSafeValue(header,@"m_webMMBtn");
+    UIColor *color=nil;
+    for (UIView *view=device;view && view!=self.table;view=view.superview) {
+        id native=[self.nativeBackgrounds objectForKey:view];
+        UIColor *candidate=native?(native==NSNull.null?nil:native):view.backgroundColor;
+        if (candidate && CGColorGetAlpha([candidate resolvedColorWithTraitCollection:self.traitCollection].CGColor)>0.99) { color=candidate;break; }
+    }
+    if (!color) color=self.table.backgroundColor ?: UIColor.systemGroupedBackgroundColor;
+    self.chromeColor=color;self.backgroundColor=color;
+    [self setChromeBackground:self.originalHeader];
+    [self setChromeBackground:device];
+    UIView *fold=WCTweakSafeValue(self.controller,@"topSessionFoldView");
+    [self setChromeBackground:fold];
+    [self setChromeBackground:WCTweakSafeValue(fold,@"bannerBtn")];
+    for (UITableViewCell *cell in self.table.visibleCells) {
+        NSIndexPath *path=[self.table indexPathForCell:cell];
+        if (path) [self styleCell:cell path:path];
+    }
+}
+- (void)traitCollectionDidChange:(UITraitCollection *)previous {
+    [super traitCollectionDidChange:previous];
+    if ([self.traitCollection hasDifferentColorAppearanceComparedToTraitCollection:previous]) [self updateBackground];
 }
 - (void)chosen:(UIButton *)button {
     WCGestureHomeGroupsSelect(WCGestureHomeGroupsList()[button.tag][@"id"]);
@@ -246,9 +311,9 @@ NSIndexPath *WCGestureHomeGroupsFind(id logic, NSString *user) {
     if (self.version==WCGroupVersion && self.lastWidth==width && self.originalHeight==nativeHeight) return;
     self.version=WCGroupVersion;self.lastWidth=width;self.originalHeight=nativeHeight;
     CGFloat scale=WCGestureLayoutScaleFactor(), height=44*scale;
-    self.frame=CGRectMake(0,0,width,nativeHeight+height+12*scale);
+    self.frame=CGRectMake(0,0,width,nativeHeight+height);
     self.originalHeader.frame=CGRectMake(0,0,width,nativeHeight);
-    self.stack.frame=CGRectMake(12*scale,nativeHeight+6*scale,width-24*scale,height);
+    self.stack.frame=CGRectMake(12*scale,nativeHeight,width-24*scale,height);
     NSArray *groups=WCGestureHomeGroupsList();NSUserDefaults *d=NSUserDefaults.standardUserDefaults;
     CGFloat font=MAX(10,MIN(24,[d doubleForKey:WCGestureHomeGroupsFontSizeKey]))*scale;
     CGFloat weight=[d doubleForKey:WCGestureHomeGroupsFontWeightKey];
@@ -292,12 +357,14 @@ NSIndexPath *WCGestureHomeGroupsFind(id logic, NSString *user) {
     WCGestureHomeGroupsBeginNative();
     for(NSInteger section=0;section<2;section++) {
         NSInteger count=[(id<WCHomeGroupsNative>)logic getSessionCountForSection:section];
-        for(NSInteger row=0;row<count;row++) { id item=[(id<WCHomeGroupsNative>)logic getSessionInfoAtIndexPath:[NSIndexPath indexPathForRow:row inSection:section]];NSString *name=WCGestureHomeGroupsUserName(item);if(name.length && ![seenNames containsObject:name]){[seenNames addObject:name];[sessions addObject:item];} }
+        for(NSInteger row=0;row<count;row++) { id item=[(id<WCHomeGroupsNative>)logic getSessionInfoAtIndexPath:[NSIndexPath indexPathForRow:row inSection:section]];item=WCTweakSafeValue(item,@"m_sessionInfo") ?: item;NSString *name=WCGestureHomeGroupsUserName(item);if(name.length && ![seenNames containsObject:name]){[seenNames addObject:name];[sessions addObject:item];} }
     }
     WCGestureHomeGroupsEndNative();
     Class badgeClass=NSClassFromString(@"MMBadgeView");SEL factory=NSSelectorFromString(@"redDotWithNumber:");
     BOOL native=[d boolForKey:WCGestureHomeGroupsNativeBadgeKey] && [badgeClass respondsToSelector:factory]
         && [badgeClass instancesRespondToSelector:NSSelectorFromString(@"setValue:")]
+        && [badgeClass instancesRespondToSelector:NSSelectorFromString(@"setBgColor:")]
+        && [badgeClass instancesRespondToSelector:NSSelectorFromString(@"setTextColor:")]
         && [badgeClass instancesRespondToSelector:NSSelectorFromString(@"setAsSmallDotForChatSession")];
     if (self.nativeBadgeMode!=native) { for(UIView *badge in self.badges)[badge removeFromSuperview];self.badges=nil; }
     self.nativeBadgeMode=native;if(!self.badges)self.badges=[NSMutableArray array];
@@ -312,10 +379,11 @@ NSIndexPath *WCGestureHomeGroupsFind(id logic, NSString *user) {
         }
         UIView *badge=index<self.badges.count?self.badges[index]:nil;
         if(!badge){badge=native?((id(*)(id,SEL,unsigned long long))objc_msgSend)(badgeClass,factory,1):[UILabel new];badge.userInteractionEnabled=NO;[self addSubview:badge];[self.badges addObject:badge];}
-        badge.hidden=[d boolForKey:WCGestureHomeGroupsHideBadgesKey] || (!unread && (!dot || [d boolForKey:WCGestureHomeGroupsHideRedDotsKey]));
         if(native) {
             if(unread){SEL clear=NSSelectorFromString(@"removeSmallDot");if([badge respondsToSelector:clear])((void(*)(id,SEL))objc_msgSend)(badge,clear);((void(*)(id,SEL,unsigned long long))objc_msgSend)(badge,NSSelectorFromString(@"setValue:"),unread);}
             else ((void(*)(id,SEL))objc_msgSend)(badge,NSSelectorFromString(@"setAsSmallDotForChatSession"));
+            ((void(*)(id,SEL,id))objc_msgSend)(badge,NSSelectorFromString(@"setBgColor:"),WCGestureColorForDefaultsKey(WCGestureHomeGroupsBadgeColorKey,UIColor.systemRedColor));
+            ((void(*)(id,SEL,id))objc_msgSend)(badge,NSSelectorFromString(@"setTextColor:"),WCGestureColorForDefaultsKey(WCGestureHomeGroupsBadgeTextColorKey,UIColor.whiteColor));
         } else {
             UILabel *label=(UILabel *)badge;label.font=[UIFont systemFontOfSize:10*scale];label.textAlignment=NSTextAlignmentCenter;
             label.text=unread?(unread>99?@"99+":[NSString stringWithFormat:@"%lu",(unsigned long)unread]):@"";
@@ -324,6 +392,8 @@ NSIndexPath *WCGestureHomeGroupsFind(id logic, NSString *user) {
             CGFloat w=unread?MAX(16*scale,[label.text sizeWithAttributes:@{NSFontAttributeName:label.font}].width+8*scale):6*scale;
             CGFloat h=(unread?16:6)*scale;label.bounds=CGRectMake(0,0,w,h);label.layer.cornerRadius=h/2;label.layer.masksToBounds=YES;
         }
+        if (native) [badge sizeToFit];
+        badge.hidden=[d boolForKey:WCGestureHomeGroupsHideBadgesKey] || (!unread && (!dot || [d boolForKey:WCGestureHomeGroupsHideRedDotsKey]));
         UIButton *button=(UIButton *)self.stack.arrangedSubviews[index];
         CGFloat titleWidth=[groups[index][@"title"] sizeWithAttributes:@{NSFontAttributeName:button.titleLabel.font}].width;
         badge.center=CGPointMake(self.stack.frame.origin.x+(index+0.5)*cellWidth+titleWidth/2+badge.bounds.size.width/2+[d doubleForKey:WCGestureHomeGroupsBadgeXKey]*scale,
@@ -340,6 +410,7 @@ void WCGestureHomeGroupsAttach(UIViewController *controller) {
     WCHomeGroupBanner *banner=objc_getAssociatedObject(controller,&WCGroupBannerKey);
     if (!WCGestureHomeGroupsEnabled()) {
         if (table.tableHeaderView==banner) { banner.originalHeader.autoresizingMask=banner.originalMask;table.tableHeaderView=banner.originalHeader; }
+        [banner restoreBackgrounds];
         banner.left.enabled=banner.right.enabled=NO;return;
     }
     if (!banner) {
@@ -360,8 +431,13 @@ void WCGestureHomeGroupsAttach(UIViewController *controller) {
         if (nativeHeader) { banner.originalMask=nativeHeader.autoresizingMask;nativeHeader.autoresizingMask=UIViewAutoresizingFlexibleWidth;[banner addSubview:nativeHeader]; }
         banner.version=0;
     }
+    [banner updateBackground];
     CGFloat oldHeight=banner.bounds.size.height;[banner update];
     if (table.tableHeaderView!=banner || oldHeight!=banner.bounds.size.height) table.tableHeaderView=banner;
+}
+void WCGestureHomeGroupsStyleCell(UIViewController *controller, UITableViewCell *cell, NSIndexPath *path) {
+    WCHomeGroupBanner *banner=objc_getAssociatedObject(controller,&WCGroupBannerKey);
+    if (WCGestureHomeGroupsEnabled()) [banner styleCell:cell path:path];
 }
 static void WCGroupScheduleReload(void) {
     if (WCGroupReloadPending) return;WCGroupReloadPending=YES;
@@ -371,7 +447,7 @@ static void WCGroupScheduleReload(void) {
         SEL update=NSSelectorFromString(@"updateTopSessionFoldView");
         if([controller respondsToSelector:update])((void(*)(id,SEL))objc_msgSend)(controller,update);
         WCGestureHomeGroupsAttach(controller);
-        [(UITableView *)WCTweakSafeValue(controller,@"m_tableView") reloadData];
+        [UIView performWithoutAnimation:^{ [(UITableView *)WCTweakSafeValue(controller,@"m_tableView") reloadData]; }];
     });
 }
 void WCGestureHomeGroupsInvalidate(id logic) {

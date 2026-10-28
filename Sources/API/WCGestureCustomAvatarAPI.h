@@ -8,4 +8,5 @@ NSArray<NSString *> *WCGestureCustomAvatarSavedUsers(void);
 void WCGestureCustomAvatarSave(NSString *username, UIImage *image, void (^completion)(BOOL success));
 void WCGestureCustomAvatarRemove(NSString *username, void (^completion)(BOOL success));
 UIViewController *WCGestureCreateCustomAvatarController(void);
+void WCGesturePresentCustomAvatarEditor(UIViewController *presenter, NSString *username, void (^completion)(BOOL changed));
 NS_ASSUME_NONNULL_END

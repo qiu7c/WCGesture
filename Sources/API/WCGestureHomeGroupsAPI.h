@@ -22,3 +22,5 @@ UIViewController *WCGestureCreateHomeGroupsSettingsController(void);
 NSArray<NSString *> *WCGestureHomeGroupsPendingNames(void);
 void WCGestureHomeGroupsSetPendingNames(NSArray<NSString *> *names);
 UIViewController *WCGestureCreateHomeGroupsPendingController(void);
+
+void WCGestureHomeGroupsStyleCell(UIViewController *controller, UITableViewCell *cell, NSIndexPath *path);

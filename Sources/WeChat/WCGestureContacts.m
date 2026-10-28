@@ -126,3 +126,12 @@ UIView *WCGestureContactUncroppedAvatarView(NSString *username) {
     view.userInteractionEnabled = NO;
     return view;
 }
+
+NSInteger WCGestureContactPickerKind(id contact, NSString *username) {
+    if (!username.length) return NSNotFound;
+    if ([username hasSuffix:@"@chatroom"] || [username hasSuffix:@"@im.chatroom"]) return 1;
+    if ([username hasPrefix:@"gh_"] || !contact) return NSNotFound;
+    for (NSString *key in @[@"isBrandContact", @"isOfficialContact", @"isEnterpriseBrand"])
+        if ([WCTweakSafeValue(contact,key) boolValue]) return NSNotFound;
+    return [WCTweakSafeValue(contact,@"isMyContact") boolValue] || [username isEqual:WCCurrentUserWXID()] ? 0 : NSNotFound;
+}

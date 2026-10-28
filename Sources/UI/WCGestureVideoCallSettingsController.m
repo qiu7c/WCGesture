@@ -37,6 +37,7 @@ static NSDictionary *WCVideoSettingsRow(NSString *title, NSString *kind, NSStrin
         UINavigationBarAppearance *appearance = [UINavigationBarAppearance new];
         [appearance configureWithTransparentBackground]; appearance.backgroundEffect = nil;
         appearance.backgroundColor = UIColor.clearColor; appearance.shadowColor = UIColor.clearColor;
+        appearance.titleTextAttributes = self.navigationItem.standardAppearance.titleTextAttributes;
         self.navigationController.navigationBar.standardAppearance = appearance;
         self.navigationController.navigationBar.scrollEdgeAppearance = appearance;
         self.navigationController.navigationBar.compactAppearance = appearance;
