@@ -375,9 +375,10 @@ void WCGestureChatSearchHandleEdgePan(UIViewController *controller, UIScreenEdge
     }
 }
 
-void WCGestureChatSearchDidDismiss(id helper) {
+void WCGestureChatSearchDidDismiss(id owner) {
     for (BaseMsgContentViewController *controller in WCChatSearchControllers().allObjects) {
-        if (WCChatSearchNativeHelper(controller, NO) != helper) continue;
+        id helper=WCChatSearchNativeHelper(controller, NO);
+        if (helper!=owner && WCChatSearchNativeSearcher(helper)!=owner) continue;
         id session = objc_getAssociatedObject(controller, &WCChatSearchSessionKey);
         __weak BaseMsgContentViewController *weakController = controller;
         // Let the native dismissal finish before querying the searcher's active state.

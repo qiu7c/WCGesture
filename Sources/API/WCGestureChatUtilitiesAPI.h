@@ -5,7 +5,7 @@ BOOL WCGestureChatSearchIsActive(UIViewController *controller);
 void WCGestureChatSearchOpen(UIViewController *controller, id _Nullable sender);
 void WCGestureChatSearchWillAppear(UIViewController *controller);
 void WCGestureChatSearchHandleEdgePan(UIViewController *controller, UIScreenEdgePanGestureRecognizer *recognizer);
-void WCGestureChatSearchDidDismiss(id helper);
+void WCGestureChatSearchDidDismiss(id owner);
 BOOL WCGestureJumpToReferencedMessage(UIView *cell);
 void WCGestureChatUtilitiesSettingsChanged(NSString * _Nullable key);
 NS_ASSUME_NONNULL_END

@@ -1,5 +1,9 @@
 # One Wx 开发交接
 
+## 2026-10-29 聊天记录搜索空查询返回残留
+
+用户明确是聊天记录搜索：打开后不输入直接返回，搜索框残留顶端。对照WCAtlas/Tweak.xm 8479–8581清理和11278取消入口，原迁移保留了外层chrome隐藏/0、0.12、0.35秒复核/交互返回恢复，却漏了显式取消入口。WCAtlas旧BaseMsgContentViewController.msgSearchBarCancel未在当前8.0.79头文件确认，未新增该未知orig Hook；采用当前WCSearcher.h已确认的searchBarCancelButtonClicked:/didDismissSearchController:，原生执行后复用现有DidDismiss。DidDismiss支持helper或searcher身份匹配到所属会话，沿用既有下一轮主线程及session校验，避免影响重开搜索。两个新Hook签名确认、无重复/无新key；218源文件结构/import、309唯一Hook及diff静态检查通过，未编译或真机验证。按小修正自动提交推送授权处理；首页圆角不改。
+
 ## 2026-10-29 设置数值与箭头重叠修正
 
 共享WCSettingsCardCell先由UIKit布局label，再内缩contentView/移动accessory，导致Value1数值仍占旧位置。现保存cell style，在最终content宽度内重新定位右侧数值并预留标题间距，Value1数值最多占可用宽度55%，标题按剩余空间收窄；Subtitle保持上下排布并限制宽度，不挪动开关和自绘控件。无新Hook/key/API。218文件结构/import、307唯一Hook及diff静态检查通过，未编译或真机验证；按小修正自动提交推送授权处理。

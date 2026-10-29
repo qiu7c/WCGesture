@@ -39,6 +39,17 @@
 }
 %end
 
+%hook WCSearcher
+- (void)searchBarCancelButtonClicked:(id)sender {
+    %orig(sender);
+    WCGestureChatSearchDidDismiss(self);
+}
+- (void)didDismissSearchController:(id)controller {
+    %orig(controller);
+    WCGestureChatSearchDidDismiss(self);
+}
+%end
+
 %ctor {
     %init;
 }
