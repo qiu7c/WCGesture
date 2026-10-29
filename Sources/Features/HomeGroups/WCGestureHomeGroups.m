@@ -68,6 +68,7 @@ void WCGestureHomeGroupsSave(NSArray<NSDictionary *> *groups) {
 void WCGestureHomeGroupsSelect(NSString *groupID) {
     [NSUserDefaults.standardUserDefaults setObject:groupID forKey:WCGestureHomeGroupsSelectedKey];
     WCGestureHomeGroupsSettingsChanged(WCGestureHomeGroupsSelectedKey);
+    if (WCGroupMainController) WCGestureHomeGroupsAttach(WCGroupMainController);
 }
 static NSString *WCGroupName(id object, NSUInteger depth) {
     if (depth>3) return nil; // Original helper 0x3bb47c.
@@ -397,7 +398,7 @@ NSIndexPath *WCGestureHomeGroupsFind(id logic, NSString *user) {
         self.buttons[i].frame=CGRectMake(left,0,right-left,height);
         [self.buttons[i] setTitleColor:textColor forState:UIControlStateNormal];
     }
-    if (self.version==WCGroupVersion && self.lastWidth==width && self.originalHeight==nativeHeight) return;
+    BOOL refreshContent=self.version!=WCGroupVersion || self.lastWidth!=width || self.originalHeight!=nativeHeight;
     self.version=WCGroupVersion;self.lastWidth=width;self.originalHeight=nativeHeight;
     NSArray *groups=WCGestureHomeGroupsList();NSUserDefaults *d=NSUserDefaults.standardUserDefaults;
     CGFloat font=MAX(10,MIN(24,[d doubleForKey:WCGestureHomeGroupsFontSizeKey]))*scale;
@@ -430,8 +431,10 @@ NSIndexPath *WCGestureHomeGroupsFind(id logic, NSString *user) {
     UIColor *sliderFallback=[UIColor colorWithWhite:WCGestureHomePageIsDark(self)?0.25:0.92 alpha:1];
     self.indicator.backgroundColor=WCGestureColorForDefaultsKey(WCGestureHomeGroupsSliderColorKey,sliderFallback);
     self.indicator.layer.cornerRadius=MIN(CGRectGetHeight(target)/2,MAX(0,[d doubleForKey:WCGestureHomeGroupsSliderRadiusKey]*scale));
-    if ([d boolForKey:WCGestureHomeGroupsSliderAnimationKey]) [UIView animateWithDuration:0.25 animations:^{ self.indicator.frame=target; }];
-    else self.indicator.frame=target;
+    if (!CGRectEqualToRect(self.indicator.frame,target)) {
+        if ([d boolForKey:WCGestureHomeGroupsSliderAnimationKey]) [UIView animateWithDuration:0.25 delay:0 options:UIViewAnimationOptionBeginFromCurrentState|UIViewAnimationOptionAllowUserInteraction animations:^{ self.indicator.frame=target; } completion:nil];
+        else self.indicator.frame=target;
+    }
     UIView *line=[self viewWithTag:9092];
     if (!line) { line=[UIView new];line.tag=9092;line.userInteractionEnabled=NO;[self addSubview:line]; }
     line.hidden=![d boolForKey:WCGestureHomeGroupsUnderlineKey];
@@ -440,6 +443,8 @@ NSIndexPath *WCGestureHomeGroupsFind(id logic, NSString *user) {
     line.frame=CGRectMake(self.stack.frame.origin.x+(selected+0.5)*cellWidth-length/2,
         CGRectGetMaxY(self.stack.frame)-[d doubleForKey:WCGestureHomeGroupsUnderlineOffsetKey]*scale,length,thickness);
     line.backgroundColor=WCGestureColorForDefaultsKey(WCGestureHomeGroupsUnderlineColorKey,UIColor.systemBlueColor);
+    // Selection geometry must update even when unread content is cached.
+    if (!refreshContent) return;
     // One Wx aggregates the verified 8079 MMSessionInfo unread-count/dot
     // fields over the same predicates; native badge API verified in MMBadgeView.h.
     id logic=WCTweakSafeValue(self.controller,@"m_mainFrameLogicController");

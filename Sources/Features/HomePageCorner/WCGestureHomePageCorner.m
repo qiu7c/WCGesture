@@ -4,7 +4,7 @@
 #import <math.h>
 #import "Sources/API/WCGestureInternal.h"
 
-static char WCHomeCornerStateKey, WCHomeCornerGroupSurfaceKey;
+static char WCHomeCornerStateKey, WCHomeCornerGroupSurfaceKey, WCHomeCornerSearchSurfaceKey;
 static __weak UIViewController *WCHomeCornerController;
 static __weak UITableView *WCHomeCornerTable;
 static __weak UIView *WCHomeCornerSearch;
@@ -41,7 +41,6 @@ static void WCHomeCornerReadSettings(void) {
 @property (nonatomic) CGRect originalFrame;
 @property (nonatomic) CGRect appliedFrame;
 @property (nonatomic) BOOL managesFrame;
-@property (nonatomic) BOOL managesVerticalFrame;
 @property (nonatomic) BOOL managesHidden;
 @property (nonatomic) BOOL originalHidden;
 @property (nonatomic) BOOL managesSeparator;
@@ -113,9 +112,6 @@ static void WCHomeCornerRestore(UIView *view) {
     if (state.managesHidden && view.hidden) view.hidden=state.originalHidden;
     if (state.managesFrame && view.frame.origin.x==state.appliedFrame.origin.x && view.frame.size.width==state.appliedFrame.size.width) {
         CGRect frame=view.frame;frame.origin.x=state.originalFrame.origin.x;frame.size.width=state.originalFrame.size.width;
-        if (state.managesVerticalFrame && view.frame.origin.y==state.appliedFrame.origin.y && view.frame.size.height==state.appliedFrame.size.height) {
-            frame.origin.y=state.originalFrame.origin.y;frame.size.height=state.originalFrame.size.height;
-        }
         view.frame=frame;
     }
     if (state.managesSeparator && [(UITableView *)view separatorStyle]==UITableViewCellSeparatorStyleNone)
@@ -193,31 +189,37 @@ void WCGestureHomePageCornerLayoutChrome(UIView *view) {
     WCHomeCornerInsetView(view);WCHomeCornerMask(view,UIRectCornerAllCorners);
 }
 void WCGestureHomePageCornerLayoutSearch(UIView *view) {
-    if (view!=WCHomeCornerSearch || !WCGestureHomePageCornerEnabled() || CGRectIsEmpty(view.bounds)) return;
+    if (view!=WCHomeCornerSearch || CGRectIsEmpty(view.bounds)) return;
+    UIView *surface=objc_getAssociatedObject(view,&WCHomeCornerSearchSurfaceKey);
     UIView *box=WCTweakSafeValue(view,@"searchBoxContainer");
     if (!box) return;
-    if ([WCTweakSafeValue(WCHomeCornerController,@"isSearching") boolValue]) {
+    if (!WCGestureHomePageCornerEnabled() || [WCTweakSafeValue(WCHomeCornerController,@"isSearching") boolValue]) {
+        surface.hidden=YES;
         WCHomeCornerRestore(box);WCHomeCornerRestore(view);return;
     }
+    // Draw in the outer search bar, outside the native stack's clipping area.
+    // Keep native input frames, constraints and placeholder centering intact.
+    if (!surface) {
+        surface=[UIView new];surface.userInteractionEnabled=NO;
+        [view insertSubview:surface atIndex:0];
+        objc_setAssociatedObject(view,&WCHomeCornerSearchSurfaceKey,surface,OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    surface.hidden=NO;
     WCHomeCornerColorView(view,WCGestureHomePageCornerColor(view,NO));
-    WCHomeCornerColorView(box,WCGestureHomePageCornerColor(view,YES));
-    // The native input is already inset. Set absolute table-aligned edges,
-    // rather than subtracting another inset on each layout.
+    WCHomeCornerColorView(box,UIColor.clearColor);
     CGRect cardRect=CGRectInset(WCHomeCornerTable.bounds,WCHomeCornerInset,0);
-    CGRect tableRect=[WCHomeCornerTable convertRect:cardRect toView:box.superview];
-    CGRect frame=box.frame;
-    WCHomeCornerState *state=WCHomeCornerStateForView(box);
-    if (!state.managesFrame || !CGRectEqualToRect(frame,state.appliedFrame))
-        state.originalFrame=frame;
-    frame.origin.x=tableRect.origin.x;
-    frame.size.width=MAX(0,tableRect.size.width);
+    CGRect tableRect=[WCHomeCornerTable convertRect:cardRect toView:view];
     CGFloat scale=WCGestureLayoutScaleFactor();
-    CGRect available=[view convertRect:CGRectInset(view.bounds,0,2*scale) toView:box.superview];
-    CGFloat height=MIN(40*scale,MAX(0,available.size.height));
-    frame.origin.y=CGRectGetMidY(available)-height/2;frame.size.height=height;
-    state.managesFrame=YES;state.managesVerticalFrame=YES;state.appliedFrame=frame;
-    if (!CGRectEqualToRect(box.frame,frame)) box.frame=frame;
-    WCHomeCornerMask(box,UIRectCornerAllCorners);
+    CGRect available=view.bounds;
+    for (UIView *parent=view.superview;parent;parent=parent.superview) {
+        if (parent.clipsToBounds) available=CGRectIntersection(available,[parent convertRect:parent.bounds toView:view]);
+        if (parent==WCHomeCornerController.view) break;
+    }
+    if (CGRectIsEmpty(available)) { surface.hidden=YES;return; }
+    CGFloat height=MIN(40*scale,MAX(0,available.size.height-4*scale));
+    surface.frame=CGRectMake(tableRect.origin.x,CGRectGetMidY(available)-height/2,tableRect.size.width,height);
+    WCHomeCornerColorView(surface,WCGestureHomePageCornerColor(view,YES));
+    WCHomeCornerMask(surface,UIRectCornerAllCorners);
 }
 void WCGestureHomePageCornerLayoutTable(UITableView *table) {
     if (!table || table!=WCHomeCornerTable || !WCGestureHomePageCornerEnabled()) return;

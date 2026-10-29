@@ -1,5 +1,9 @@
 # One Wx 开发交接
 
+## 2026-10-29 搜索框裁切/对齐与分组指示条跟随修正
+
+用户截图证实直接增大searchBoxContainer仍不对齐且下沿裁平。本次撤掉全部搜索输入容器frame/mask修改及专用纵向恢复字段，在首页WCSearchBar外层新增无交互背景surface：原生输入背景透明，文字/输入框/约束保持原状；圆角背景直接按主表内缩rect换算到搜索栏坐标，限定在搜索栏及裁切祖先的实际可见区域内，避免撑破内部stack裁切层。进入搜索隐藏自绘背景并恢复原生颜色，关闭圆角按已有恢复路径清理。分组update不再在指示条更新前缓存返回，仅未读角标统计走缓存；Select立即Attach同步位置，滑块动画从当前状态继续，目标不变不重复启动动画。无新key/Hook。218文件括号/import、307唯一Hook与diff静态检查通过；未编译/真机验证，不承诺截图问题已设备确认消除。按小修正自动提交推送授权处理。
+
 ## 2026-10-29 搜索框加厚、边缘对齐与首页背景统一
 
 用户截图反馈搜索框偏薄、比下方卡片更宽，顶栏仍有灰色色差。搜索容器改为40×布局比例目标高度，在原搜索栏可用高度内上下居中；先在表格坐标中生成完整内缩矩形，再整体转换到输入容器父视图，避免坐标换算后再加边距；恢复状态增加搜索容器纵向frame恢复。首页navigationItem改为同页面留白色的不透明背景，fakeNavBarView同步；首页特有navigationBarBackgroundColor/realNavigationBarBackgroundColor返回同色、navigationBarBlurEffect关闭模糊，签名与MMTabBarBaseViewController→MMUIViewController继承链核对。不改共享导航栏，不加key，不做reload轮询；颜色变化时同步四种appearance。218文件括号/import、307唯一Hook及diff静态检查通过，未编译/真机验证；按用户小修正自动提交推送规则处理。
