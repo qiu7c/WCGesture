@@ -150,14 +150,20 @@ static void WCChatSearchHideChrome(BaseMsgContentViewController *controller,
 }
 
 static void WCChatSearchCleanup(BaseMsgContentViewController *controller) {
-    if (!controller || ![objc_getAssociatedObject(controller, &WCChatSearchActiveKey) boolValue] ||
+    if (!controller || !objc_getAssociatedObject(controller, &WCChatSearchSessionKey) ||
         [objc_getAssociatedObject(controller, &WCChatSearchCleanupKey) boolValue]) return;
+    id helper = WCChatSearchNativeHelper(controller, NO);
+    id searcher = WCChatSearchNativeSearcher(helper);
+    // viewWillAppear may run before the native pop animation finishes. The
+    // final disappearance callback must still remove chrome restored by it.
+    if (![objc_getAssociatedObject(controller, &WCChatSearchActiveKey) boolValue]) {
+        WCChatSearchHideChrome(controller,searcher);
+        return;
+    }
     objc_setAssociatedObject(controller, &WCChatSearchCleanupKey, @YES,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     WCChatSearchRemoveEdgePan(controller);
 
-    id helper = WCChatSearchNativeHelper(controller, NO);
-    id searcher = WCChatSearchNativeSearcher(helper);
     WCChatSearchHideChrome(controller, searcher);
     SEL activeSelector = NSSelectorFromString(@"setActive:animated:completion:");
     SEL searchActiveSelector = NSSelectorFromString(@"isSeachActive");
@@ -186,22 +192,6 @@ static void WCChatSearchCleanup(BaseMsgContentViewController *controller) {
             ((void (*)(id, SEL))objc_msgSend)(helper, finishSelector);
         } @catch (__unused NSException *exception) {
         }
-    }
-    id session = objc_getAssociatedObject(controller, &WCChatSearchSessionKey);
-    __weak BaseMsgContentViewController *weakController = controller;
-    __weak id weakSearcher = searcher;
-    for (NSNumber *delay in @[@0.0, @0.12, @0.35]) {
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
-                                     (int64_t)(delay.doubleValue * NSEC_PER_SEC)),
-                       dispatch_get_main_queue(), ^{
-            BaseMsgContentViewController *strongController = weakController;
-            id strongSearcher = weakSearcher;
-            if (strongController && strongSearcher
-                && objc_getAssociatedObject(strongController, &WCChatSearchSessionKey) == session
-                && ![objc_getAssociatedObject(strongController, &WCChatSearchActiveKey) boolValue]) {
-                WCChatSearchHideChrome(strongController, strongSearcher);
-            }
-        });
     }
     NSNumber *originalPop = objc_getAssociatedObject(controller, &WCChatSearchOriginalPopKey);
     if (originalPop) WCChatSearchSetInteractivePop(controller, originalPop.boolValue);
@@ -385,6 +375,10 @@ void WCGestureChatSearchDidDismiss(id owner) {
         dispatch_async(dispatch_get_main_queue(), ^{
             BaseMsgContentViewController *target = weakController;
             if (target && objc_getAssociatedObject(target, &WCChatSearchSessionKey) == session) {
+                id searcher=WCChatSearchNativeSearcher(WCChatSearchNativeHelper(target,NO));
+                // A cancelled interactive pop keeps the search screen alive.
+                if ([searcher respondsToSelector:NSSelectorFromString(@"isSeachActive")]
+                    && ((BOOL (*)(id,SEL))objc_msgSend)(searcher,NSSelectorFromString(@"isSeachActive"))) return;
                 WCChatSearchCleanup(target);
                 WCGestureChatSearchUpdate(target);
             }

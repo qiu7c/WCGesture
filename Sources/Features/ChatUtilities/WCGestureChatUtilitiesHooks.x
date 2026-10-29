@@ -48,6 +48,10 @@
     %orig(controller);
     WCGestureChatSearchDidDismiss(self);
 }
+- (void)onWCSearchControllerDidDisappear:(BOOL)animated {
+    %orig(animated);
+    WCGestureChatSearchDidDismiss(self);
+}
 %end
 
 %ctor {

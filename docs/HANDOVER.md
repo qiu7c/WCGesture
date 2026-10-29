@@ -1,5 +1,9 @@
 # One Wx 开发交接
 
+## 2026-10-29 聊天搜索退出时序再次修正
+
+用户反馈搜索界面仍清除不净。源码发现打开优先pushSearchControllerWithCompletion:，只接UISearchController dismiss不足；viewWillAppear首次Cleanup已清Active标记，实际动画结束的再次Cleanup被入口拦住。新增当前WCSearcher.h确认的onWCSearchControllerDidDisappear:(BOOL)，复用已有按owner/session匹配的DidDismiss；Cleanup以本插件session归属及清理重入为边界，已结束搜索仍执行chrome隐藏，不再关闭第二次。删除0/0.12/0.35秒重复隐藏，改为实际页面消失后清理；DidDismiss在原生仍isSeachActive时跳过，避免交互返回取消或push搜索结果详情时误关仍在的搜索。218文件结构/import、314唯一Hook与diff静态检查通过；没有设备残留层级/调用栈，未编译或真机确认，不能承诺残留已彻底消除。按小修正自动提交推送授权处理。
+
 ## 2026-10-29 扩展侧滑残留灰色背景继续修正
 
 用户确认778aa4a侧滑起点已正确，但仍带灰色卡片。保留原frame/边距/动画，补充仅UIKit扩展容器内的微信背景层处理：隐藏MMBaseMultiMenuTableViewCell头文件明确存在的_copyedBackgroundView及原生m_backGroundViewOfCell，给dump中m_itemView.superview和cell.backgroundView同步卡片表面色；不修改原生菜单背景缓存或全局主题。NewMainFrameCell继承的updateCopyedBackgroundView回调后重新转发侧滑布局，防止快照重建覆盖；关闭/复用恢复快照和中间层原状态。没有新key/API，313唯一Hook无冲突，218源文件结构/import与diff静态检查通过；没有新灰块视图颜色信息，背景快照是本次补齐的实际代码路径，不能声称其归属或消除已由真机证实。按小修正自动提交推送授权处理。
