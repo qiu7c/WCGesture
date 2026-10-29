@@ -7,6 +7,7 @@
 static char WCHomeCornerStateKey, WCHomeCornerGroupSurfaceKey;
 static __weak UIViewController *WCHomeCornerController;
 static __weak UITableView *WCHomeCornerTable;
+static __weak UIView *WCHomeCornerSearch;
 static NSHashTable<UIView *> *WCHomeCornerViews;
 static BOOL WCHomeCornerLoaded, WCHomeCornerEnabled;
 static CGFloat WCHomeCornerRadius, WCHomeCornerInset, WCHomeCornerGap;
@@ -42,6 +43,9 @@ static void WCHomeCornerReadSettings(void) {
 @property (nonatomic) BOOL originalHidden;
 @property (nonatomic) BOOL managesSeparator;
 @property (nonatomic) UITableViewCellSeparatorStyle separator;
+@property (nonatomic, copy) NSArray *navigationAppearances;
+@property (nonatomic, strong) UINavigationBarAppearance *navigationAppearance;
+@property (nonatomic, weak) UINavigationItem *navigationItem;
 @end
 @implementation WCHomeCornerState
 @end
@@ -86,6 +90,14 @@ static void WCHomeCornerColorView(UIView *view, UIColor *color) {
 static void WCHomeCornerRestore(UIView *view) {
     WCHomeCornerState *state=objc_getAssociatedObject(view,&WCHomeCornerStateKey);
     if (!state) return;
+    if (state.navigationAppearance) {
+        UINavigationItem *item=state.navigationItem;
+        NSArray *original=state.navigationAppearances;
+        item.standardAppearance=original[0]==NSNull.null?nil:original[0];
+        item.scrollEdgeAppearance=original[1]==NSNull.null?nil:original[1];
+        item.compactAppearance=original[2]==NSNull.null?nil:original[2];
+        if (@available(iOS 15.0,*)) item.compactScrollEdgeAppearance=original[3]==NSNull.null?nil:original[3];
+    }
     if (view.layer.mask==state.mask) view.layer.mask=state.originalMask;
     if ([view.backgroundColor isEqual:state.appliedColor]) view.backgroundColor=state.originalColor;
     if (state.managesHidden && view.hidden) view.hidden=state.originalHidden;
@@ -164,6 +176,28 @@ void WCGestureHomePageCornerLayoutChrome(UIView *view) {
     }
     WCHomeCornerInsetView(view);WCHomeCornerMask(view,UIRectCornerAllCorners);
 }
+void WCGestureHomePageCornerLayoutSearch(UIView *view) {
+    if (view!=WCHomeCornerSearch || !WCGestureHomePageCornerEnabled()) return;
+    UIView *box=WCTweakSafeValue(view,@"searchBoxContainer");
+    if (!box) return;
+    if ([WCTweakSafeValue(WCHomeCornerController,@"isSearching") boolValue]) {
+        WCHomeCornerRestore(box);WCHomeCornerRestore(view);return;
+    }
+    WCHomeCornerColorView(view,WCGestureHomePageCornerColor(view,NO));
+    WCHomeCornerColorView(box,WCGestureHomePageCornerColor(view,YES));
+    // The native input is already inset. Set absolute table-aligned edges,
+    // rather than subtracting another inset on each layout.
+    CGRect tableRect=[WCHomeCornerTable convertRect:WCHomeCornerTable.bounds toView:box.superview];
+    CGRect frame=box.frame;
+    WCHomeCornerState *state=WCHomeCornerStateForView(box);
+    if (!state.managesFrame || frame.origin.x!=state.appliedFrame.origin.x || frame.size.width!=state.appliedFrame.size.width)
+        state.originalFrame=frame;
+    frame.origin.x=tableRect.origin.x+WCHomeCornerInset;
+    frame.size.width=MAX(0,tableRect.size.width-2*WCHomeCornerInset);
+    state.managesFrame=YES;state.appliedFrame=frame;
+    if (!CGRectEqualToRect(box.frame,frame)) box.frame=frame;
+    WCHomeCornerMask(box,UIRectCornerAllCorners);
+}
 void WCGestureHomePageCornerLayoutTable(UITableView *table) {
     if (!table || table!=WCHomeCornerTable || !WCGestureHomePageCornerEnabled()) return;
     WCHomeCornerColorView(table,WCGestureHomePageCornerColor(table,NO));
@@ -211,6 +245,32 @@ void WCGestureHomePageCornerAttach(UIViewController *controller) {
     UITableView *table=WCTweakSafeValue(controller,@"m_tableView");
     if (![table isKindOfClass:UITableView.class]) return;
     WCHomeCornerController=controller;WCHomeCornerTable=table;
+    WCHomeCornerSearch=WCTweakSafeValue(controller,@"searchBar");
+    // The navigation bar is shared with other pages. Override only this item.
+    WCHomeCornerState *state=WCHomeCornerStateForView(controller.view);
+    UINavigationItem *item=controller.navigationItem;
+    if (WCGestureHomePageCornerEnabled()) {
+        if (!state.navigationAppearance) {
+            UINavigationBarAppearance *compactEdge=nil;
+            if (@available(iOS 15.0,*)) compactEdge=item.compactScrollEdgeAppearance;
+            state.navigationAppearances=@[item.standardAppearance ?: NSNull.null,
+                item.scrollEdgeAppearance ?: NSNull.null,item.compactAppearance ?: NSNull.null,compactEdge ?: NSNull.null];
+            state.navigationItem=item;
+            state.navigationAppearance=[(item.standardAppearance ?: controller.navigationController.navigationBar.standardAppearance) copy] ?: [UINavigationBarAppearance new];
+            [state.navigationAppearance configureWithTransparentBackground];
+            state.navigationAppearance.backgroundEffect=nil;
+            state.navigationAppearance.shadowColor=UIColor.clearColor;
+            item.standardAppearance=state.navigationAppearance;
+            item.scrollEdgeAppearance=state.navigationAppearance;
+            item.compactAppearance=state.navigationAppearance;
+            if (@available(iOS 15.0,*)) item.compactScrollEdgeAppearance=state.navigationAppearance;
+        }
+        WCHomeCornerColorView(controller.view,WCGestureHomePageCornerColor(controller.view,NO));
+        WCHomeCornerColorView(WCTweakSafeValue(controller,@"fakeNavBarView"),UIColor.clearColor);
+        WCGestureHomePageCornerLayoutSearch(WCHomeCornerSearch);
+    } else if (state.navigationAppearance) {
+        WCHomeCornerRestore(controller.view);
+    }
     WCGestureHomePageCornerLayoutTable(table);
 }
 void WCGestureHomePageCornerSettingsChanged(NSString *key) {
@@ -220,12 +280,14 @@ void WCGestureHomePageCornerSettingsChanged(NSString *key) {
     if (!WCHomeCornerController) return;
     for (UIView *view in WCHomeCornerViews.allObjects) WCHomeCornerRestore(view);
     WCGestureHomeGroupsRefreshAppearance();
+    WCGestureHomePageCornerAttach(WCHomeCornerController);
     [WCHomeCornerTable reloadData];
     WCGestureHomePageCornerLayoutTable(WCHomeCornerTable);
 }
 void WCGestureHomePageCornerThemeChanged(void) {
     dispatch_async(dispatch_get_main_queue(),^{
         WCGestureHomeGroupsRefreshAppearance();
+        if (WCHomeCornerController) WCGestureHomePageCornerAttach(WCHomeCornerController);
         [WCHomeCornerTable setNeedsLayout];
         for (UITableViewCell *cell in WCHomeCornerTable.visibleCells) [cell setNeedsLayout];
         WCGestureHomePageCornerLayoutTable(WCHomeCornerTable);

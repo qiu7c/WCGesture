@@ -41,6 +41,12 @@
     WCGestureHomePageCornerLayoutChrome((UIView *)self);
 }
 %end
+%hook WCSearchBar
+- (void)layoutSubviews {
+    %orig;
+    WCGestureHomePageCornerLayoutSearch((UIView *)self);
+}
+%end
 %hook MainFrameSectionFoldView
 - (void)layoutSubviews {
     %orig;

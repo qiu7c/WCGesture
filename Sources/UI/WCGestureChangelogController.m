@@ -11,6 +11,7 @@
     self.tableView.rowHeight=UITableViewAutomaticDimension;self.tableView.estimatedRowHeight=64;
     self.tableView.allowsSelection=NO;
     self.updates=@[
+        @"首页搜索框同步圆角与边距，调整顶部导航背景衔接。",
         @"修正首页圆角的布局重入和重复外观刷新问题。",
         @"修复分组角标漏算普通会话未读消息的问题。",
         @"新增首页圆角，支持半径、边距和间距调节；分组栏与列表同步，适配微信深色模式。",
