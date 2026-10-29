@@ -205,14 +205,9 @@ void WCGestureHomePageCornerLayoutSearch(UIView *view) {
     CGRect cardRect=CGRectInset(WCHomeCornerTable.bounds,WCHomeCornerInset,0);
     CGRect tableRect=[WCHomeCornerTable convertRect:cardRect toView:view];
     CGFloat scale=WCGestureLayoutScaleFactor();
-    CGRect available=view.bounds;
-    for (UIView *parent=view.superview;parent;parent=parent.superview) {
-        if (parent.clipsToBounds) available=CGRectIntersection(available,[parent convertRect:parent.bounds toView:view]);
-        if (parent==WCHomeCornerController.view) break;
-    }
-    if (CGRectIsEmpty(available)) { surface.hidden=YES;return; }
-    CGFloat height=MIN(40*scale,MAX(0,available.size.height-4*scale));
-    surface.frame=CGRectMake(tableRect.origin.x,CGRectGetMidY(available)-height/2,tableRect.size.width,height);
+    // Scrolling changes visibility, not the search background's dimensions.
+    CGFloat height=40*scale;
+    surface.frame=CGRectMake(tableRect.origin.x,CGRectGetMidY(view.bounds)-height/2,tableRect.size.width,height);
     WCHomeCornerColorView(surface,WCGestureHomePageCornerColor(view,YES));
     WCHomeCornerMask(surface,UIRectCornerAllCorners);
 }
@@ -244,14 +239,13 @@ CGFloat WCGestureHomePageCornerHeaderHeight(UITableView *table, NSInteger sectio
     if (table!=WCHomeCornerTable || !WCGestureHomePageCornerEnabled()) return original;
     NSInteger merged=WCGestureHomePageCornerMergedSection(table);
     if (merged!=NSNotFound && section<=merged) return 0;
-    if (section==0) return original;
     // Header measurement runs while UITableView builds its row data. Query the
     // data source directly instead of reentering the table's row-data queries.
     id<UITableViewDataSource> source=table.dataSource;
     if (![source tableView:table numberOfRowsInSection:section]) return original;
     BOOL previousContent=NO;
     for (NSInteger previous=0;previous<section;previous++) if ([source tableView:table numberOfRowsInSection:previous]) { previousContent=YES;break; }
-    if (!previousContent) return original;
+    if (!previousContent) return WCGestureHomeGroupsEnabled()?original:MAX(original,WCHomeCornerGap);
     return MAX(original,WCHomeCornerGap);
 }
 UIView *WCGestureHomePageCornerHeaderView(UITableView *table, NSInteger section, UIView *original) {

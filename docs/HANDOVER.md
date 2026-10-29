@@ -1,5 +1,9 @@
 # One Wx 开发交接
 
+## 2026-10-29 搜索区下方间距与尺寸稳定
+
+用户要求卡片间距应用到搜索框和下方卡片之间，反馈搜索框自动变大变小。已删除随祖先可见交集缩放背景的逻辑，高度固定40×布局比例，滚动只改变可见范围，不重算高度。分组wrapper在原生header之后、分组卡片之前增加现有卡片间距，背景/按钮/指示条一起偏移；分组与系统横幅、可选置顶的内部合并间距仍为0。未开分组时通过第一个非空分区header应用卡片间距，包含section0系统横幅；不向空分区重复加间距。无新key/Hook，不修改系统顶栏。静态结构/import/305唯一Hook与diff检查通过，未编译/真机验证。按小修正自动提交推送授权处理。
+
 ## 2026-10-29 保留原生顶栏，下方背景跟随
 
 用户反馈改顶栏后下拉小程序始终白色，要求不再修改系统顶栏。已删除首页navigationBarBackgroundColor/realNavigationBarBackgroundColor/navigationBarBlurEffect三个覆盖Hook、navigationItem四种appearance写入及保存恢复、根视图和fakeNavBarView着色。页面留白颜色改为读取微信原生realNavigationBarBackgroundColor，缺值时读navigationBarBackgroundColor，再沿用既有浅深回退；搜索外层/列表/分组外侧/分区间距使用该颜色，卡片表面保持白/深色。原生changeNavigationFakeBackgroundColor执行后仅更新下方搜索/列表，不修改其结果；原生布局入口继续更新分组。218文件括号/import、305唯一Hook与diff静态检查通过，未编译或真机验证，不查CI。按小修正自动提交推送授权处理。

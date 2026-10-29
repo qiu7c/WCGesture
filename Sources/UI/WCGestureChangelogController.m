@@ -11,6 +11,7 @@
     self.tableView.rowHeight=UITableViewAutomaticDimension;self.tableView.estimatedRowHeight=64;
     self.tableView.allowsSelection=NO;
     self.updates=@[
+        @"卡片间距应用到搜索区下方，搜索框高度不再随滚动可见范围变化。",
         @"恢复微信原生顶栏，下方留白跟随原生配色，避免干扰下拉小程序背景。",
         @"调整搜索框背景绘制，修正下沿裁切与对齐；修复分组指示条偶尔不跟随。",
         @"加厚首页搜索框并对齐卡片边缘，统一顶栏和列表背景色。",

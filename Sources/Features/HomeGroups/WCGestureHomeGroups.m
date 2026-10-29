@@ -385,11 +385,12 @@ NSIndexPath *WCGestureHomeGroupsFind(id logic, NSString *user) {
     BOOL rounded=WCGestureHomePageCornerEnabled();
     BOOL joined=rounded && WCGestureHomePageCornerMergedSection(self.table)!=NSNotFound;
     CGFloat gap=rounded && !joined?WCGestureHomePageCornerGap():0;
-    self.frame=CGRectMake(0,0,width,nativeHeight+height+gap);
+    CGFloat groupY=nativeHeight+(rounded?WCGestureHomePageCornerGap():0);
+    self.frame=CGRectMake(0,0,width,groupY+height+gap);
     self.originalHeader.frame=CGRectMake(0,0,width,nativeHeight);
     CGFloat horizontal=rounded?WCGestureHomePageCornerInset()+8*scale:12*scale;
-    self.stack.frame=CGRectMake(horizontal,nativeHeight,MAX(0,width-2*horizontal),height);
-    WCGestureHomePageCornerLayoutGroup(self,nativeHeight,height,joined);
+    self.stack.frame=CGRectMake(horizontal,groupY,MAX(0,width-2*horizontal),height);
+    WCGestureHomePageCornerLayoutGroup(self,groupY,height,joined);
     UIColor *textColor=WCGestureHomePageIsDark(self)?UIColor.whiteColor:UIColor.blackColor;
     // Always restore geometry, even when only the native header was relaid out.
     for (NSUInteger i=0;i<self.buttons.count;i++) {
