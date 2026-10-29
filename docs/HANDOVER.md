@@ -1,5 +1,9 @@
 # One Wx 开发交接
 
+## 2026-10-29 根据截图处理侧滑接缝与完整搜索根视图
+
+用户确认两个问题仍在并提供三张图：扩展最后按钮与移动cell之间有约一次边距的灰缝；聊天残留层级含UITransitionView→_UISearchControllerView(WCSearchController)→_UISearchBarContainerView→MMUISearchBar，而非仅输入框。侧滑在实际容器内比较cell.minX与pull.maxX，差值约等于当前inset时消除该次偏移，已贴合/其它位移不变；撤掉此前背景快照Hook和中间层改色假设，保留已验证起点/裁切。聊天通过已确认WCSearcher.searchController及UISearchController获取自己的viewIfLoaded，纳入隐藏/重开恢复，清理时使原生controller inactive，且仅在非presented/非导航栈时移除其孤立root；不隐藏共享UITransitionView/导航栏，删除旧三层祖先隐藏/恢复。退出回调根据实际presenting/导航栈归属判断仍在展示，不单凭isSeachActive阻断清理。313唯一Hook、218文件结构/import、一次13.6pt接缝修正及幂等/其它位移/0边距几何检查与diff通过。没有iOS编译或真机验证，不能声称已最终消除两个问题。按小修正自动提交推送授权处理。
+
 ## 2026-10-29 聊天搜索退出时序再次修正
 
 用户反馈搜索界面仍清除不净。源码发现打开优先pushSearchControllerWithCompletion:，只接UISearchController dismiss不足；viewWillAppear首次Cleanup已清Active标记，实际动画结束的再次Cleanup被入口拦住。新增当前WCSearcher.h确认的onWCSearchControllerDidDisappear:(BOOL)，复用已有按owner/session匹配的DidDismiss；Cleanup以本插件session归属及清理重入为边界，已结束搜索仍执行chrome隐藏，不再关闭第二次。删除0/0.12/0.35秒重复隐藏，改为实际页面消失后清理；DidDismiss在原生仍isSeachActive时跳过，避免交互返回取消或push搜索结果详情时误关仍在的搜索。218文件结构/import、314唯一Hook与diff静态检查通过；没有设备残留层级/调用栈，未编译或真机确认，不能承诺残留已彻底消除。按小修正自动提交推送授权处理。

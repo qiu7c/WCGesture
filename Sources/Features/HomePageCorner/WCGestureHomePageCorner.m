@@ -157,11 +157,8 @@ CGRect WCGestureHomePageCornerCellFrame(UITableViewCell *cell, CGRect frame) {
 }
 void WCGestureHomePageCornerRestoreCell(UITableViewCell *cell) {
     if ([cell isKindOfClass:NSClassFromString(@"NewMainFrameCell")]) {
-        UIView *item=WCTweakSafeValue(cell,@"m_itemView");
-        WCHomeCornerRestore(item.superview);
-        WCHomeCornerRestore(WCTweakSafeValue(cell,@"_copyedBackgroundView"));
         WCHomeCornerRestore(WCTweakSafeValue(cell,@"m_backGroundViewOfCell"));
-        WCHomeCornerRestore(item);
+        WCHomeCornerRestore(WCTweakSafeValue(cell,@"m_itemView"));
     }
     WCHomeCornerRestore(cell.backgroundView);WCHomeCornerRestore(cell.contentView);WCHomeCornerRestore(cell);
 }
@@ -213,15 +210,14 @@ void WCGestureHomePageCornerLayoutSwipe(UIView *container) {
     WCHomeCornerInsetView(container);
     WCHomeCornerColorView(container,UIColor.clearColor);
     WCHomeCornerColorView(pull,UIColor.clearColor);
-    // WeChat retains a separate menu background snapshot in its base cell.
-    // UIKit moves the whole cell, including that snapshot and the item wrapper.
-    // Scope the cleanup to the UIKit expansion container, not WeChat's menu.
-    WCHomeCornerHideNativeBackground(WCTweakSafeValue(cell,@"_copyedBackgroundView"));
-    WCHomeCornerHideNativeBackground(WCTweakSafeValue(cell,@"m_backGroundViewOfCell"));
-    UIView *item=WCTweakSafeValue(cell,@"m_itemView");
-    UIColor *surface=WCGestureHomePageCornerColor(cell,YES);
-    WCHomeCornerColorView(item.superview,surface);
-    WCHomeCornerColorView(cell.backgroundView,surface);
+    // Normalize only the one-inset seam shown in the screenshot, leaving
+    // all other UIKit animation offsets unchanged.
+    CGFloat gap=CGRectGetMinX(cell.frame)-CGRectGetMaxX(pull.frame);
+    CGFloat inset=WCGestureHomePageCornerInset();
+    if (inset>0 && fabs(gap-inset)<0.5) {
+        CGRect frame=cell.frame;frame.origin.x-=gap;
+        cell.frame=frame;
+    }
     WCHomeCornerState *cellState=objc_getAssociatedObject(cell,&WCHomeCornerStateKey);
     WCHomeCornerMask(container,cellState.corners);
     // Standard buttons have oversized background children (-502 / 576pt in

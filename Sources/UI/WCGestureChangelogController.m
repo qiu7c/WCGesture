@@ -11,6 +11,7 @@
     self.tableView.rowHeight=UITableViewAutomaticDimension;self.tableView.estimatedRowHeight=64;
     self.tableView.allowsSelection=NO;
     self.updates=@[
+        @"调整扩展侧滑按钮与会话之间的接缝，补充搜索控制器根视图退出清理。",
         @"调整聊天搜索退出清理时机，在页面消失后清理残留背景。",
         @"补充首页扩展侧滑的背景快照和中间背景层清理。",
         @"首页侧滑扩展适配卡片边距和圆角，限制按钮背景越界。",
