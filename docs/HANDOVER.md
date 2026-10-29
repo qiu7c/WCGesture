@@ -1,5 +1,9 @@
 # One Wx 开发交接
 
+## 2026-10-29 设置数值与箭头重叠修正
+
+共享WCSettingsCardCell先由UIKit布局label，再内缩contentView/移动accessory，导致Value1数值仍占旧位置。现保存cell style，在最终content宽度内重新定位右侧数值并预留标题间距，Value1数值最多占可用宽度55%，标题按剩余空间收窄；Subtitle保持上下排布并限制宽度，不挪动开关和自绘控件。无新Hook/key/API。218文件结构/import、307唯一Hook及diff静态检查通过，未编译或真机验证；按小修正自动提交推送授权处理。
+
 ## 2026-10-29 EDEDED背景、滚动横带与首次进入位置修正
 
 用户明确原生顶栏为#EDEDED，反馈下滑时多出横带、进入首页仍像已滚动。首页圆角浅色留白现固定237/255（#EDEDED），不再取可能返回F2F2F2的原生getter或0.95回退；深色仍读原生色，卡片表面不变，不修改顶栏。移除自绘section header留白，卡片之间的额外间距移至section footer，避免自绘header吸到顶栏；原生header保留，仅合并区域高度归0。footer两个delegate已核对MMUIViewController继承签名。首次定位改为真正table顶端-adjustedContentInset.top，等待m_bReadyToLoadData、首次reload后再排队布局/定位，定位成功才设置initialPresentationFinished；后续普通返回和用户滚动不持续置顶。218源文件结构/import、307唯一Hook及diff静态检查通过；未编译或真机验证，不能认为三项反馈已设备验收。按用户小修正自动提交推送授权处理。

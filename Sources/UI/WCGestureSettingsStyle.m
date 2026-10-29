@@ -94,10 +94,12 @@ UIView *WCGestureSettingsSearchHeader(UITextField *field, CGFloat width) {
 @property (nonatomic, strong) UIView *pressedSurface;
 @property (nonatomic) CACornerMask cardCorners;
 @property (nonatomic, strong) UIImageView *disclosure;
+@property (nonatomic) UITableViewCellStyle cardStyle;
 @end
 @implementation WCSettingsCardCell
 - (instancetype)initWithStyle:(UITableViewCellStyle)style reuseIdentifier:(NSString *)identifier {
     if ((self=[super initWithStyle:style reuseIdentifier:identifier])) {
+        self.cardStyle=style;
         self.backgroundColor=UIColor.clearColor;self.backgroundView=[UIView new];
         self.surface=[UIView new];self.surface.backgroundColor=UIColor.secondarySystemGroupedBackgroundColor;
         self.surface.layer.cornerCurve=kCACornerCurveContinuous;self.surface.clipsToBounds=YES;
@@ -140,6 +142,25 @@ UIView *WCGestureSettingsSearchHeader(UITextField *field, CGFloat width) {
         trailing=CGRectGetWidth(accessory)+3*inset;
     } else if (self.accessoryType!=UITableViewCellAccessoryNone) trailing=3*inset;
     self.contentView.frame=CGRectMake(inset,0,MAX(0,CGRectGetWidth(self.bounds)-inset-trailing),CGRectGetHeight(self.bounds));
+    // UIKit laid out its labels before the card's content width was inset.
+    // Refit native labels to that final width, reserving a separate value area.
+    CGFloat right=MAX(0,CGRectGetWidth(self.contentView.bounds)-(self.accessoryView?0:inset));
+    CGRect title=self.textLabel.frame;
+    CGFloat titleRight=right;
+    if (self.cardStyle==UITableViewCellStyleValue1 && self.detailTextLabel.text.length) {
+        CGRect value=self.detailTextLabel.frame;
+        CGFloat available=MAX(0,right-CGRectGetMinX(title));
+        value.size.width=MIN([self.detailTextLabel sizeThatFits:CGSizeMake(CGFLOAT_MAX,value.size.height)].width,available*0.55);
+        value.origin.x=right-value.size.width;
+        self.detailTextLabel.frame=value;
+        titleRight=CGRectGetMinX(value)-8;
+    } else if (self.cardStyle==UITableViewCellStyleSubtitle) {
+        CGRect subtitle=self.detailTextLabel.frame;
+        subtitle.size.width=MIN(subtitle.size.width,MAX(0,right-subtitle.origin.x));
+        self.detailTextLabel.frame=subtitle;
+    }
+    title.size.width=MIN(title.size.width,MAX(0,titleRight-title.origin.x));
+    self.textLabel.frame=title;
 }
 @end
 UITableViewCell *WCGestureSettingsCardCell(UITableView *table, NSString *identifier, UITableViewCellStyle style, NSIndexPath *path) {
