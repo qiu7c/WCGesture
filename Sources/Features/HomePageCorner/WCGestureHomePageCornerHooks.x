@@ -7,7 +7,7 @@
 }
 - (void)traitCollectionDidChange:(UITraitCollection *)previous {
     %orig(previous);
-    if ([self.traitCollection hasDifferentColorAppearanceComparedToTraitCollection:previous])
+    if ([((UIView *)self).traitCollection hasDifferentColorAppearanceComparedToTraitCollection:previous])
         WCGestureHomePageCornerThemeChanged();
 }
 %end
