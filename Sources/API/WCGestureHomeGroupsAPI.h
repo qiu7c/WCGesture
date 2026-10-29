@@ -16,6 +16,7 @@ void WCGestureHomeGroupsInvalidate(id logic);
 void WCGestureHomeGroupsAttach(UIViewController *controller);
 void WCGestureHomeGroupsDidAppear(UIViewController *controller);
 void WCGestureHomeGroupsSettingsChanged(NSString *key);
+void WCGestureHomeGroupsRefreshAppearance(void);
 void WCGestureHomeGroupsMessageAdded(id target, id wrap, BOOL localMessage);
 void WCGestureHomeGroupsChatEntered(id controller);
 UIViewController *WCGestureCreateHomeGroupsSettingsController(void);

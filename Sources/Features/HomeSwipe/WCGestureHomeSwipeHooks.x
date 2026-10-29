@@ -3,6 +3,7 @@
 - (void)viewDidLoad {
     %orig;
     WCGestureHomeGroupsAttach((UIViewController *)self);
+    WCGestureHomePageCornerAttach((UIViewController *)self);
 }
 %end
 %hook NewMainFrameCell

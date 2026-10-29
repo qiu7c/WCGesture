@@ -4,6 +4,20 @@
 - (void)tableView:(UITableView *)table willDisplayCell:(UITableViewCell *)cell forRowAtIndexPath:(NSIndexPath *)path {
     %orig(table,cell,path);
     WCGestureHomeGroupsStyleCell((UIViewController *)self,cell,path);
+    WCGestureHomePageCornerLayoutCell(cell);
+}
+- (void)viewWillAppear:(BOOL)animated {
+    %orig(animated);
+    WCGestureHomeGroupsAttach((UIViewController *)self);
+    WCGestureHomePageCornerAttach((UIViewController *)self);
+}
+- (CGFloat)tableView:(UITableView *)table heightForHeaderInSection:(NSInteger)section {
+    CGFloat original=%orig(table,section);
+    return WCGestureHomePageCornerHeaderHeight(table,section,original);
+}
+- (UIView *)tableView:(UITableView *)table viewForHeaderInSection:(NSInteger)section {
+    UIView *original=%orig(table,section);
+    return WCGestureHomePageCornerHeaderView(table,section,original);
 }
 - (void)viewDidAppear:(BOOL)animated {
     %orig(animated);
@@ -12,6 +26,7 @@
 - (void)viewDidLayoutSubviews {
     %orig;
     WCGestureHomeGroupsAttach((UIViewController *)self);
+    WCGestureHomePageCornerAttach((UIViewController *)self);
 }
 %end
 
@@ -42,11 +57,11 @@
 }
 - (unsigned int)getSessionCount {
     if (WCGestureHomeGroupsNative() || !WCGestureHomeGroupsEnabled()) return %orig;
-    return (unsigned int)(WCGestureHomeGroupsSection(self,0).count + WCGestureHomeGroupsSection(self,1).count);
+    return (unsigned int)(WCGestureHomeGroupsSection(self,1).count + WCGestureHomeGroupsSection(self,2).count);
 }
 - (unsigned int)getVisibleSessionCount {
     if (WCGestureHomeGroupsNative() || !WCGestureHomeGroupsEnabled()) return %orig;
-    return (unsigned int)(WCGestureHomeGroupsSection(self,0).count + WCGestureHomeGroupsSection(self,1).count);
+    return (unsigned int)(WCGestureHomeGroupsSection(self,1).count + WCGestureHomeGroupsSection(self,2).count);
 }
 - (id)getSessionInfoAtIndexPath:(NSIndexPath *)path {
     NSIndexPath *native = WCGestureHomeGroupsNativePath(self, path);
@@ -76,7 +91,7 @@
     NSIndexPath *path = WCGestureHomeGroupsFind(self,user);
     if (!path) return NSNotFound;
     NSUInteger count = path.row;
-    for (NSInteger section=0;section<path.section;section++) count += WCGestureHomeGroupsSection(self,section).count;
+    for (NSInteger section=1;section<path.section;section++) count += WCGestureHomeGroupsSection(self,section).count;
     return count;
 }
 - (void)onMainSessionReload {

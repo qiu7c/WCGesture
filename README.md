@@ -24,6 +24,8 @@ One Wx is a WeChat enhancement plugin that grew out of WCGesture (originally ext
 
 ## Features
 
+- 界面类功能 → 圆角设置 → 首页圆角：支持半径、边距和卡片间距，分组栏、会话与设备横条同步。开启后浅色卡片白色，随微信自身深色模式切换；默认关闭，源码已接入，待编译与真机验收。详见[首页圆角](docs/HOME_PAGE_CORNER.md)。
+
 The home page has six categories: 聊天类功能 / 手势类功能 / 朋友圈功能 / 界面类功能 / 增强类功能 / 插件类配置. Hidden-entry and cleanup options are under 界面类, menu management under 聊天类, and ad filtering under 增强类.
 The search bar lists first-level feature entries only, including disabled features, and opens their group without enabling them. Nested settings stay inside their feature pages.
 

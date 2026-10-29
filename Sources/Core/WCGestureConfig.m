@@ -1,5 +1,10 @@
 #import "Sources/API/WCGestureInternal.h"
 
+NSString *const WCGestureHomePageCornerEnabledKey = @"com.qiu7c.onewx.home.corner.enabled";
+NSString *const WCGestureHomePageCornerRadiusKey = @"com.qiu7c.onewx.home.corner.radius";
+NSString *const WCGestureHomePageCornerInsetKey = @"com.qiu7c.onewx.home.corner.inset";
+NSString *const WCGestureHomePageCornerGapKey = @"com.qiu7c.onewx.home.corner.gap";
+
 NSString *const WCGestureHomeSwipeEnabledKey = @"com.qiu7c.onewx.home.swipe.enabled";
 NSString *const WCGestureMultiSelectEnabledKey = @"com.qiu7c.onewx.chat.multi-select.enabled";
 NSString *const WCGestureHomeGroupsUnifiedColorEnabledKey = @"com.qiu7c.onewx.home.groups.unified-color.enabled";
@@ -400,6 +405,10 @@ void WCGestureRegisterDefaults(void) {
             [stored setBool:NO forKey:WCGestureMessageTimeBelowAvatarKey];
         }
         NSDictionary *defaults = @{
+            WCGestureHomePageCornerEnabledKey: @NO,
+            WCGestureHomePageCornerRadiusKey: @16,
+            WCGestureHomePageCornerInsetKey: @16,
+            WCGestureHomePageCornerGapKey: @8,
             WCGestureVirtualVideoEnabledKey: @NO,
             WCGestureVirtualVideoAudioKey: @NO,
             WCGestureVirtualVideoMixMicKey: @NO,

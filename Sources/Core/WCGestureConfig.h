@@ -3,6 +3,11 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+FOUNDATION_EXPORT NSString *const WCGestureHomePageCornerEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureHomePageCornerRadiusKey;
+FOUNDATION_EXPORT NSString *const WCGestureHomePageCornerInsetKey;
+FOUNDATION_EXPORT NSString *const WCGestureHomePageCornerGapKey;
+
 /// Master switch key. When OFF, every gesture feature is disabled.
 FOUNDATION_EXPORT NSString *const WCGestureEnabledKey;
 

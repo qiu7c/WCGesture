@@ -1,4 +1,5 @@
 #import "Sources/Core/WCGestureConfig.h"
+#import "Sources/API/WCGestureHomePageCornerAPI.h"
 #import "Sources/WeChat/WCGestureWeChatClasses.h"
 #import "Sources/WeChat/WCGestureAccount.h"
 #import "Sources/WeChat/WCGesturePrivateAPI.h"

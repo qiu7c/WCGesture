@@ -178,7 +178,8 @@ NSIndexPath *WCGestureHomeGroupsNativePath(id logic, NSIndexPath *path) {
     return path.row < (NSInteger)rows.count ? rows[path.row][@"path"] : path;
 }
 NSIndexPath *WCGestureHomeGroupsFind(id logic, NSString *user) {
-    for (NSInteger section=0;section<2;section++) {
+    // Native homepage: section 0 is auxiliary rows, 1 pinned, 2 normal sessions.
+    for (NSInteger section=1;section<=2;section++) {
         NSArray *rows=WCGestureHomeGroupsSection(logic,section);
         for (NSUInteger row=0;row<rows.count;row++) if ([WCGestureHomeGroupsUserName(rows[row][@"session"]) isEqual:user])
             return [NSIndexPath indexPathForRow:row inSection:section];
@@ -235,6 +236,7 @@ NSIndexPath *WCGestureHomeGroupsFind(id logic, NSString *user) {
     [self.nativeBackgrounds removeAllObjects];
 }
 - (void)styleCell:(UITableViewCell *)cell path:(NSIndexPath *)path {
+    if (WCGestureHomePageCornerEnabled()) return;
     id logic=WCTweakSafeValue(self.controller,@"m_mainFrameLogicController");
     NSArray *entries=WCGestureHomeGroupsSection(logic,path.section);
     id session=path.row<(NSInteger)entries.count?entries[path.row][@"session"]:nil;
@@ -256,6 +258,12 @@ NSIndexPath *WCGestureHomeGroupsFind(id logic, NSString *user) {
     }
 }
 - (void)updateBackground {
+    if (WCGestureHomePageCornerEnabled()) {
+        [self restoreBackgrounds];
+        self.chromeColor=WCGestureHomePageCornerColor(self,YES);
+        self.backgroundColor=WCGestureHomePageCornerColor(self,NO);
+        return;
+    }
     BOOL unified=[NSUserDefaults.standardUserDefaults boolForKey:WCGestureHomeGroupsUnifiedColorEnabledKey];
     if (!unified) [self restoreBackgrounds];
     id header=WCTweakSafeValue(self.controller,@"m_headerLogic");
@@ -373,14 +381,20 @@ NSIndexPath *WCGestureHomeGroupsFind(id logic, NSString *user) {
     CGFloat width=self.table.bounds.size.width, nativeHeight=self.originalHeader.bounds.size.height;
     if (width<=0) return;
     CGFloat scale=WCGestureLayoutScaleFactor(), height=44*scale;
-    self.frame=CGRectMake(0,0,width,nativeHeight+height);
+    BOOL rounded=WCGestureHomePageCornerEnabled();
+    CGFloat gap=rounded?WCGestureHomePageCornerGap():0;
+    self.frame=CGRectMake(0,0,width,nativeHeight+height+gap);
     self.originalHeader.frame=CGRectMake(0,0,width,nativeHeight);
-    self.stack.frame=CGRectMake(12*scale,nativeHeight,MAX(0,width-24*scale),height);
+    CGFloat horizontal=rounded?WCGestureHomePageCornerInset()+8*scale:12*scale;
+    self.stack.frame=CGRectMake(horizontal,nativeHeight,MAX(0,width-2*horizontal),height);
+    WCGestureHomePageCornerLayoutGroup(self,nativeHeight,height);
+    UIColor *textColor=WCGestureHomePageIsDark(self)?UIColor.whiteColor:UIColor.blackColor;
     // Always restore geometry, even when only the native header was relaid out.
     for (NSUInteger i=0;i<self.buttons.count;i++) {
         CGFloat left=self.stack.bounds.size.width*i/self.buttons.count;
         CGFloat right=self.stack.bounds.size.width*(i+1)/self.buttons.count;
         self.buttons[i].frame=CGRectMake(left,0,right-left,height);
+        [self.buttons[i] setTitleColor:textColor forState:UIControlStateNormal];
     }
     if (self.version==WCGroupVersion && self.lastWidth==width && self.originalHeight==nativeHeight) return;
     self.version=WCGroupVersion;self.lastWidth=width;self.originalHeight=nativeHeight;
@@ -403,7 +417,7 @@ NSIndexPath *WCGestureHomeGroupsFind(id logic, NSString *user) {
         CGFloat right=self.stack.bounds.size.width*(i+1)/groups.count;
         button.frame=CGRectMake(left,0,right-left,height);
         [button setTitle:groups[i][@"title"] forState:UIControlStateNormal];
-        [button setTitleColor:UIColor.labelColor forState:UIControlStateNormal];button.titleLabel.font=[UIFont systemFontOfSize:font weight:fw];
+        [button setTitleColor:textColor forState:UIControlStateNormal];button.titleLabel.font=[UIFont systemFontOfSize:font weight:fw];
         if ([groups[i][@"id"] isEqual:WCGestureHomeGroupsSelected()]) selected=i;
     }
     [self.stack layoutIfNeeded];
@@ -412,7 +426,8 @@ NSIndexPath *WCGestureHomeGroupsFind(id logic, NSString *user) {
     CGRect target=CGRectMake(self.stack.frame.origin.x+selected*cellWidth+(1-percent)*cellWidth/2,
         self.stack.frame.origin.y+(1-percent)*height/2,cellWidth*percent,height*percent);
     self.indicator.hidden=![d boolForKey:WCGestureHomeGroupsSliderKey] || percent==0;
-    self.indicator.backgroundColor=WCGestureColorForDefaultsKey(WCGestureHomeGroupsSliderColorKey,UIColor.tertiarySystemFillColor);
+    UIColor *sliderFallback=[UIColor colorWithWhite:WCGestureHomePageIsDark(self)?0.25:0.92 alpha:1];
+    self.indicator.backgroundColor=WCGestureColorForDefaultsKey(WCGestureHomeGroupsSliderColorKey,sliderFallback);
     self.indicator.layer.cornerRadius=MIN(CGRectGetHeight(target)/2,MAX(0,[d doubleForKey:WCGestureHomeGroupsSliderRadiusKey]*scale));
     if ([d boolForKey:WCGestureHomeGroupsSliderAnimationKey]) [UIView animateWithDuration:0.25 animations:^{ self.indicator.frame=target; }];
     else self.indicator.frame=target;
@@ -429,7 +444,7 @@ NSIndexPath *WCGestureHomeGroupsFind(id logic, NSString *user) {
     id logic=WCTweakSafeValue(self.controller,@"m_mainFrameLogicController");
     NSMutableArray *sessions=[NSMutableArray array];NSMutableSet *seenNames=[NSMutableSet set];
     WCGestureHomeGroupsBeginNative();
-    for(NSInteger section=0;section<2;section++) {
+    for(NSInteger section=1;section<=2;section++) {
         NSInteger count=[(id<WCHomeGroupsNative>)logic getSessionCountForSection:section];
         for(NSInteger row=0;row<count;row++) { id item=[(id<WCHomeGroupsNative>)logic getSessionInfoAtIndexPath:[NSIndexPath indexPathForRow:row inSection:section]];item=WCTweakSafeValue(item,@"m_sessionInfo") ?: item;NSString *name=WCGestureHomeGroupsUserName(item);if(name.length && ![seenNames containsObject:name]){[seenNames addObject:name];[sessions addObject:item];} }
     }
@@ -559,6 +574,12 @@ void WCGestureHomeGroupsInvalidate(id logic) {
 void WCGestureHomeGroupsSettingsChanged(NSString *key) {
     if (key && ![key hasPrefix:@"com.qiu7c.onewx.home.groups."] && ![key isEqual:WCGesturePageScalePercentKey] && ![key isEqual:WCGesturePageScaleEnabledKey] && ![key isEqual:WCGestureEnabledKey]) return;
     WCGroupList=nil;WCGroupCustomMembers=nil;WCGroupVersion++;WCGroupScheduleReload();
+}
+void WCGestureHomeGroupsRefreshAppearance(void) {
+    if (!WCGroupMainController) return;
+    WCHomeGroupBanner *banner=objc_getAssociatedObject(WCGroupMainController,&WCGroupBannerKey);
+    banner.nativePinnedImage=nil;banner.nativePinnedColor=nil;banner.version=0;
+    WCGestureHomeGroupsAttach(WCGroupMainController);
 }
 
 static __weak UIViewController *WCGroupChatController;

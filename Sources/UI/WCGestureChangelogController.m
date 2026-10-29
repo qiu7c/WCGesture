@@ -11,6 +11,8 @@
     self.tableView.rowHeight=UITableViewAutomaticDimension;self.tableView.estimatedRowHeight=64;
     self.tableView.allowsSelection=NO;
     self.updates=@[
+        @"修复分组角标漏算普通会话未读消息的问题。",
+        @"新增首页圆角，支持半径、边距和间距调节；分组栏与列表同步，适配微信深色模式。",
         @"首页精简为六类，同页设置合并到一张圆角卡片，修正箭头和按压高亮越出卡片的问题。",
         @"新增主页分组，支持自定义分组、成员管理和横滑切换。",
         @"新增主页右滑扩展，支持备注、朋友圈、勿扰和置顶等操作。",
@@ -22,7 +24,7 @@
         @"设置页标题加粗，菜单默认收起；分组栏默认跟随置顶灰色，开启统一改色后默认白色。",
         @"修复分组显示异常，避免防撤回样式干扰普通聊天提示颜色。"];
 }
-- (NSString *)tableView:(UITableView *)table titleForHeaderInSection:(NSInteger)section { return @"1.0.0 · 2026-10-28"; }
+- (NSString *)tableView:(UITableView *)table titleForHeaderInSection:(NSInteger)section { return @"1.0.0 · 2026-10-29"; }
 - (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section { return self.updates.count; }
 - (UITableViewCell *)tableView:(UITableView *)table cellForRowAtIndexPath:(NSIndexPath *)path {
     UITableViewCell *cell=[table dequeueReusableCellWithIdentifier:@"update"];
