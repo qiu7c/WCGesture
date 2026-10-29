@@ -1,5 +1,9 @@
 # One Wx 开发交接
 
+## 2026-10-29 首页侧滑扩展适配卡片边距
+
+用户提供文本 2(3).txt/文本(5).txt展开dump，确认MainFrameTableView→_UITableViewCellSwipeContainerView直接包含UISwipeActionPullView与NewMainFrameCell。外层已内缩为x13.6/w365.8，不能再叠加边距；按钮有x-502/w576的超宽背景子视图，cell展开x309.6=13.6+296。新增NewMainFrameCell.setFrame:转发，在原生setter前仅调整x约0且全表宽的frame，动画位移/已内缩frame原样保留。侧滑容器及PullView的布局入口复用圆角API：仅该主表实际层级生效，外层透明并用对应cell角位裁切，PullView矩形mask限制超宽按钮背景，保持UIKit原动作/拖动动画；关闭按现有状态恢复。mask路径使用局部0原点配合frame=view.bounds，避免非零bounds偏移。无新key。218文件结构/import、312唯一Hook、两个API定义、dump提取的全宽→13.6/365.8/重复内缩不变/动画x不变几何检查及diff通过；未编译/真机验证，滑动流畅度和灰块消除仍需设备验收。按小修正自动提交推送授权处理。
+
 ## 2026-10-29 聊天记录搜索空查询返回残留
 
 用户明确是聊天记录搜索：打开后不输入直接返回，搜索框残留顶端。对照WCAtlas/Tweak.xm 8479–8581清理和11278取消入口，原迁移保留了外层chrome隐藏/0、0.12、0.35秒复核/交互返回恢复，却漏了显式取消入口。WCAtlas旧BaseMsgContentViewController.msgSearchBarCancel未在当前8.0.79头文件确认，未新增该未知orig Hook；采用当前WCSearcher.h已确认的searchBarCancelButtonClicked:/didDismissSearchController:，原生执行后复用现有DidDismiss。DidDismiss支持helper或searcher身份匹配到所属会话，沿用既有下一轮主线程及session校验，避免影响重开搜索。两个新Hook签名确认、无重复/无新key；218源文件结构/import、309唯一Hook及diff静态检查通过，未编译或真机验证。按小修正自动提交推送授权处理；首页圆角不改。

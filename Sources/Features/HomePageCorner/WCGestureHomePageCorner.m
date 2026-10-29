@@ -131,21 +131,29 @@ static void WCHomeCornerMask(UIView *view, UIRectCorner corners) {
         [CATransaction begin];[CATransaction setDisableActions:YES];
         state.maskBounds=view.bounds;state.corners=corners;state.radius=radius;
         state.mask.frame=view.bounds;
-        state.mask.path=[UIBezierPath bezierPathWithRoundedRect:view.bounds byRoundingCorners:corners cornerRadii:CGSizeMake(radius,radius)].CGPath;
+        CGRect local=CGRectMake(0,0,view.bounds.size.width,view.bounds.size.height);
+        state.mask.path=[UIBezierPath bezierPathWithRoundedRect:local byRoundingCorners:corners cornerRadii:CGSizeMake(radius,radius)].CGPath;
         [CATransaction commit];
     }
     if (view.layer.mask!=state.mask) view.layer.mask=state.mask;
 }
-static void WCHomeCornerInsetView(UIView *view) {
+static CGRect WCHomeCornerInsetFrame(UIView *view, CGRect frame) {
     CGFloat inset=WCGestureHomePageCornerInset(), width=WCHomeCornerTable.bounds.size.width;
-    CGRect frame=view.frame;
     // Apply to full-width native frames, never subtract from our last result.
-    if (fabs(frame.origin.x)>0.5 || frame.size.width<width-0.5 || width<=2*inset) return;
+    if (fabs(frame.origin.x)>0.5 || frame.size.width<width-0.5 || width<=2*inset) return frame;
     WCHomeCornerState *state=WCHomeCornerStateForView(view);
     if (!state.managesFrame || !CGRectEqualToRect(frame,state.appliedFrame)) state.originalFrame=frame;
     frame.origin.x=inset;frame.size.width=width-2*inset;
     state.managesFrame=YES;state.appliedFrame=frame;
+    return frame;
+}
+static void WCHomeCornerInsetView(UIView *view) {
+    CGRect frame=WCHomeCornerInsetFrame(view,view.frame);
     if (!CGRectEqualToRect(view.frame,frame)) view.frame=frame;
+}
+CGRect WCGestureHomePageCornerCellFrame(UITableViewCell *cell, CGRect frame) {
+    if (!WCGestureHomePageCornerEnabled() || !WCHomeCornerTable || ![cell isDescendantOfView:WCHomeCornerTable]) return frame;
+    return WCHomeCornerInsetFrame(cell,frame);
 }
 void WCGestureHomePageCornerRestoreCell(UITableViewCell *cell) {
     if ([cell isKindOfClass:NSClassFromString(@"NewMainFrameCell")]) {
@@ -183,6 +191,29 @@ void WCGestureHomePageCornerLayoutChrome(UIView *view) {
         }
     }
     WCHomeCornerInsetView(view);WCHomeCornerMask(view,UIRectCornerAllCorners);
+}
+void WCGestureHomePageCornerLayoutSwipe(UIView *container) {
+    // Both names and the direct parent/child relation are in the supplied dump.
+    if (![container isKindOfClass:NSClassFromString(@"_UITableViewCellSwipeContainerView")]
+        || !WCHomeCornerTable || container.superview!=WCHomeCornerTable) return;
+    UITableViewCell *cell=nil;
+    UIView *pull=nil;
+    for (UIView *child in container.subviews) {
+        if ([child isKindOfClass:NSClassFromString(@"NewMainFrameCell")]) cell=(UITableViewCell *)child;
+        else if ([child isKindOfClass:NSClassFromString(@"UISwipeActionPullView")]) pull=child;
+    }
+    if (!cell || !pull) return;
+    if (!WCGestureHomePageCornerEnabled()) {
+        WCHomeCornerRestore(pull);WCHomeCornerRestore(container);return;
+    }
+    WCHomeCornerInsetView(container);
+    WCHomeCornerColorView(container,UIColor.clearColor);
+    WCHomeCornerColorView(pull,UIColor.clearColor);
+    WCHomeCornerState *cellState=objc_getAssociatedObject(cell,&WCHomeCornerStateKey);
+    WCHomeCornerMask(container,cellState.corners);
+    // Standard buttons have oversized background children (-502 / 576pt in
+    // the dump). Clip at the action panel, then at the stationary card edge.
+    WCHomeCornerMask(pull,0);
 }
 void WCGestureHomePageCornerLayoutSearch(UIView *view) {
     if (view!=WCHomeCornerSearch || CGRectIsEmpty(view.bounds)) return;

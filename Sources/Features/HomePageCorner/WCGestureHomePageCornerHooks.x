@@ -27,6 +27,10 @@
 }
 %end
 %hook NewMainFrameCell
+- (void)setFrame:(CGRect)frame {
+    CGRect adjusted=WCGestureHomePageCornerCellFrame((UITableViewCell *)self,frame);
+    %orig(adjusted);
+}
 - (void)layoutSubviews {
     %orig;
     WCGestureHomePageCornerLayoutCell((UITableViewCell *)self);
@@ -60,6 +64,18 @@
 - (void)layoutSubviews {
     %orig;
     WCGestureHomePageCornerLayoutSearch((UIView *)self);
+}
+%end
+%hook _UITableViewCellSwipeContainerView
+- (void)layoutSubviews {
+    %orig;
+    WCGestureHomePageCornerLayoutSwipe((UIView *)self);
+}
+%end
+%hook UISwipeActionPullView
+- (void)layoutSubviews {
+    %orig;
+    WCGestureHomePageCornerLayoutSwipe(((UIView *)self).superview);
 }
 %end
 %hook MainFrameSectionFoldView

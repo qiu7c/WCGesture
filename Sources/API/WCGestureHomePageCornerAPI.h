@@ -8,6 +8,8 @@ CGFloat WCGestureHomePageCornerGap(void);
 void WCGestureHomePageCornerAttach(UIViewController *controller);
 void WCGestureHomePageCornerLayoutTable(UITableView *table);
 void WCGestureHomePageCornerLayoutCell(UITableViewCell *cell);
+CGRect WCGestureHomePageCornerCellFrame(UITableViewCell *cell, CGRect frame);
+void WCGestureHomePageCornerLayoutSwipe(UIView *container);
 void WCGestureHomePageCornerRestoreCell(UITableViewCell *cell);
 void WCGestureHomePageCornerLayoutChrome(UIView *view);
 void WCGestureHomePageCornerLayoutSearch(UIView *view);

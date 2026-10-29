@@ -11,6 +11,7 @@
     self.tableView.rowHeight=UITableViewAutomaticDimension;self.tableView.estimatedRowHeight=64;
     self.tableView.allowsSelection=NO;
     self.updates=@[
+        @"首页侧滑扩展适配卡片边距和圆角，限制按钮背景越界。",
         @"补齐聊天记录搜索取消清理，处理空输入返回后顶部搜索框残留。",
         @"修复设置项右侧数值与跳转箭头重叠。",
         @"首页浅色留白改为EDEDED，调整滚动间距横带和首次进入位置。",
