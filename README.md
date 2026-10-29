@@ -135,6 +135,7 @@ hooks; shared code sits outside `Features/`:
 | `Sources/Features/MessageGestures/` | Bubble swipes/taps, repeat path, voice-upload hooks |
 | `Sources/Features/InputGestures/` | Input-box swipes/taps and their actions |
 | `Sources/Features/KeyboardStrip/` | Keyboard bottom gesture strip |
+| `Sources/Features/FloatingTabBar/` | Floating native bottom bar, appearance restoration, drag switching and shared preview rendering |
 | `Sources/Features/ChatLayout/` | WCAtlas theme/WebView size scaling and legacy layout compatibility |
 | `Sources/Features/ChatInputAppearance/` | Input/toolbar rounding, restoration and native layout hooks |
 | `Sources/Features/InterfaceCleanup/` | Group title, screenshot overlay and Me-entry visibility |
@@ -263,3 +264,8 @@ Home-group member and custom-avatar pickers use native avatars in inset cards, w
 When custom avatars are enabled, friend/group information cards include a direct avatar-change action with restore support. It shares the avatar manager’s picker and storage, and refreshes the card after saving or restoring. Official accounts are excluded.
 
 The homepage group strip removes its extra vertical gap and follows the native device-banner/pinned-session background by default. Native surfaces keep their original colors; the group strip reads the pinned background image color, using a gray placeholder until available. 主页分组 → 分组外观 → 统一改色 optionally applies a chosen background to the strip, pinned sessions and device banner together; it defaults off, uses white when first enabled, and restores native backgrounds when disabled. Device verification remains pending.
+
+
+## 悬浮底栏（源码接入，待编译与真机验证）
+
+界面类功能 → 悬浮底栏，默认关闭。保留微信原生图标、文字、角标和切换动作，支持纯色/磨砂/自动浅深/自定义颜色、独立背景与滑块透明度、位置和圆角、拖动切换、选中动画、角标隐藏及长按通讯录调节。设置页提供实时预览，尺寸跟随界面比例，配色跟随微信深色模式，关闭后恢复保存的原生外观。实现记录和设备验收项见 [悬浮底栏](docs/FLOATING_TAB_BAR.md)。

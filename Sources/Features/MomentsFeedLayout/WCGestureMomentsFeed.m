@@ -292,11 +292,12 @@ static NSIndexPath *WCFeedItemIndexPath(UIViewController *controller, id item) {
 static void WCFeedSetContentHeight(UIView *cell, CGFloat height) {
     // Extending the hit-test bounds must not move native labels/media through
     // flexible-top autoresizing masks after we have placed the metadata.
-    BOOL autoresizes = cell.autoresizesSubviews;
-    cell.autoresizesSubviews = NO;
-    @try {
+    [UIView performWithoutAnimation:^{
+        BOOL autoresizes = cell.autoresizesSubviews;
+        cell.autoresizesSubviews = NO;
         CGRect frame = cell.frame; frame.size.height = height; cell.frame = frame;
-    } @finally { cell.autoresizesSubviews = autoresizes; }
+        cell.autoresizesSubviews = autoresizes;
+    }];
 }
 double WCGestureMomentsFeedRowHeight(UIViewController *controller, UITableView *table, NSIndexPath *path, double original) {
     if (!NSThread.isMainThread || !WCFeedControllerSupported(controller) || !isfinite(original) || original <= 0 ||
@@ -462,11 +463,13 @@ static WCFeedPlan *WCFeedRecoverPlan(UIView *cell, id item, id context, id model
 
 static void WCFeedRestoreViews(UIView *cell, WCFeedState *state) {
     id item = WCTweakSafeValue(cell, @"m_dataItem");
-    BOOL sameContent = item == state.item && state.model == WCTweakSafeValue(cell, @"actionAreaVM") &&
+    BOOL sameItem = item == state.item &&
         [state.tid isEqualToString:WCFeedText(WCTweakSafeValue(item, @"tid"))] &&
         [state.account isEqualToString:WCCurrentUserWXID() ?: @""];
+    BOOL sameContent = sameItem && state.model == WCTweakSafeValue(cell, @"actionAreaVM");
     // If native code already rebound the cell, old snapshots belong to the old
     // post. Restoring them here would resurrect its location/visibility.
+    [UIView performWithoutAnimation:^{
     for (WCFeedViewState *saved in (sameContent ? state.views : @[])) {
         UIView *view = saved.view;
         if (!CGRectEqualToRect(view.frame, saved.frame)) view.frame = saved.frame;
@@ -479,6 +482,12 @@ static void WCFeedRestoreViews(UIView *cell, WCFeedState *state) {
     [state.views removeAllObjects];
     state.footer.hidden = YES;
     state.actionsAvailable = NO;
+    // Native layout must start with native bounds, not our previous extension.
+    if (sameItem && state.resizedContent && CGAffineTransformIsIdentity(cell.transform) &&
+        fabs(cell.frame.size.height - state.appliedContentHeight) < .5)
+        WCFeedSetContentHeight(cell, state.originalContentHeight);
+    state.resizedContent = NO;
+    }];
 }
 void WCGestureMomentsFeedBeforeLayout(UIView *cell) {
     WCFeedState *state = objc_getAssociatedObject(cell, &WCFeedStateKey);
@@ -488,12 +497,6 @@ void WCGestureMomentsFeedReset(UIView *cell) {
     WCFeedState *state = objc_getAssociatedObject(cell, &WCFeedStateKey);
     if (!state) return;
     WCFeedRestoreViews(cell, state); [state.footer removeFromSuperview];
-    if (state.resizedContent && state.item == WCTweakSafeValue(cell, @"m_dataItem") &&
-        [state.tid isEqualToString:WCFeedText(WCTweakSafeValue(state.item, @"tid"))] &&
-        [state.account isEqualToString:WCCurrentUserWXID() ?: @""] &&
-        CGAffineTransformIsIdentity(cell.transform) && fabs(cell.frame.size.height - state.appliedContentHeight) < .5) {
-        WCFeedSetContentHeight(cell, state.originalContentHeight);
-    }
     objc_setAssociatedObject(cell, &WCFeedStateKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 static void WCFeedSave(WCFeedState *state, UIView *view) {
@@ -631,6 +634,7 @@ void WCGestureMomentsFeedLayout(UIView *cell) {
     if (!state) state = WCFeedCreateState(cell);
     WCFeedRestoreViews(cell, state);
     state.updating = YES;
+    [UIView performWithoutAnimation:^{
     @try {
         state.item = item; state.model = model;
         state.tid = WCFeedText(WCTweakSafeValue(item, @"tid")); state.account = WCCurrentUserWXID() ?: @"";
@@ -749,6 +753,7 @@ void WCGestureMomentsFeedLayout(UIView *cell) {
         }
         WCFeedUpdateRowHeight(cell, controller, item, model, plan, requiredBottom);
     } @finally { state.updating = NO; }
+    }];
 }
 
 BOOL WCGestureMomentsFeedIsActionPoint(UIView *cell, CGPoint point) {

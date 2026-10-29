@@ -1,5 +1,28 @@
 #import "Sources/API/WCGestureInternal.h"
 
+NSString *const WCGestureFloatingTabBarEnabledKey = @"com.qiu7c.onewx.interface.floating-tab.enabled";
+NSString *const WCGestureFloatingTabBarStyleKey = @"com.qiu7c.onewx.interface.floating-tab.style";
+NSString *const WCGestureFloatingTabBarNoMaskKey = @"com.qiu7c.onewx.interface.floating-tab.no-mask";
+NSString *const WCGestureFloatingTabBarStereoKey = @"com.qiu7c.onewx.interface.floating-tab.stereo";
+NSString *const WCGestureFloatingTabBarMaskGlowKey = @"com.qiu7c.onewx.interface.floating-tab.mask-glow";
+NSString *const WCGestureFloatingTabBarLongPressKey = @"com.qiu7c.onewx.interface.floating-tab.long-press";
+NSString *const WCGestureFloatingTabBarPanKey = @"com.qiu7c.onewx.interface.floating-tab.pan";
+NSString *const WCGestureFloatingTabBarHideDotKey = @"com.qiu7c.onewx.interface.floating-tab.hide-dot";
+NSString *const WCGestureFloatingTabBarHideBadgeKey = @"com.qiu7c.onewx.interface.floating-tab.hide-badge";
+NSString *const WCGestureFloatingTabBarHideTextKey = @"com.qiu7c.onewx.interface.floating-tab.hide-text";
+NSString *const WCGestureFloatingTabBarAnimationKey = @"com.qiu7c.onewx.interface.floating-tab.animation";
+NSString *const WCGestureFloatingTabBarSelectedColorKey = @"com.qiu7c.onewx.interface.floating-tab.selected-color";
+NSString *const WCGestureFloatingTabBarBackgroundLightKey = @"com.qiu7c.onewx.interface.floating-tab.background-light";
+NSString *const WCGestureFloatingTabBarBackgroundDarkKey = @"com.qiu7c.onewx.interface.floating-tab.background-dark";
+NSString *const WCGestureFloatingTabBarMaskLightKey = @"com.qiu7c.onewx.interface.floating-tab.mask-light";
+NSString *const WCGestureFloatingTabBarMaskDarkKey = @"com.qiu7c.onewx.interface.floating-tab.mask-dark";
+NSString *const WCGestureFloatingTabBarWidthKey = @"com.qiu7c.onewx.interface.floating-tab.width";
+NSString *const WCGestureFloatingTabBarYKey = @"com.qiu7c.onewx.interface.floating-tab.y";
+NSString *const WCGestureFloatingTabBarHeightKey = @"com.qiu7c.onewx.interface.floating-tab.height";
+NSString *const WCGestureFloatingTabBarAlphaKey = @"com.qiu7c.onewx.interface.floating-tab.alpha";
+NSString *const WCGestureFloatingTabBarMaskAlphaKey = @"com.qiu7c.onewx.interface.floating-tab.mask-alpha";
+NSString *const WCGestureFloatingTabBarRadiusKey = @"com.qiu7c.onewx.interface.floating-tab.radius";
+
 NSString *const WCGestureHomePageCornerEnabledKey = @"com.qiu7c.onewx.home.corner.enabled";
 NSString *const WCGestureHomePageCornerRadiusKey = @"com.qiu7c.onewx.home.corner.radius";
 NSString *const WCGestureHomePageCornerInsetKey = @"com.qiu7c.onewx.home.corner.inset";
@@ -406,6 +429,28 @@ void WCGestureRegisterDefaults(void) {
             [stored setBool:NO forKey:WCGestureMessageTimeBelowAvatarKey];
         }
         NSDictionary *defaults = @{
+            WCGestureFloatingTabBarEnabledKey: @NO,
+            WCGestureFloatingTabBarStyleKey: @0,
+            WCGestureFloatingTabBarNoMaskKey: @NO,
+            WCGestureFloatingTabBarStereoKey: @NO,
+            WCGestureFloatingTabBarMaskGlowKey: @YES,
+            WCGestureFloatingTabBarLongPressKey: @NO,
+            WCGestureFloatingTabBarPanKey: @YES,
+            WCGestureFloatingTabBarHideDotKey: @NO,
+            WCGestureFloatingTabBarHideBadgeKey: @NO,
+            WCGestureFloatingTabBarHideTextKey: @NO,
+            WCGestureFloatingTabBarAnimationKey: @0,
+            WCGestureFloatingTabBarSelectedColorKey: @"",
+            WCGestureFloatingTabBarBackgroundLightKey: @"",
+            WCGestureFloatingTabBarBackgroundDarkKey: @"",
+            WCGestureFloatingTabBarMaskLightKey: @"",
+            WCGestureFloatingTabBarMaskDarkKey: @"",
+            WCGestureFloatingTabBarWidthKey: @(-1),
+            WCGestureFloatingTabBarYKey: @(-4),
+            WCGestureFloatingTabBarHeightKey: @12,
+            WCGestureFloatingTabBarAlphaKey: @100,
+            WCGestureFloatingTabBarMaskAlphaKey: @100,
+            WCGestureFloatingTabBarRadiusKey: @(-1),
             WCGestureHomePageCornerEnabledKey: @NO,
             WCGestureHomePageCornerRadiusKey: @16,
             WCGestureHomePageCornerInsetKey: @16,

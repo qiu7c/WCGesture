@@ -4,6 +4,8 @@ void WCGestureChatSearchUpdate(UIViewController *controller);
 BOOL WCGestureChatSearchIsActive(UIViewController *controller);
 void WCGestureChatSearchOpen(UIViewController *controller, id _Nullable sender);
 void WCGestureChatSearchWillAppear(UIViewController *controller);
+void WCGestureChatSearchDidAppear(UIViewController *controller);
+void WCGestureChatSearchCapture(id owner, id _Nullable searchController);
 void WCGestureChatSearchHandleEdgePan(UIViewController *controller, UIScreenEdgePanGestureRecognizer *recognizer);
 void WCGestureChatSearchDidDismiss(id owner);
 BOOL WCGestureJumpToReferencedMessage(UIView *cell);

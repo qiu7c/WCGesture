@@ -3,6 +3,29 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+FOUNDATION_EXPORT NSString *const WCGestureFloatingTabBarEnabledKey;
+FOUNDATION_EXPORT NSString *const WCGestureFloatingTabBarStyleKey;
+FOUNDATION_EXPORT NSString *const WCGestureFloatingTabBarNoMaskKey;
+FOUNDATION_EXPORT NSString *const WCGestureFloatingTabBarStereoKey;
+FOUNDATION_EXPORT NSString *const WCGestureFloatingTabBarMaskGlowKey;
+FOUNDATION_EXPORT NSString *const WCGestureFloatingTabBarLongPressKey;
+FOUNDATION_EXPORT NSString *const WCGestureFloatingTabBarPanKey;
+FOUNDATION_EXPORT NSString *const WCGestureFloatingTabBarHideDotKey;
+FOUNDATION_EXPORT NSString *const WCGestureFloatingTabBarHideBadgeKey;
+FOUNDATION_EXPORT NSString *const WCGestureFloatingTabBarHideTextKey;
+FOUNDATION_EXPORT NSString *const WCGestureFloatingTabBarAnimationKey;
+FOUNDATION_EXPORT NSString *const WCGestureFloatingTabBarSelectedColorKey;
+FOUNDATION_EXPORT NSString *const WCGestureFloatingTabBarBackgroundLightKey;
+FOUNDATION_EXPORT NSString *const WCGestureFloatingTabBarBackgroundDarkKey;
+FOUNDATION_EXPORT NSString *const WCGestureFloatingTabBarMaskLightKey;
+FOUNDATION_EXPORT NSString *const WCGestureFloatingTabBarMaskDarkKey;
+FOUNDATION_EXPORT NSString *const WCGestureFloatingTabBarWidthKey;
+FOUNDATION_EXPORT NSString *const WCGestureFloatingTabBarYKey;
+FOUNDATION_EXPORT NSString *const WCGestureFloatingTabBarHeightKey;
+FOUNDATION_EXPORT NSString *const WCGestureFloatingTabBarAlphaKey;
+FOUNDATION_EXPORT NSString *const WCGestureFloatingTabBarMaskAlphaKey;
+FOUNDATION_EXPORT NSString *const WCGestureFloatingTabBarRadiusKey;
+
 FOUNDATION_EXPORT NSString *const WCGestureHomePageCornerEnabledKey;
 FOUNDATION_EXPORT NSString *const WCGestureHomePageCornerRadiusKey;
 FOUNDATION_EXPORT NSString *const WCGestureHomePageCornerInsetKey;

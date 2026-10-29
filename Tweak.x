@@ -75,6 +75,7 @@
                 WCGestureCustomAvatarSettingsChanged(note.object);
                 WCGestureImageAnnotationSettingsChanged(note.object);
                 WCGestureVirtualVideoSettingsChanged(note.object);
+                WCGestureFloatingTabBarSettingsChanged(note.object);
                 WCGestureHomeGroupsSettingsChanged(note.object);
                 WCGestureHomePageCornerSettingsChanged(note.object);
                 WCGestureAdBlockerSettingsChanged(note.object);

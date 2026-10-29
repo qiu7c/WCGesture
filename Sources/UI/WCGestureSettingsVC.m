@@ -861,6 +861,28 @@ static NSDictionary<NSString *, NSString *> *WCConfigShareKeys(void) {
         WCGestureHomeSwipeEnabledKey,
         WCGestureMultiSelectEnabledKey,
         WCGestureHomeGroupsEnabledKey,
+        WCGestureFloatingTabBarEnabledKey,
+        WCGestureFloatingTabBarStyleKey,
+        WCGestureFloatingTabBarNoMaskKey,
+        WCGestureFloatingTabBarStereoKey,
+        WCGestureFloatingTabBarMaskGlowKey,
+        WCGestureFloatingTabBarLongPressKey,
+        WCGestureFloatingTabBarPanKey,
+        WCGestureFloatingTabBarHideDotKey,
+        WCGestureFloatingTabBarHideBadgeKey,
+        WCGestureFloatingTabBarHideTextKey,
+        WCGestureFloatingTabBarAnimationKey,
+        WCGestureFloatingTabBarSelectedColorKey,
+        WCGestureFloatingTabBarBackgroundLightKey,
+        WCGestureFloatingTabBarBackgroundDarkKey,
+        WCGestureFloatingTabBarMaskLightKey,
+        WCGestureFloatingTabBarMaskDarkKey,
+        WCGestureFloatingTabBarWidthKey,
+        WCGestureFloatingTabBarYKey,
+        WCGestureFloatingTabBarHeightKey,
+        WCGestureFloatingTabBarAlphaKey,
+        WCGestureFloatingTabBarMaskAlphaKey,
+        WCGestureFloatingTabBarRadiusKey,
         WCGestureHomePageCornerEnabledKey,
         WCGestureHomePageCornerRadiusKey,
         WCGestureHomePageCornerInsetKey,
@@ -1850,6 +1872,10 @@ static NSString *WCRowDetailText(WCRow *row) {
         [collapsible addObject:@YES]; [collapseKeys addObject:[prefix stringByAppendingString:@".moments.interaction-reminder"]];
 
     } else if (self.category == WCGestureCategoryInterface) {
+        WCRow *floatingBar = WCPlainRow(@"悬浮底栏", WCRowKindChatOption);
+        floatingBar.chatOption = @{@"title":floatingBar.title,@"type":@"floating-tab-bar",@"key":@""};
+        [sections addObject:@[floatingBar]]; [collapsible addObject:@NO];
+        [collapseKeys addObject:[prefix stringByAppendingString:@".interface.floating-tab-bar"]];
         WCRow *homeGroups = WCPlainRow(@"主页分组", WCRowKindChatOption);
         homeGroups.chatOption = @{@"title":homeGroups.title,@"type":@"home-groups",@"key":@""};
         [sections addObject:@[homeGroups]]; [collapsible addObject:@NO];

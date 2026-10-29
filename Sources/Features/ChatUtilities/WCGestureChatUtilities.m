@@ -17,6 +17,15 @@ static char WCChatSearchEdgePanKey;
 static char WCChatSearchOriginalPopKey;
 static char WCChatSearchSessionKey;
 
+@interface WCChatSearchSession : NSObject
+@property (nonatomic, strong) id helper;
+@property (nonatomic, strong) id searcher;
+@property (nonatomic, strong) UISearchController *native;
+@property (nonatomic, strong) NSMutableArray<UIView *> *views;
+@end
+@implementation WCChatSearchSession
+@end
+
 static id WCChatSearchExactIvarValue(id object, NSString *name) {
     if (!object) return nil;
     Ivar ivar = class_getInstanceVariable([object class], name.UTF8String);
@@ -110,22 +119,31 @@ static void WCChatSearchRemoveEdgePan(BaseMsgContentViewController *controller) 
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
-static NSArray<UIView *> *WCChatSearchOfficialChromeViews(id searcher) {
-    if (!searcher) return @[];
-    NSMutableArray<UIView *> *views = [NSMutableArray array];
+static void WCChatSearchCaptureViews(WCChatSearchSession *session, UISearchController *native) {
+    id searcher=session.searcher;
+    // Keep the actual objects before native dismissal clears its weak properties.
+    session.native=native ?: WCChatSearchNativeController(searcher) ?: session.native;
+    NSMutableArray<UIView *> *views=session.views;
+    UIView *root=session.native.viewIfLoaded;
     for (NSString *key in @[@"searchBar", @"searchBarNotInSearcher", @"searchContainerView"]) {
         id value = WCTweakSafeValue(searcher, key);
-        if ([value isKindOfClass:UIView.class] && ![views containsObject:value]) {
-            [views addObject:value];
+        if (![value isKindOfClass:UIView.class]) continue;
+        if (![views containsObject:value]) [views addObject:value];
+        // Both native search-bar placements may own wrappers outside the root.
+        // The two class names below are present in the supplied dump.
+        if (![value isKindOfClass:UISearchBar.class]) continue;
+        for (UIView *parent=((UIView *)value).superview; parent && parent!=root; parent=parent.superview) {
+            if ([parent isKindOfClass:UINavigationBar.class]) break;
+            NSString *name=NSStringFromClass(parent.class);
+            if (([name isEqualToString:@"_UISearchBarContainerView"] || [name isEqualToString:@"_UISearchBarSearchContainerView"])
+                && ![views containsObject:parent]) [views addObject:parent];
         }
     }
-    UIView *root=WCChatSearchNativeController(searcher).viewIfLoaded;
     if (root && ![views containsObject:root]) [views addObject:root];
-    return views;
 }
 
-static void WCChatSearchSetChromeHidden(id searcher, BOOL hidden) {
-    for (UIView *view in WCChatSearchOfficialChromeViews(searcher)) {
+static void WCChatSearchSetChromeHidden(WCChatSearchSession *session, BOOL hidden) {
+    for (UIView *view in [session.views copy]) {
         if (hidden) [view endEditing:YES];
         view.hidden = hidden;
         view.alpha = hidden ? 0.0 : 1.0;
@@ -133,11 +151,9 @@ static void WCChatSearchSetChromeHidden(id searcher, BOOL hidden) {
     }
 }
 
-static void WCChatSearchHideChrome(BaseMsgContentViewController *controller,
-                                   id searcher) {
-    if (!controller || !searcher) return;
-    WCChatSearchSetChromeHidden(searcher, YES);
-    UISearchController *native=WCChatSearchNativeController(searcher);
+static void WCChatSearchHideChrome(WCChatSearchSession *session) {
+    WCChatSearchSetChromeHidden(session, YES);
+    UISearchController *native=session.native;
     // Only detach the searcher's own orphaned root, never a transition view
     // or shared navigation bar. Active presentation/pop remains UIKit-owned.
     if (!native.isActive && !native.presentingViewController
@@ -148,21 +164,24 @@ static void WCChatSearchHideChrome(BaseMsgContentViewController *controller,
 static void WCChatSearchCleanup(BaseMsgContentViewController *controller) {
     if (!controller || !objc_getAssociatedObject(controller, &WCChatSearchSessionKey) ||
         [objc_getAssociatedObject(controller, &WCChatSearchCleanupKey) boolValue]) return;
-    id helper = WCChatSearchNativeHelper(controller, NO);
-    id searcher = WCChatSearchNativeSearcher(helper);
+    WCChatSearchSession *session=objc_getAssociatedObject(controller,&WCChatSearchSessionKey);
+    WCChatSearchCaptureViews(session,nil);
+    id helper = session.helper;
+    id searcher = session.searcher;
     // viewWillAppear may run before the native pop animation finishes. The
     // final disappearance callback must still remove chrome restored by it.
     if (![objc_getAssociatedObject(controller, &WCChatSearchActiveKey) boolValue]) {
-        UISearchController *native=WCChatSearchNativeController(searcher);
+        UISearchController *native=session.native;
         if (native.isActive) native.active=NO;
-        WCChatSearchHideChrome(controller,searcher);
+        WCChatSearchCaptureViews(session,nil);
+        WCChatSearchHideChrome(session);
         return;
     }
     objc_setAssociatedObject(controller, &WCChatSearchCleanupKey, @YES,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     WCChatSearchRemoveEdgePan(controller);
 
-    WCChatSearchHideChrome(controller, searcher);
+    WCChatSearchHideChrome(session);
     SEL activeSelector = NSSelectorFromString(@"setActive:animated:completion:");
     SEL searchActiveSelector = NSSelectorFromString(@"isSeachActive");
     BOOL closedThroughSearcher = NO;
@@ -191,9 +210,10 @@ static void WCChatSearchCleanup(BaseMsgContentViewController *controller) {
         } @catch (__unused NSException *exception) {
         }
     }
-    UISearchController *native=WCChatSearchNativeController(searcher);
+    WCChatSearchCaptureViews(session,nil);
+    UISearchController *native=session.native;
     if (native.isActive) native.active=NO;
-    WCChatSearchHideChrome(controller,searcher);
+    WCChatSearchHideChrome(session);
     NSNumber *originalPop = objc_getAssociatedObject(controller, &WCChatSearchOriginalPopKey);
     if (originalPop) WCChatSearchSetInteractivePop(controller, originalPop.boolValue);
     objc_setAssociatedObject(controller, &WCChatSearchOriginalPopKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
@@ -218,15 +238,16 @@ static BOOL WCChatSearchOpenNative(BaseMsgContentViewController *controller, id 
     }
     id searcher = WCChatSearchNativeSearcher(helper);
 
-    WCChatSearchSetChromeHidden(searcher, NO);
-
     SEL pushSelector = NSSelectorFromString(@"pushSearchControllerWithCompletion:");
     SEL activeSelector = NSSelectorFromString(@"setActive:animated:completion:");
     if (![searcher respondsToSelector:pushSelector] &&
         ![searcher respondsToSelector:activeSelector]) return NO;
     NSNumber *originalPop = WCTweakSafeValue(controller, @"m_bInteractivePopEnabled");
     objc_setAssociatedObject(controller, &WCChatSearchOriginalPopKey, originalPop, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    objc_setAssociatedObject(controller, &WCChatSearchSessionKey, [NSObject new], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    WCChatSearchSession *session=[WCChatSearchSession new];
+    session.helper=helper; session.searcher=searcher; session.views=[NSMutableArray array];
+    WCChatSearchCaptureViews(session,nil); WCChatSearchSetChromeHidden(session,NO);
+    objc_setAssociatedObject(controller, &WCChatSearchSessionKey, session, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     WCChatSearchSetInteractivePop(controller, NO);
     objc_setAssociatedObject(controller, &WCChatSearchActiveKey, @YES,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
@@ -247,6 +268,7 @@ static BOOL WCChatSearchOpenNative(BaseMsgContentViewController *controller, id 
         WCChatSearchCleanup(controller);
         return NO;
     }
+    WCChatSearchCaptureViews(session,nil); WCChatSearchSetChromeHidden(session,NO);
     return YES;
 }
 
@@ -342,6 +364,20 @@ void WCGestureChatSearchWillAppear(UIViewController *controller) {
     WCGestureChatSearchUpdate(controller);
 }
 
+void WCGestureChatSearchDidAppear(UIViewController *controller) {
+    if (controller.navigationController && controller.navigationController.topViewController!=controller) return;
+    WCChatSearchCleanup((BaseMsgContentViewController *)controller);
+    WCGestureChatSearchUpdate(controller);
+}
+
+void WCGestureChatSearchCapture(id owner, id searchController) {
+    UISearchController *native=[searchController isKindOfClass:UISearchController.class]?searchController:nil;
+    for (UIViewController *controller in WCChatSearchControllers().allObjects) {
+        WCChatSearchSession *session=objc_getAssociatedObject(controller,&WCChatSearchSessionKey);
+        if (session && (session.helper==owner || session.searcher==owner || session.native==owner)) WCChatSearchCaptureViews(session,native);
+    }
+}
+
 void WCGestureChatSearchHandleEdgePan(UIViewController *controller, UIScreenEdgePanGestureRecognizer *recognizer) {
     if (recognizer.state != UIGestureRecognizerStateEnded
         || ![objc_getAssociatedObject(controller, &WCChatSearchActiveKey) boolValue]) return;
@@ -353,20 +389,25 @@ void WCGestureChatSearchHandleEdgePan(UIViewController *controller, UIScreenEdge
 
 void WCGestureChatSearchDidDismiss(id owner) {
     for (BaseMsgContentViewController *controller in WCChatSearchControllers().allObjects) {
-        id helper=WCChatSearchNativeHelper(controller, NO);
-        if (helper!=owner && WCChatSearchNativeSearcher(helper)!=owner) continue;
-        id session = objc_getAssociatedObject(controller, &WCChatSearchSessionKey);
+        WCChatSearchSession *session=objc_getAssociatedObject(controller,&WCChatSearchSessionKey);
+        if (!session || (session.helper!=owner && session.searcher!=owner && session.native!=owner)) continue;
         __weak BaseMsgContentViewController *weakController = controller;
         // Let the native dismissal finish before querying the searcher's active state.
         dispatch_async(dispatch_get_main_queue(), ^{
             BaseMsgContentViewController *target = weakController;
             if (target && objc_getAssociatedObject(target, &WCChatSearchSessionKey) == session) {
-                UISearchController *native=WCChatSearchNativeController(WCChatSearchNativeSearcher(WCChatSearchNativeHelper(target,NO)));
-                // Keep a cancelled return or an active results page intact.
-                if ((native.presentingViewController && !native.isBeingDismissed)
-                    || [native.navigationController.viewControllers containsObject:native]) return;
+                UISearchController *native=session.native;
+                BOOL returnedToChat=target.navigationController.topViewController==target && target.viewIfLoaded.window;
+                // A pushed result page/cancelled pop keeps its search controller.
+                // A completed return to this chat takes precedence over stale
+                // presentation/stack references left by the native searcher.
+                if (!returnedToChat && ((native.presentingViewController && !native.isBeingDismissed)
+                    || [native.navigationController.viewControllers containsObject:native])) return;
                 WCChatSearchCleanup(target);
                 WCGestureChatSearchUpdate(target);
+                if (owner==session.native && !native.isActive && !native.presentingViewController
+                    && ![native.navigationController.viewControllers containsObject:native])
+                    objc_setAssociatedObject(target,&WCChatSearchSessionKey,nil,OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             }
         });
     }

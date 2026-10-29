@@ -1,5 +1,23 @@
 # One Wx 开发交接
 
+最新提交授权澄清（2026-10-29）：仅用户贴出编译错误后，对该错误的小修正允许自动提交推送。普通UI/运行时修复及功能新增都需明确授权，覆盖下方历史“小修正自动推送”记录；不得将未提交功能顺带提交。本轮用户随后明确授权提交推送当前全部改动；默认授权范围仍仅限编译错误后的对应小修正。
+
+本轮提交说明（2026-10-29）：用户已明确“提交推送”，本轮统一纳入悬浮底栏、分组指示条与朋友圈高度闪动、聊天搜索会话对象清理、简短更新日志及授权规则澄清。下方各节“未提交/未授权/不提交”均为实施时记录，此次授权已覆盖当前全部改动。版本仍1.0.0；222源文件结构/import、332唯一Hook、22新key/default/UI/runtime/share、新API/宿主接口、旧别名和diff静态检查通过。未进行iOS编译或真机验证，不查询CI，不宣称已设备确认消除反馈问题。
+
+## 2026-10-29 聊天搜索保留实际会话对象清理（未提交）
+
+用户反馈搜索退出仍残留。旧逻辑退出后从helper重新取searcher/controller，原生若已清空/替换引用就会丢失待清理对象。本次以WCChatSearchSession保存本次helper/searcher、原生UISearchController和实际views；打开后、加载后及取消/消失回调orig之前捕获。按用户dump记录_UISearchBarContainerView/_UISearchBarSearchContainerView实际祖先，并保存完整原生root；不隐藏导航栏或UITransitionView，不按固定深度猜祖先。清理按session快照处理，两种searchbar布局都捕获；重开只恢复本次实际使用的视图，不复活旧孤立root。增加WCSearchController.viewDidDisappear和既有聊天viewDidAppear转发，原生最终回调后再清理；已回到所属聊天时不被残留的presentation/stack引用阻断，新的search session仍通过对象身份排除旧异步回调。实际controller消失且已不在展示/导航栈时释放会话引用。WCSearcher.onWCSearchControllerDidLoad与原生8.0.79头文件核对，viewDidDisappear为UIKit继承方法。保留此前willAppear清理及搜索样式，不增加定时重试、全局UIView Hook或额外配置。222源文件结构/import、332唯一Hook、新API/捕获顺序/宿主签名及diff静态检查通过；未编译、未真机验证，不能称残留已设备确认消除。依最新授权不提交推送，其它未提交功能保留。
+
+## 2026-10-29 分组指示条与朋友圈高度闪动（未提交）
+
+用户反馈分组下划线/滑块偶尔不跟随切换，朋友圈偶尔多出一小片拉长空白。分组选中ID每次update读取一次，滑块与下划线共用终点更新：先无动画写入真实frame，再按开关从presentation位置做独立0.25秒位移动画，切换时清理自身旧动画；缓存未读不跳过几何，快速往返切换也按选中ID刷新，不依赖UITableView当前动画状态。朋友圈将既有自增高度恢复从Reset移到公共RestoreViews，使每次原生布局前都恢复仍由本功能持有且身份匹配的原生高度，再计算新布局；不回写已被原生接管或复用给其它内容的高度。内部位置/高度恢复和排版放在无动画事务中，不改原生列表插入/滚动动画。无新key/API/Hook，悬浮底栏未提交改动保留。222源文件结构/import、330唯一Hook及diff静态检查通过，未编译、未真机复现确认；本轮不提交推送。
+
+## 2026-10-29 悬浮底栏接入（未提交）
+
+用户授权开始实现已研究的悬浮底栏。按 WeChatX 已闭合逻辑新增 FloatingTabBar 独立模块，保留原生 item/角标/按钮动作，支持四种外观、透明度、位置/圆角、选中滑块、拖动切换、五种动画、分别隐藏红点/数字、长按第二项打开设置。界面类功能新增独立设置页，顶部共享渲染实时预览、浅深切换，菜单默认收起；22新key完成Core/default/share。尺寸跟随界面比例，颜色跟随微信独立深色模式，复用已有主题Hook。保存并恢复自己修改的原生外观/视图，不改变原生bar.frame、导航返回手势或分组。来源ButtonScale无消费、黄白未闭合动作未接入。详见FLOATING_TAB_BAR.md。版本仍1.0.0。未编译或真机验证，不主动查CI；功能新增尚未获提交推送授权。
+
+验证：222源文件结构/import、330唯一Logos Hook、22新key/default/UI/runtime/share、所有新API定义、34旧别名不变及diff检查通过；核对8.0.79实际私有方法和避免私有类直接符号引用，iOS15可选运行时Hook单独安装。布局表达式按15组宽度/比例验证。均为静态检查，不代表iOS构建或设备通过。
+
 ## 2026-10-29 根据截图处理侧滑接缝与完整搜索根视图
 
 用户确认两个问题仍在并提供三张图：扩展最后按钮与移动cell之间有约一次边距的灰缝；聊天残留层级含UITransitionView→_UISearchControllerView(WCSearchController)→_UISearchBarContainerView→MMUISearchBar，而非仅输入框。侧滑在实际容器内比较cell.minX与pull.maxX，差值约等于当前inset时消除该次偏移，已贴合/其它位移不变；撤掉此前背景快照Hook和中间层改色假设，保留已验证起点/裁切。聊天通过已确认WCSearcher.searchController及UISearchController获取自己的viewIfLoaded，纳入隐藏/重开恢复，清理时使原生controller inactive，且仅在非presented/非导航栈时移除其孤立root；不隐藏共享UITransitionView/导航栏，删除旧三层祖先隐藏/恢复。退出回调根据实际presenting/导航栈归属判断仍在展示，不单凭isSeachActive阻断清理。313唯一Hook、218文件结构/import、一次13.6pt接缝修正及幂等/其它位移/0边距几何检查与diff通过。没有iOS编译或真机验证，不能声称已最终消除两个问题。按小修正自动提交推送授权处理。

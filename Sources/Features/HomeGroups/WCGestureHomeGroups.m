@@ -1,5 +1,6 @@
 #import <objc/message.h>
 #import <objc/runtime.h>
+#import <QuartzCore/QuartzCore.h>
 #import "Sources/API/WCGestureInternal.h"
 
 // Evidence: HomeCategories 0x3ab630..0x3bfd34. Rendering below uses UIKit
@@ -195,6 +196,7 @@ NSIndexPath *WCGestureHomeGroupsFind(id logic, NSString *user) {
 @property (nonatomic, strong) UIView *stack;
 @property (nonatomic, strong) NSMutableArray<UIButton *> *buttons;
 @property (nonatomic, strong) UIView *indicator;
+@property (nonatomic, copy) NSString *displayedGroupID;
 @property (nonatomic, strong) UISwipeGestureRecognizer *left;
 @property (nonatomic, strong) UISwipeGestureRecognizer *right;
 @property (nonatomic) NSUInteger version;
@@ -213,6 +215,22 @@ NSIndexPath *WCGestureHomeGroupsFind(id logic, NSString *user) {
 - (void)restoreBackgrounds;
 - (void)styleCell:(UITableViewCell *)cell path:(NSIndexPath *)path;
 @end
+
+static void WCGroupPlaceSelection(UIView *view, CGRect frame, BOOL animated) {
+    CALayer *presentation=view.layer.presentationLayer;
+    CGPoint previous=presentation?presentation.position:view.layer.position;
+    [view.layer removeAllAnimations];
+    // Set the destination independently of UITableView's surrounding animation.
+    [UIView performWithoutAnimation:^{ view.frame=frame; }];
+    if (animated) {
+        CABasicAnimation *movement=[CABasicAnimation animationWithKeyPath:@"position"];
+        movement.fromValue=[NSValue valueWithCGPoint:previous];
+        movement.toValue=[NSValue valueWithCGPoint:view.layer.position];
+        movement.duration=.25;
+        movement.timingFunction=[CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
+        [view.layer addAnimation:movement forKey:@"onewx.group.selection"];
+    }
+}
 
 @implementation WCHomeGroupBanner
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -405,6 +423,9 @@ NSIndexPath *WCGestureHomeGroupsFind(id logic, NSString *user) {
     CGFloat font=MAX(10,MIN(24,[d doubleForKey:WCGestureHomeGroupsFontSizeKey]))*scale;
     CGFloat weight=[d doubleForKey:WCGestureHomeGroupsFontWeightKey];
     UIFontWeight fw=weight<=300?UIFontWeightLight:(weight>=500?UIFontWeightMedium:UIFontWeightRegular);
+    NSString *selectedID=WCGestureHomeGroupsSelected();
+    BOOL changedSelection=self.displayedGroupID && ![self.displayedGroupID isEqualToString:selectedID];
+    self.displayedGroupID=selectedID;
     NSUInteger selected=0;
     while(self.buttons.count>groups.count) { [self.buttons.lastObject removeFromSuperview];[self.buttons removeLastObject]; }
     while(self.buttons.count<groups.count) {
@@ -421,7 +442,7 @@ NSIndexPath *WCGestureHomeGroupsFind(id logic, NSString *user) {
         button.frame=CGRectMake(left,0,right-left,height);
         [button setTitle:groups[i][@"title"] forState:UIControlStateNormal];
         [button setTitleColor:textColor forState:UIControlStateNormal];button.titleLabel.font=[UIFont systemFontOfSize:font weight:fw];
-        if ([groups[i][@"id"] isEqual:WCGestureHomeGroupsSelected()]) selected=i;
+        if ([groups[i][@"id"] isEqual:selectedID]) selected=i;
     }
     [self.stack layoutIfNeeded];
     CGFloat cellWidth=self.stack.bounds.size.width/groups.count;
@@ -432,17 +453,18 @@ NSIndexPath *WCGestureHomeGroupsFind(id logic, NSString *user) {
     UIColor *sliderFallback=[UIColor colorWithWhite:WCGestureHomePageIsDark(self)?0.25:0.92 alpha:1];
     self.indicator.backgroundColor=WCGestureColorForDefaultsKey(WCGestureHomeGroupsSliderColorKey,sliderFallback);
     self.indicator.layer.cornerRadius=MIN(CGRectGetHeight(target)/2,MAX(0,[d doubleForKey:WCGestureHomeGroupsSliderRadiusKey]*scale));
-    if (!CGRectEqualToRect(self.indicator.frame,target)) {
-        if ([d boolForKey:WCGestureHomeGroupsSliderAnimationKey]) [UIView animateWithDuration:0.25 delay:0 options:UIViewAnimationOptionBeginFromCurrentState|UIViewAnimationOptionAllowUserInteraction animations:^{ self.indicator.frame=target; } completion:nil];
-        else self.indicator.frame=target;
-    }
+    BOOL animateSelection=changedSelection && self.window && [d boolForKey:WCGestureHomeGroupsSliderAnimationKey];
+    if (changedSelection || !CGRectEqualToRect(self.indicator.frame,target))
+        WCGroupPlaceSelection(self.indicator,target,animateSelection);
     UIView *line=[self viewWithTag:9092];
     if (!line) { line=[UIView new];line.tag=9092;line.userInteractionEnabled=NO;[self addSubview:line]; }
     line.hidden=![d boolForKey:WCGestureHomeGroupsUnderlineKey];
     CGFloat length=MAX(1,MIN(200,[d doubleForKey:WCGestureHomeGroupsUnderlineLengthKey]))*scale;
     CGFloat thickness=MAX(0.5,MIN(20,[d doubleForKey:WCGestureHomeGroupsUnderlineThicknessKey]))*scale;
-    line.frame=CGRectMake(self.stack.frame.origin.x+(selected+0.5)*cellWidth-length/2,
+    CGRect lineTarget=CGRectMake(self.stack.frame.origin.x+(selected+0.5)*cellWidth-length/2,
         CGRectGetMaxY(self.stack.frame)-[d doubleForKey:WCGestureHomeGroupsUnderlineOffsetKey]*scale,length,thickness);
+    if (changedSelection || !CGRectEqualToRect(line.frame,lineTarget))
+        WCGroupPlaceSelection(line,lineTarget,animateSelection);
     line.backgroundColor=WCGestureColorForDefaultsKey(WCGestureHomeGroupsUnderlineColorKey,UIColor.systemBlueColor);
     // Selection geometry must update even when unread content is cached.
     if (!refreshContent) return;

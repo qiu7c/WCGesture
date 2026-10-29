@@ -90,7 +90,10 @@
     BOOL changed=!hasMode || lastMode!=dark;
     hasMode=YES;lastMode=dark;
     %orig(dark);
-    if (changed) WCGestureHomePageCornerThemeChanged();
+    if (changed) {
+        WCGestureHomePageCornerThemeChanged();
+        WCGestureFloatingTabBarThemeChanged();
+    }
 }
 %end
 %ctor {

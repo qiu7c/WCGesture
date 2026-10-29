@@ -42,6 +42,7 @@
 - (void)viewDidAppear:(BOOL)animated {
     %orig;
     WCSetVisibleChatController(self);
+    WCGestureChatSearchDidAppear((UIViewController *)self);
     WCGestureHomeGroupsChatEntered(self);
     WCGestureChatTopBarUpdate(self);
 }

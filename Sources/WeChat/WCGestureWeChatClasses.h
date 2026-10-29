@@ -6,6 +6,28 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+// WeChat 8.0.79: MMTabBar.h / MMTabBarItemView.h / MMBadgeView.h.
+@interface MMTabBar : UITabBar
+@property (nonatomic, strong) UIView *backgroundView;
+@property (nonatomic, strong) NSMutableArray<UIView *> *tabBarItemViews;
+- (void)selectIndex:(long long)index;
+@end
+@interface MMTabBarItemView : UIView
+@property (nonatomic, strong) UIView *imageView;
+@property (nonatomic, strong) UIView *customIconView;
+@property (nonatomic, strong) UILabel *textLabel;
+@property (nonatomic, strong) UIView *badgeView;
+- (BOOL)isSelectedState;
+- (void)setSelected:(BOOL)selected;
+- (void)layoutIcon;
+- (void)relayoutIconAndBadge;
+- (void)reloadIconImage;
+@end
+@interface MMBadgeView : UIImageView
+@property (nonatomic, strong) UILabel *badgeLabel;
+- (void)setString:(id)string;
+@end
+
 @interface CMessageWrap : NSObject
 @end
 

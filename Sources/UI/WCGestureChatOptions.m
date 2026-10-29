@@ -160,6 +160,8 @@ void WCGestureEditChatOption(UIViewController *presenter, NSDictionary *option) 
         [presenter.navigationController pushViewController:WCGestureCreatePositionEditor(previewKind.integerValue) animated:YES];
     } else if ([type isEqualToString:@"moments-feed-preview"]) {
         [presenter.navigationController pushViewController:WCGestureCreateMomentsFeedPreviewController() animated:YES];
+    } else if ([type isEqualToString:@"floating-tab-bar"]) {
+        [presenter.navigationController pushViewController:WCGestureCreateFloatingTabBarSettingsController() animated:YES];
     } else if ([type isEqualToString:@"home-groups"]) {
         [presenter.navigationController pushViewController:WCGestureCreateHomeGroupsSettingsController() animated:YES];
     } else if ([type isEqualToString:@"custom-avatar"]) {

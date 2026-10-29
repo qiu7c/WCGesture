@@ -92,3 +92,5 @@
 #import "Sources/API/WCGestureHomeGroupsAPI.h"
 
 #import "Sources/API/WCGestureHomeSwipeAPI.h"
+
+#import "Sources/API/WCGestureFloatingTabBarAPI.h"

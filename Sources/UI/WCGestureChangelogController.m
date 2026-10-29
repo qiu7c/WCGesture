@@ -11,6 +11,9 @@
     self.tableView.rowHeight=UITableViewAutomaticDimension;self.tableView.estimatedRowHeight=64;
     self.tableView.allowsSelection=NO;
     self.updates=@[
+        @"聊天搜索退出改为清理本次保存的搜索视图，补充页面返回完成后的清理。",
+        @"调整分组指示条切换同步，修正朋友圈排版的旧高度残留和拉伸动画。",
+        @"新增悬浮底栏与实时预览，支持外观、透明度、圆角、拖动切换和角标调节。",
         @"调整扩展侧滑按钮与会话之间的接缝，补充搜索控制器根视图退出清理。",
         @"调整聊天搜索退出清理时机，在页面消失后清理残留背景。",
         @"补充首页扩展侧滑的背景快照和中间背景层清理。",
