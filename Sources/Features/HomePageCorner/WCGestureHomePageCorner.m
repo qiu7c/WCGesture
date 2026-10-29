@@ -60,6 +60,7 @@ BOOL WCGestureHomePageIsDark(UIView *view) {
     return view.traitCollection.userInterfaceStyle==UIUserInterfaceStyleDark;
 }
 UIColor *WCGestureHomePageCornerColor(UIView *view, BOOL surface) {
+    if (!surface && !WCGestureHomePageIsDark(view)) return [UIColor colorWithWhite:237.0/255.0 alpha:1];
     if (!surface) {
         // Read the host's current color; never replace its navigation styling.
         id color=WCTweakSafeValue(WCHomeCornerController,@"realNavigationBarBackgroundColor")
@@ -67,7 +68,7 @@ UIColor *WCGestureHomePageCornerColor(UIView *view, BOOL surface) {
         if ([color isKindOfClass:UIColor.class]) return color;
     }
     if (WCGestureHomePageIsDark(view)) return [UIColor colorWithWhite:surface?0.11:0.04 alpha:1];
-    return surface?UIColor.whiteColor:[UIColor colorWithWhite:0.95 alpha:1];
+    return surface?UIColor.whiteColor:[UIColor colorWithWhite:237.0/255.0 alpha:1];
 }
 CGFloat WCGestureHomePageCornerInset(void) {
     return WCHomeCornerInset;
@@ -246,15 +247,32 @@ CGFloat WCGestureHomePageCornerHeaderHeight(UITableView *table, NSInteger sectio
     BOOL previousContent=NO;
     for (NSInteger previous=0;previous<section;previous++) if ([source tableView:table numberOfRowsInSection:previous]) { previousContent=YES;break; }
     if (!previousContent) return WCGestureHomeGroupsEnabled()?original:MAX(original,WCHomeCornerGap);
-    return MAX(original,WCHomeCornerGap);
+    return original;
 }
 UIView *WCGestureHomePageCornerHeaderView(UITableView *table, NSInteger section, UIView *original) {
     if (table!=WCHomeCornerTable || !WCGestureHomePageCornerEnabled()) return original;
-    UIView *header=original;
-    CGFloat gap=WCGestureHomePageCornerHeaderHeight(table,section,0);
-    if (!header && gap>0) header=[[UIView alloc] initWithFrame:CGRectMake(0,0,table.bounds.size.width,gap)];
-    WCHomeCornerColorView(header,WCGestureHomePageCornerColor(table,NO));
-    return header;
+    WCHomeCornerColorView(original,WCGestureHomePageCornerColor(table,NO));
+    return original;
+}
+CGFloat WCGestureHomePageCornerFooterHeight(UITableView *table, NSInteger section, CGFloat original) {
+    if (table!=WCHomeCornerTable || !WCGestureHomePageCornerEnabled()) return original;
+    id<UITableViewDataSource> source=table.dataSource;
+    if (![source tableView:table numberOfRowsInSection:section]) return original;
+    NSInteger merged=WCGestureHomePageCornerMergedSection(table);
+    for (NSInteger next=section+1;next<3;next++) {
+        if (![source tableView:table numberOfRowsInSection:next]) continue;
+        if (merged!=NSNotFound && next<=merged) return 0;
+        return MAX(original,WCHomeCornerGap);
+    }
+    return original;
+}
+UIView *WCGestureHomePageCornerFooterView(UITableView *table, NSInteger section, UIView *original) {
+    if (table!=WCHomeCornerTable || !WCGestureHomePageCornerEnabled()) return original;
+    CGFloat gap=WCGestureHomePageCornerFooterHeight(table,section,0);
+    UIView *footer=original;
+    if (!footer && gap>0) footer=[[UIView alloc] initWithFrame:CGRectMake(0,0,table.bounds.size.width,gap)];
+    WCHomeCornerColorView(footer,WCGestureHomePageCornerColor(table,NO));
+    return footer;
 }
 void WCGestureHomePageCornerAttach(UIViewController *controller) {
     UITableView *table=WCTweakSafeValue(controller,@"m_tableView");

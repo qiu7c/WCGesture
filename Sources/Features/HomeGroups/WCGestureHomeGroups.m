@@ -546,16 +546,19 @@ void WCGestureHomeGroupsDidAppear(UIViewController *controller) {
     WCGestureHomeGroupsAttach(controller);
     WCHomeGroupBanner *banner=objc_getAssociatedObject(controller,&WCGroupBannerKey);
     if (!WCGestureHomeGroupsEnabled() || !banner || banner.initialPresentationFinished) return;
-    banner.initialPresentationFinished=YES;
+    id logic=WCTweakSafeValue(controller,@"m_mainFrameLogicController");
+    if (![WCTweakSafeValue(logic,@"m_bReadyToLoadData") boolValue]) return;
     // One initial correction after the native appearance/layout work, never on
     // ordinary returns to the homepage or while the user is scrolling.
     dispatch_async(dispatch_get_main_queue(),^{
         UITableView *table=banner.table;
-        if (!WCGestureHomeGroupsEnabled() || !controller.view.window || table.tableHeaderView!=banner
+        if (banner.initialPresentationFinished || !WCGestureHomeGroupsEnabled() || !controller.view.window || table.tableHeaderView!=banner
             || table.tracking || table.dragging || table.decelerating) return;
-        CGFloat groupTop=CGRectGetMinY(banner.stack.frame)-table.adjustedContentInset.top;
-        if (table.contentOffset.y>groupTop)
-            [table setContentOffset:CGPointMake(table.contentOffset.x,groupTop) animated:NO];
+        [table layoutIfNeeded];
+        CGFloat top=-table.adjustedContentInset.top;
+        if (table.contentOffset.y>top)
+            [table setContentOffset:CGPointMake(table.contentOffset.x,top) animated:NO];
+        banner.initialPresentationFinished=YES;
     });
 }
 void WCGestureHomeGroupsStyleCell(UIViewController *controller, UITableViewCell *cell, NSIndexPath *path) {
@@ -571,6 +574,7 @@ static void WCGroupScheduleReload(void) {
         if([controller respondsToSelector:update])((void(*)(id,SEL))objc_msgSend)(controller,update);
         WCGestureHomeGroupsAttach(controller);
         [UIView performWithoutAnimation:^{ [(UITableView *)WCTweakSafeValue(controller,@"m_tableView") reloadData]; }];
+        WCGestureHomeGroupsDidAppear(controller);
     });
 }
 void WCGestureHomeGroupsInvalidate(id logic) {

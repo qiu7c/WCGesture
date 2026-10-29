@@ -15,5 +15,7 @@ NSInteger WCGestureHomePageCornerMergedSection(UITableView *table);
 void WCGestureHomePageCornerLayoutGroup(UIView *banner, CGFloat nativeHeight, CGFloat height, BOOL joined);
 CGFloat WCGestureHomePageCornerHeaderHeight(UITableView *table, NSInteger section, CGFloat original);
 UIView *WCGestureHomePageCornerHeaderView(UITableView *table, NSInteger section, UIView *original);
+CGFloat WCGestureHomePageCornerFooterHeight(UITableView *table, NSInteger section, CGFloat original);
+UIView *WCGestureHomePageCornerFooterView(UITableView *table, NSInteger section, UIView *original);
 void WCGestureHomePageCornerSettingsChanged(NSString *key);
 void WCGestureHomePageCornerThemeChanged(void);

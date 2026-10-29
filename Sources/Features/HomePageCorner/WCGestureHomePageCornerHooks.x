@@ -1,6 +1,14 @@
 #import "Sources/API/WCGestureInternal.h"
 
 %hook NewMainFrameViewController
+- (CGFloat)tableView:(UITableView *)table heightForFooterInSection:(NSInteger)section {
+    CGFloat original=%orig(table,section);
+    return WCGestureHomePageCornerFooterHeight(table,section,original);
+}
+- (UIView *)tableView:(UITableView *)table viewForFooterInSection:(NSInteger)section {
+    UIView *original=%orig(table,section);
+    return WCGestureHomePageCornerFooterView(table,section,original);
+}
 - (void)changeNavigationFakeBackgroundColor {
     %orig;
     WCGestureHomePageCornerAttach((UIViewController *)self);
