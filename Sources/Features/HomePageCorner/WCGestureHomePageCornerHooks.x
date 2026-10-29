@@ -39,6 +39,10 @@
     %orig(background);
     WCGestureHomePageCornerLayoutCell((UITableViewCell *)self);
 }
+- (void)updateCopyedBackgroundView {
+    %orig;
+    WCGestureHomePageCornerLayoutSwipe(((UIView *)self).superview);
+}
 - (void)prepareForReuse {
     WCGestureHomePageCornerRestoreCell((UITableViewCell *)self);
     %orig;

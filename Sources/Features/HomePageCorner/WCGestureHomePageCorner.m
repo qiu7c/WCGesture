@@ -157,8 +157,11 @@ CGRect WCGestureHomePageCornerCellFrame(UITableViewCell *cell, CGRect frame) {
 }
 void WCGestureHomePageCornerRestoreCell(UITableViewCell *cell) {
     if ([cell isKindOfClass:NSClassFromString(@"NewMainFrameCell")]) {
+        UIView *item=WCTweakSafeValue(cell,@"m_itemView");
+        WCHomeCornerRestore(item.superview);
+        WCHomeCornerRestore(WCTweakSafeValue(cell,@"_copyedBackgroundView"));
         WCHomeCornerRestore(WCTweakSafeValue(cell,@"m_backGroundViewOfCell"));
-        WCHomeCornerRestore(WCTweakSafeValue(cell,@"m_itemView"));
+        WCHomeCornerRestore(item);
     }
     WCHomeCornerRestore(cell.backgroundView);WCHomeCornerRestore(cell.contentView);WCHomeCornerRestore(cell);
 }
@@ -204,11 +207,21 @@ void WCGestureHomePageCornerLayoutSwipe(UIView *container) {
     }
     if (!cell || !pull) return;
     if (!WCGestureHomePageCornerEnabled()) {
+        WCGestureHomePageCornerRestoreCell(cell);
         WCHomeCornerRestore(pull);WCHomeCornerRestore(container);return;
     }
     WCHomeCornerInsetView(container);
     WCHomeCornerColorView(container,UIColor.clearColor);
     WCHomeCornerColorView(pull,UIColor.clearColor);
+    // WeChat retains a separate menu background snapshot in its base cell.
+    // UIKit moves the whole cell, including that snapshot and the item wrapper.
+    // Scope the cleanup to the UIKit expansion container, not WeChat's menu.
+    WCHomeCornerHideNativeBackground(WCTweakSafeValue(cell,@"_copyedBackgroundView"));
+    WCHomeCornerHideNativeBackground(WCTweakSafeValue(cell,@"m_backGroundViewOfCell"));
+    UIView *item=WCTweakSafeValue(cell,@"m_itemView");
+    UIColor *surface=WCGestureHomePageCornerColor(cell,YES);
+    WCHomeCornerColorView(item.superview,surface);
+    WCHomeCornerColorView(cell.backgroundView,surface);
     WCHomeCornerState *cellState=objc_getAssociatedObject(cell,&WCHomeCornerStateKey);
     WCHomeCornerMask(container,cellState.corners);
     // Standard buttons have oversized background children (-502 / 576pt in
