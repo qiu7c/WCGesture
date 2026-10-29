@@ -1,19 +1,9 @@
 #import "Sources/API/WCGestureInternal.h"
 
 %hook NewMainFrameViewController
-- (id)navigationBarBackgroundColor {
-    if (WCGestureHomePageCornerEnabled())
-        return WCGestureHomePageCornerColor(((UIViewController *)self).view,NO);
-    return %orig;
-}
-- (id)realNavigationBarBackgroundColor {
-    if (WCGestureHomePageCornerEnabled())
-        return WCGestureHomePageCornerColor(((UIViewController *)self).view,NO);
-    return %orig;
-}
-- (BOOL)navigationBarBlurEffect {
-    if (WCGestureHomePageCornerEnabled()) return NO;
-    return %orig;
+- (void)changeNavigationFakeBackgroundColor {
+    %orig;
+    WCGestureHomePageCornerAttach((UIViewController *)self);
 }
 %end
 

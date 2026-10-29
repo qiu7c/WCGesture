@@ -45,9 +45,6 @@ static void WCHomeCornerReadSettings(void) {
 @property (nonatomic) BOOL originalHidden;
 @property (nonatomic) BOOL managesSeparator;
 @property (nonatomic) UITableViewCellSeparatorStyle separator;
-@property (nonatomic, copy) NSArray *navigationAppearances;
-@property (nonatomic, strong) UINavigationBarAppearance *navigationAppearance;
-@property (nonatomic, weak) UINavigationItem *navigationItem;
 @end
 @implementation WCHomeCornerState
 @end
@@ -63,6 +60,12 @@ BOOL WCGestureHomePageIsDark(UIView *view) {
     return view.traitCollection.userInterfaceStyle==UIUserInterfaceStyleDark;
 }
 UIColor *WCGestureHomePageCornerColor(UIView *view, BOOL surface) {
+    if (!surface) {
+        // Read the host's current color; never replace its navigation styling.
+        id color=WCTweakSafeValue(WCHomeCornerController,@"realNavigationBarBackgroundColor")
+            ?: WCTweakSafeValue(WCHomeCornerController,@"navigationBarBackgroundColor");
+        if ([color isKindOfClass:UIColor.class]) return color;
+    }
     if (WCGestureHomePageIsDark(view)) return [UIColor colorWithWhite:surface?0.11:0.04 alpha:1];
     return surface?UIColor.whiteColor:[UIColor colorWithWhite:0.95 alpha:1];
 }
@@ -99,14 +102,6 @@ static void WCHomeCornerColorView(UIView *view, UIColor *color) {
 static void WCHomeCornerRestore(UIView *view) {
     WCHomeCornerState *state=objc_getAssociatedObject(view,&WCHomeCornerStateKey);
     if (!state) return;
-    if (state.navigationAppearance) {
-        UINavigationItem *item=state.navigationItem;
-        NSArray *original=state.navigationAppearances;
-        item.standardAppearance=original[0]==NSNull.null?nil:original[0];
-        item.scrollEdgeAppearance=original[1]==NSNull.null?nil:original[1];
-        item.compactAppearance=original[2]==NSNull.null?nil:original[2];
-        if (@available(iOS 15.0,*)) item.compactScrollEdgeAppearance=original[3]==NSNull.null?nil:original[3];
-    }
     if (view.layer.mask==state.mask) view.layer.mask=state.originalMask;
     if ([view.backgroundColor isEqual:state.appliedColor]) view.backgroundColor=state.originalColor;
     if (state.managesHidden && view.hidden) view.hidden=state.originalHidden;
@@ -272,35 +267,7 @@ void WCGestureHomePageCornerAttach(UIViewController *controller) {
     if (![table isKindOfClass:UITableView.class]) return;
     WCHomeCornerController=controller;WCHomeCornerTable=table;
     WCHomeCornerSearch=WCTweakSafeValue(controller,@"searchBar");
-    // The navigation bar is shared with other pages. Override only this item.
-    WCHomeCornerState *state=WCHomeCornerStateForView(controller.view);
-    UINavigationItem *item=controller.navigationItem;
-    if (WCGestureHomePageCornerEnabled()) {
-        if (!state.navigationAppearance) {
-            UINavigationBarAppearance *compactEdge=nil;
-            if (@available(iOS 15.0,*)) compactEdge=item.compactScrollEdgeAppearance;
-            state.navigationAppearances=@[item.standardAppearance ?: NSNull.null,
-                item.scrollEdgeAppearance ?: NSNull.null,item.compactAppearance ?: NSNull.null,compactEdge ?: NSNull.null];
-            state.navigationItem=item;
-            state.navigationAppearance=[(item.standardAppearance ?: controller.navigationController.navigationBar.standardAppearance) copy] ?: [UINavigationBarAppearance new];
-            [state.navigationAppearance configureWithOpaqueBackground];
-            state.navigationAppearance.backgroundEffect=nil;
-            state.navigationAppearance.shadowColor=UIColor.clearColor;
-        }
-        UIColor *pageColor=WCGestureHomePageCornerColor(controller.view,NO);
-        if (![state.navigationAppearance.backgroundColor isEqual:pageColor]) {
-            state.navigationAppearance.backgroundColor=pageColor;
-            item.standardAppearance=state.navigationAppearance;
-            item.scrollEdgeAppearance=state.navigationAppearance;
-            item.compactAppearance=state.navigationAppearance;
-            if (@available(iOS 15.0,*)) item.compactScrollEdgeAppearance=state.navigationAppearance;
-        }
-        WCHomeCornerColorView(controller.view,pageColor);
-        WCHomeCornerColorView(WCTweakSafeValue(controller,@"fakeNavBarView"),pageColor);
-        WCGestureHomePageCornerLayoutSearch(WCHomeCornerSearch);
-    } else if (state.navigationAppearance) {
-        WCHomeCornerRestore(controller.view);
-    }
+    WCGestureHomePageCornerLayoutSearch(WCHomeCornerSearch);
     WCGestureHomePageCornerLayoutTable(table);
 }
 void WCGestureHomePageCornerSettingsChanged(NSString *key) {

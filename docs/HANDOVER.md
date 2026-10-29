@@ -1,5 +1,9 @@
 # One Wx 开发交接
 
+## 2026-10-29 保留原生顶栏，下方背景跟随
+
+用户反馈改顶栏后下拉小程序始终白色，要求不再修改系统顶栏。已删除首页navigationBarBackgroundColor/realNavigationBarBackgroundColor/navigationBarBlurEffect三个覆盖Hook、navigationItem四种appearance写入及保存恢复、根视图和fakeNavBarView着色。页面留白颜色改为读取微信原生realNavigationBarBackgroundColor，缺值时读navigationBarBackgroundColor，再沿用既有浅深回退；搜索外层/列表/分组外侧/分区间距使用该颜色，卡片表面保持白/深色。原生changeNavigationFakeBackgroundColor执行后仅更新下方搜索/列表，不修改其结果；原生布局入口继续更新分组。218文件括号/import、305唯一Hook与diff静态检查通过，未编译或真机验证，不查CI。按小修正自动提交推送授权处理。
+
 ## 2026-10-29 搜索框裁切/对齐与分组指示条跟随修正
 
 用户截图证实直接增大searchBoxContainer仍不对齐且下沿裁平。本次撤掉全部搜索输入容器frame/mask修改及专用纵向恢复字段，在首页WCSearchBar外层新增无交互背景surface：原生输入背景透明，文字/输入框/约束保持原状；圆角背景直接按主表内缩rect换算到搜索栏坐标，限定在搜索栏及裁切祖先的实际可见区域内，避免撑破内部stack裁切层。进入搜索隐藏自绘背景并恢复原生颜色，关闭圆角按已有恢复路径清理。分组update不再在指示条更新前缓存返回，仅未读角标统计走缓存；Select立即Attach同步位置，滑块动画从当前状态继续，目标不变不重复启动动画。无新key/Hook。218文件括号/import、307唯一Hook与diff静态检查通过；未编译/真机验证，不承诺截图问题已设备确认消除。按小修正自动提交推送授权处理。
