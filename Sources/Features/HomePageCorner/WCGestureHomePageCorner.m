@@ -149,7 +149,7 @@ void WCGestureHomePageCornerLayoutCell(UITableViewCell *cell) {
         WCHomeCornerColorView(WCTweakSafeValue(cell,@"m_itemView"),UIColor.clearColor);
         WCHomeCornerHideNativeBackground(WCTweakSafeValue(cell,@"m_backGroundViewOfCell"));
     }
-    NSInteger count=[WCHomeCornerTable numberOfRowsInSection:path.section];
+    NSInteger count=[WCHomeCornerTable.dataSource tableView:WCHomeCornerTable numberOfRowsInSection:path.section];
     UIRectCorner corners=(path.row==0?(UIRectCornerTopLeft|UIRectCornerTopRight):0)
         | (path.row==count-1?(UIRectCornerBottomLeft|UIRectCornerBottomRight):0);
     WCHomeCornerMask(cell,corners);
@@ -170,7 +170,8 @@ void WCGestureHomePageCornerLayoutTable(UITableView *table) {
     WCHomeCornerHideNativeBackground(table.backgroundView);
     WCHomeCornerState *state=WCHomeCornerStateForView(table);
     if (!state.managesSeparator) { state.separator=table.separatorStyle;state.managesSeparator=YES; }
-    table.separatorStyle=UITableViewCellSeparatorStyleNone;
+    if (table.separatorStyle!=UITableViewCellSeparatorStyleNone)
+        table.separatorStyle=UITableViewCellSeparatorStyleNone;
     for (UITableViewCell *cell in table.visibleCells) WCGestureHomePageCornerLayoutCell(cell);
 }
 void WCGestureHomePageCornerLayoutGroup(UIView *banner, CGFloat nativeHeight, CGFloat height) {
@@ -188,9 +189,13 @@ void WCGestureHomePageCornerLayoutGroup(UIView *banner, CGFloat nativeHeight, CG
     WCHomeCornerMask(surface,UIRectCornerAllCorners);
 }
 CGFloat WCGestureHomePageCornerHeaderHeight(UITableView *table, NSInteger section, CGFloat original) {
-    if (table!=WCHomeCornerTable || !WCGestureHomePageCornerEnabled() || section==0 || ![table numberOfRowsInSection:section]) return original;
+    if (table!=WCHomeCornerTable || !WCGestureHomePageCornerEnabled() || section==0) return original;
+    // Header measurement runs while UITableView builds its row data. Query the
+    // data source directly instead of reentering the table's row-data queries.
+    id<UITableViewDataSource> source=table.dataSource;
+    if (![source tableView:table numberOfRowsInSection:section]) return original;
     BOOL previousContent=NO;
-    for (NSInteger previous=0;previous<section;previous++) if ([table numberOfRowsInSection:previous]) { previousContent=YES;break; }
+    for (NSInteger previous=0;previous<section;previous++) if ([source tableView:table numberOfRowsInSection:previous]) { previousContent=YES;break; }
     if (!previousContent) return original;
     return MAX(original,WCHomeCornerGap);
 }

@@ -7,7 +7,8 @@
 }
 - (void)traitCollectionDidChange:(UITraitCollection *)previous {
     %orig(previous);
-    WCGestureHomePageCornerThemeChanged();
+    if ([self.traitCollection hasDifferentColorAppearanceComparedToTraitCollection:previous])
+        WCGestureHomePageCornerThemeChanged();
 }
 %end
 %hook NewMainFrameCell
@@ -48,8 +49,11 @@
 %end
 %hook MMDarkModeConfigUtil
 + (void)updateCurrentIsDarkMode:(BOOL)dark {
+    static BOOL hasMode, lastMode;
+    BOOL changed=!hasMode || lastMode!=dark;
+    hasMode=YES;lastMode=dark;
     %orig(dark);
-    WCGestureHomePageCornerThemeChanged();
+    if (changed) WCGestureHomePageCornerThemeChanged();
 }
 %end
 %ctor {
