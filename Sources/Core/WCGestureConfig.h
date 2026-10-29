@@ -7,6 +7,7 @@ FOUNDATION_EXPORT NSString *const WCGestureHomePageCornerEnabledKey;
 FOUNDATION_EXPORT NSString *const WCGestureHomePageCornerRadiusKey;
 FOUNDATION_EXPORT NSString *const WCGestureHomePageCornerInsetKey;
 FOUNDATION_EXPORT NSString *const WCGestureHomePageCornerGapKey;
+FOUNDATION_EXPORT NSString *const WCGestureHomePageCornerMergePinnedKey;
 
 /// Master switch key. When OFF, every gesture feature is disabled.
 FOUNDATION_EXPORT NSString *const WCGestureEnabledKey;

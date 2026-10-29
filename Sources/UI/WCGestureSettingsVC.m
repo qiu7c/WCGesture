@@ -865,6 +865,7 @@ static NSDictionary<NSString *, NSString *> *WCConfigShareKeys(void) {
         WCGestureHomePageCornerRadiusKey,
         WCGestureHomePageCornerInsetKey,
         WCGestureHomePageCornerGapKey,
+        WCGestureHomePageCornerMergePinnedKey,
         WCGestureHomeGroupsListKey,
         WCGestureHomeGroupsSelectedKey,
         WCGestureHomeGroupsBurnAfterReadingKey,

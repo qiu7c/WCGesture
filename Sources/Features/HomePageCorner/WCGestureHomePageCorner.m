@@ -10,11 +10,13 @@ static __weak UITableView *WCHomeCornerTable;
 static __weak UIView *WCHomeCornerSearch;
 static NSHashTable<UIView *> *WCHomeCornerViews;
 static BOOL WCHomeCornerLoaded, WCHomeCornerEnabled;
+static BOOL WCHomeCornerMergePinned;
 static CGFloat WCHomeCornerRadius, WCHomeCornerInset, WCHomeCornerGap;
 
 static void WCHomeCornerReadSettings(void) {
     NSUserDefaults *d=NSUserDefaults.standardUserDefaults;
     WCHomeCornerEnabled=[d boolForKey:WCGestureEnabledKey] && [d boolForKey:WCGestureHomePageCornerEnabledKey];
+    WCHomeCornerMergePinned=[d boolForKey:WCGestureHomePageCornerMergePinnedKey];
     CGFloat scale=WCGestureLayoutScaleFactor();
     id radiusValue=[d objectForKey:WCGestureHomePageCornerRadiusKey];
     id insetValue=[d objectForKey:WCGestureHomePageCornerInsetKey];
@@ -69,6 +71,13 @@ CGFloat WCGestureHomePageCornerInset(void) {
 }
 CGFloat WCGestureHomePageCornerGap(void) {
     return WCHomeCornerGap;
+}
+NSInteger WCGestureHomePageCornerMergedSection(UITableView *table) {
+    if (!WCGestureHomePageCornerEnabled() || !WCGestureHomeGroupsEnabled()) return NSNotFound;
+    // Native homepage sections: auxiliary banners, pinned chats, normal chats.
+    id<UITableViewDataSource> source=table.dataSource;
+    if (WCHomeCornerMergePinned && [source tableView:table numberOfRowsInSection:1]>0) return 1;
+    return [source tableView:table numberOfRowsInSection:0]>0?0:NSNotFound;
 }
 static WCHomeCornerState *WCHomeCornerStateForView(UIView *view) {
     WCHomeCornerState *state=objc_getAssociatedObject(view,&WCHomeCornerStateKey);
@@ -164,6 +173,9 @@ void WCGestureHomePageCornerLayoutCell(UITableViewCell *cell) {
     NSInteger count=[WCHomeCornerTable.dataSource tableView:WCHomeCornerTable numberOfRowsInSection:path.section];
     UIRectCorner corners=(path.row==0?(UIRectCornerTopLeft|UIRectCornerTopRight):0)
         | (path.row==count-1?(UIRectCornerBottomLeft|UIRectCornerBottomRight):0);
+    NSInteger merged=WCGestureHomePageCornerMergedSection(WCHomeCornerTable);
+    if (merged!=NSNotFound && path.section<=merged)
+        corners=path.section==merged && path.row==count-1?(UIRectCornerBottomLeft|UIRectCornerBottomRight):0;
     WCHomeCornerMask(cell,corners);
 }
 void WCGestureHomePageCornerLayoutChrome(UIView *view) {
@@ -208,7 +220,7 @@ void WCGestureHomePageCornerLayoutTable(UITableView *table) {
         table.separatorStyle=UITableViewCellSeparatorStyleNone;
     for (UITableViewCell *cell in table.visibleCells) WCGestureHomePageCornerLayoutCell(cell);
 }
-void WCGestureHomePageCornerLayoutGroup(UIView *banner, CGFloat nativeHeight, CGFloat height) {
+void WCGestureHomePageCornerLayoutGroup(UIView *banner, CGFloat nativeHeight, CGFloat height, BOOL joined) {
     UIView *surface=objc_getAssociatedObject(banner,&WCHomeCornerGroupSurfaceKey);
     if (!WCGestureHomePageCornerEnabled()) { surface.hidden=YES;return; }
     if (!surface) {
@@ -220,10 +232,13 @@ void WCGestureHomePageCornerLayoutGroup(UIView *banner, CGFloat nativeHeight, CG
     CGFloat inset=WCGestureHomePageCornerInset();
     surface.frame=CGRectMake(inset,nativeHeight,MAX(0,banner.bounds.size.width-2*inset),height);
     surface.backgroundColor=WCGestureHomePageCornerColor(banner,YES);
-    WCHomeCornerMask(surface,UIRectCornerAllCorners);
+    WCHomeCornerMask(surface,joined?(UIRectCornerTopLeft|UIRectCornerTopRight):UIRectCornerAllCorners);
 }
 CGFloat WCGestureHomePageCornerHeaderHeight(UITableView *table, NSInteger section, CGFloat original) {
-    if (table!=WCHomeCornerTable || !WCGestureHomePageCornerEnabled() || section==0) return original;
+    if (table!=WCHomeCornerTable || !WCGestureHomePageCornerEnabled()) return original;
+    NSInteger merged=WCGestureHomePageCornerMergedSection(table);
+    if (merged!=NSNotFound && section<=merged) return 0;
+    if (section==0) return original;
     // Header measurement runs while UITableView builds its row data. Query the
     // data source directly instead of reentering the table's row-data queries.
     id<UITableViewDataSource> source=table.dataSource;

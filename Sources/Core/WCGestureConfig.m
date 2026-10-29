@@ -4,6 +4,7 @@ NSString *const WCGestureHomePageCornerEnabledKey = @"com.qiu7c.onewx.home.corne
 NSString *const WCGestureHomePageCornerRadiusKey = @"com.qiu7c.onewx.home.corner.radius";
 NSString *const WCGestureHomePageCornerInsetKey = @"com.qiu7c.onewx.home.corner.inset";
 NSString *const WCGestureHomePageCornerGapKey = @"com.qiu7c.onewx.home.corner.gap";
+NSString *const WCGestureHomePageCornerMergePinnedKey = @"com.qiu7c.onewx.home.corner.mergePinned";
 
 NSString *const WCGestureHomeSwipeEnabledKey = @"com.qiu7c.onewx.home.swipe.enabled";
 NSString *const WCGestureMultiSelectEnabledKey = @"com.qiu7c.onewx.chat.multi-select.enabled";
@@ -409,6 +410,7 @@ void WCGestureRegisterDefaults(void) {
             WCGestureHomePageCornerRadiusKey: @16,
             WCGestureHomePageCornerInsetKey: @16,
             WCGestureHomePageCornerGapKey: @8,
+            WCGestureHomePageCornerMergePinnedKey: @NO,
             WCGestureVirtualVideoEnabledKey: @NO,
             WCGestureVirtualVideoAudioKey: @NO,
             WCGestureVirtualVideoMixMicKey: @NO,

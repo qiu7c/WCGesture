@@ -16,7 +16,7 @@ static NSDictionary *WCCornerNumber(NSString *title, NSString *key, double maxim
     self.tableView.tableFooterView=[[UIView alloc] initWithFrame:CGRectMake(0,0,0,12)];
     self.tableView.backgroundColor = UIColor.systemGroupedBackgroundColor; self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
     self.sections = @[
-        @[WCCornerSwitch(@"首页圆角",WCGestureHomePageCornerEnabledKey),WCCornerNumber(@"圆角程度",WCGestureHomePageCornerRadiusKey,48),WCCornerNumber(@"左右边距",WCGestureHomePageCornerInsetKey,32),WCCornerNumber(@"卡片间距",WCGestureHomePageCornerGapKey,24)],
+        @[WCCornerSwitch(@"首页圆角",WCGestureHomePageCornerEnabledKey),WCCornerSwitch(@"合并置顶",WCGestureHomePageCornerMergePinnedKey),WCCornerNumber(@"圆角程度",WCGestureHomePageCornerRadiusKey,48),WCCornerNumber(@"左右边距",WCGestureHomePageCornerInsetKey,32),WCCornerNumber(@"卡片间距",WCGestureHomePageCornerGapKey,24)],
         @[WCCornerSwitch(@"全局头像圆角",WCGestureGlobalAvatarRoundingEnabledKey),WCCornerNumber(@"头像圆角程度 (%)",WCGestureGlobalAvatarCornerPercentKey,100),@{@"title":@"整页头像预览与调节",@"previewKind":@(WCGesturePreviewAvatarRounding)}],
         @[WCCornerSwitch(@"聊天输入栏圆角",WCGestureChatInputRoundingEnabledKey),WCCornerSwitch(@"输入框内部圆角",WCGestureChatInputInnerRoundingKey),WCCornerNumber(@"内部圆角程度",WCGestureChatInputInnerRadiusKey,40),WCCornerSwitch(@"外部工具栏圆角",WCGestureChatInputOuterRoundingKey),WCCornerNumber(@"外部圆角程度",WCGestureChatInputOuterRadiusKey,40),@{@"title":@"整页圆角预览与调节",@"previewKind":@(WCGesturePreviewInputRounding)}],
         @[WCCornerSwitch(@"朋友圈圆角",WCGestureMomentsImageCornerEnabledKey),WCCornerNumber(@"圆角程度",WCGestureMomentsImageCornerRadiusKey,40),@{@"title":@"朋友圈预览与调节",@"momentsPreview":@YES}],

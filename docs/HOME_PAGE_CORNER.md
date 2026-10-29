@@ -6,6 +6,7 @@
 
 ## 显示与配色
 
+- 分组和系统横幅相连，只在合并区域顶端/末端保留外圆角，去除内部间距。首页圆角下新增“合并置顶”，默认关闭；打开后置顶列表接入合并区域，普通会话仍独立。没有横幅/置顶时按实际非空分区收尾；未开启分组时保持各分区独立。新key为`com.qiu7c.onewx.home.corner.mergePinned`，已补Core/default/口令导出。
 - 首页搜索输入容器使用同一半径和左右边距，搜索区外层使用页面留白色；只处理首页持有的WCSearchBar，激活原生搜索时恢复。首页navigationItem四种背景外观透明，保留标题/按钮并与页面底色衔接，不改共享导航栏；关闭恢复原外观。
 - 会话按UITableView当前数据源的section首/末行生成上/下圆角；单行四角，中间行保持直边。当前表格已经经过HomeGroups投影，因此不按未筛选行号、固定section编号或屏外cell的无障碍标签判断。
 - 分组导航使用自己的背景surface，与列表使用同一边距和半径；按钮、角标和手势保留，原生tableHeaderView仍保留在wrapper中。设备横条和置顶折叠条通过已有MFBannerBtn/MainFrameSectionFoldView布局入口同步，作为独立原生对象处理。
