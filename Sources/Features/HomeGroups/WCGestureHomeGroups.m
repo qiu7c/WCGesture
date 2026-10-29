@@ -365,6 +365,7 @@ static void WCGroupPlaceSelection(UIView *view, CGRect frame, BOOL animated) {
     }
 }
 - (void)chosen:(UIButton *)button {
+    WCGroupMainController=self.controller;
     WCGestureHomeGroupsSelect(WCGestureHomeGroupsList()[button.tag][@"id"]);
     if ([NSUserDefaults.standardUserDefaults boolForKey:WCGestureHomeGroupsButtonHapticKey]) [[[UISelectionFeedbackGenerator alloc] init] selectionChanged];
 }
@@ -393,6 +394,7 @@ static void WCGroupPlaceSelection(UIView *view, CGRect frame, BOOL animated) {
         if (![NSUserDefaults.standardUserDefaults boolForKey:WCGestureHomeGroupsContinuousKey]) return;
         index=(index+(NSInteger)groups.count)%(NSInteger)groups.count;
     }
+    WCGroupMainController=self.controller;
     WCGestureHomeGroupsSelect(groups[index][@"id"]);
     if ([NSUserDefaults.standardUserDefaults boolForKey:WCGestureHomeGroupsHapticKey]) [[[UISelectionFeedbackGenerator alloc] init] selectionChanged];
 }
@@ -522,9 +524,9 @@ static void WCGroupPlaceSelection(UIView *view, CGRect frame, BOOL animated) {
 @end
 
 void WCGestureHomeGroupsAttach(UIViewController *controller) {
-    WCGroupMainController=controller;
     UITableView *table=WCTweakSafeValue(controller,@"m_tableView");
     if (![table isKindOfClass:UITableView.class]) return;
+    WCGroupMainController=controller;
     WCHomeGroupBanner *banner=objc_getAssociatedObject(controller,&WCGroupBannerKey);
     if (!WCGestureHomeGroupsEnabled()) {
         if (table.tableHeaderView==banner) { banner.originalHeader.autoresizingMask=banner.originalMask;table.tableHeaderView=banner.originalHeader; }
@@ -532,12 +534,22 @@ void WCGestureHomeGroupsAttach(UIViewController *controller) {
         banner.left.enabled=banner.right.enabled=NO;return;
     }
     if (!banner) {
-        banner=[[WCHomeGroupBanner alloc] initWithFrame:CGRectZero];banner.controller=controller;banner.table=table;
+        banner=[[WCHomeGroupBanner alloc] initWithFrame:CGRectZero];banner.controller=controller;
         banner.left=[[UISwipeGestureRecognizer alloc] initWithTarget:banner action:@selector(swipe:)];banner.left.direction=UISwipeGestureRecognizerDirectionLeft;banner.left.delegate=banner;
         banner.right=[[UISwipeGestureRecognizer alloc] initWithTarget:banner action:@selector(swipe:)];banner.right.direction=UISwipeGestureRecognizerDirectionRight;banner.right.delegate=banner;
+        objc_setAssociatedObject(controller,&WCGroupBannerKey,banner,OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    // The controller can replace m_tableView while retaining this banner.
+    // Refresh against the table actually hosting it, not the released old one.
+    if (banner.table!=table) {
+        if (banner.table.tableHeaderView==banner) {
+            banner.originalHeader.autoresizingMask=banner.originalMask;
+            banner.table.tableHeaderView=banner.originalHeader;
+            banner.originalHeader=nil;
+        }
+        banner.table=table;banner.version=0;
         [table addGestureRecognizer:banner.left];[table addGestureRecognizer:banner.right];
         [table.panGestureRecognizer requireGestureRecognizerToFail:banner.left];[table.panGestureRecognizer requireGestureRecognizerToFail:banner.right];
-        objc_setAssociatedObject(controller,&WCGroupBannerKey,banner,OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
     CGPoint previousOffset=table.contentOffset;
     CGFloat previousInset=table.adjustedContentInset.top;

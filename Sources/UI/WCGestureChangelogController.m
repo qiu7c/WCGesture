@@ -11,6 +11,10 @@
     self.tableView.rowHeight=UITableViewAutomaticDimension;self.tableView.estimatedRowHeight=64;
     self.tableView.allowsSelection=NO;
     self.updates=@[
+        @"修正悬浮底栏布局覆盖未读角标显示状态的问题。",
+        @"调整悬浮底栏返回时的显示与布局时机，减少原生底栏闪现。",
+        @"修正列表重建后分组指示条和角标停止刷新的问题。",
+        @"调整悬浮底栏图标与文字的整体居中，同步修正预览。",
         @"聊天搜索退出改为清理本次保存的搜索视图，补充页面返回完成后的清理。",
         @"调整分组指示条切换同步，修正朋友圈排版的旧高度残留和拉伸动画。",
         @"新增悬浮底栏与实时预览，支持外观、透明度、圆角、拖动切换和角标调节。",

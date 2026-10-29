@@ -159,7 +159,11 @@ static WCFloatSavedView *WCFloatRemember(WCFloatBarState *state, UIView *view) {
 static void WCFloatRestoreViews(WCFloatBarState *state) {
     for (UIView *view in state.saved) {
         WCFloatSavedView *saved = [state.saved objectForKey:view];
-        view.frame = saved.frame; view.hidden = saved.hidden; view.alpha = saved.alpha;
+        view.frame = saved.frame;
+        // Badge visibility belongs to native unread updates; we only change its frame.
+        if (![view isKindOfClass:NSClassFromString(@"MMBadgeView")]) {
+            view.hidden = saved.hidden; view.alpha = saved.alpha;
+        }
         if (saved.colored) {
             view.tintColor = saved.tint;
             if ([view isKindOfClass:UILabel.class]) ((UILabel *)view).textColor = saved.textColor;
@@ -237,7 +241,7 @@ BOOL WCGestureFloatingTabBarBeginLayout(UITabBar *bar) {
     WCFloatBarState *state = WCFloatState(bar, WCFloat.enabled);
     if (!state || state.inLayout || (!WCFloat.enabled && !state.surface)) return NO;
     state.inLayout = YES;
-    WCFloatRestoreViews(state);
+    [UIView performWithoutAnimation:^{ WCFloatRestoreViews(state); }];
     if (!WCFloat.enabled) {
         state.dragging = NO;
         [state.surface removeFromSuperview]; state.surface = nil;
@@ -246,6 +250,15 @@ BOOL WCGestureFloatingTabBarBeginLayout(UITabBar *bar) {
         WCFloatRestoreAppearance(state);
     }
     return YES;
+}
+
+void WCGestureFloatingTabBarPrepareForDisplay(UITabBar *bar) {
+    if (!WCFloatLoaded) WCFloatReadSettings();
+    if (!WCFloat.enabled || WCFloatState(bar, NO).inLayout) return;
+    [UIView performWithoutAnimation:^{
+        [bar setNeedsLayout];
+        [bar layoutIfNeeded];
+    }];
 }
 
 void WCGestureFloatingTabBarEndLayout(UITabBar *bar) {
@@ -333,17 +346,45 @@ void WCGestureFloatingTabBarButtonLayout(UIView *button) {
     }
 }
 
+static CGFloat WCFloatContentOffset(CGRect icon, CGRect title, CGRect bounds) {
+    CGRect content=CGRectIsNull(title)?icon:CGRectUnion(icon,title);
+    return CGRectGetMidY(bounds)-CGRectGetMidY(content);
+}
+
 void WCGestureFloatingTabBarItemLayout(UIView *view) {
     WCFloatBarState *state = WCFloatStateForView(view);
     if (!WCFloat.enabled || !state.surface || state.inLayout || ![view isKindOfClass:NSClassFromString(@"MMTabBarItemView")]) return;
     MMTabBarItemView *item = (MMTabBarItemView *)view;
     if (WCFloat.hideText) {
         WCFloatRemember(state, item.textLabel); item.textLabel.hidden = YES; item.textLabel.alpha = 0;
-        UIView *icons[] = {item.imageView, item.customIconView};
-        for (NSUInteger i = 0; i < 2; i++) {
-            UIView *icon = icons[i]; if (!icon.superview) continue;
-            WCFloatRemember(state, icon); CGPoint center = icon.center; center.y = CGRectGetMidY(icon.superview.bounds); icon.center = center;
+    }
+    UIView *icon=item.customIconView;
+    if (!icon.superview || icon.hidden || CGRectIsEmpty(icon.bounds)) icon=item.imageView;
+    if (icon.superview && !CGRectIsEmpty(icon.bounds)) {
+        UILabel *title=item.textLabel;
+        BOOL showsTitle=!WCFloat.hideText && title.superview && !title.hidden && title.text.length && !CGRectIsEmpty(title.bounds);
+        WCFloatSavedView *iconState=WCFloatRemember(state,icon);
+        if (CGRectIsEmpty(iconState.frame)) iconState.frame=icon.frame;
+        CGRect iconRect=[icon.superview convertRect:iconState.frame toView:item];
+        CGRect titleRect=CGRectNull;
+        if (showsTitle) {
+            WCFloatSavedView *titleState=WCFloatRemember(state,title);
+            if (CGRectIsEmpty(titleState.frame)) titleState.frame=title.frame;
+            titleRect=[title.superview convertRect:titleState.frame toView:item];
         }
+        CGFloat contentOffset=WCFloatContentOffset(iconRect,titleRect,item.bounds);
+        // Always derive placement from native snapshots, so nested layoutIcon /
+        // relayoutIconAndBadge callbacks cannot repeatedly add this offset.
+        iconRect.origin.x=CGRectGetMidX(item.bounds)-iconRect.size.width/2;
+        iconRect.origin.y+=contentOffset;
+        if (showsTitle) {
+            titleRect.size.width=MIN(titleRect.size.width,item.bounds.size.width);
+            titleRect.origin.x=CGRectGetMidX(item.bounds)-titleRect.size.width/2;
+        }
+        [UIView performWithoutAnimation:^{
+            icon.frame=[item convertRect:iconRect toView:icon.superview];
+            if (showsTitle) title.frame=[item convertRect:CGRectOffset(titleRect,0,contentOffset) toView:title.superview];
+        }];
     }
     NSString *hex = [NSUserDefaults.standardUserDefaults stringForKey:WCGestureFloatingTabBarSelectedColorKey];
     if ([item isSelectedState] && hex.length) {
@@ -511,10 +552,13 @@ void WCGestureFloatingTabBarThemeChanged(void) {
 - (void)layoutSubviews {
     [super layoutSubviews];
     CGFloat size = 24 * WCGestureLayoutScaleFactor();
-    self.imageView.frame = CGRectMake((self.bounds.size.width-size)/2, (self.bounds.size.height-size)/2-(WCFloat.hideText?0:6), size, size);
+    CGRect icon=CGRectMake((self.bounds.size.width-size)/2,0,size,size);
+    CGRect title=WCFloat.hideText?CGRectNull:CGRectMake(0,size+2,self.bounds.size.width,14);
+    CGFloat offset=WCFloatContentOffset(icon,title,self.bounds);
+    self.imageView.frame=CGRectOffset(icon,0,offset);
     self.imageView.contentMode = UIViewContentModeScaleAspectFit;
     self.titleLabel.hidden = WCFloat.hideText;
-    self.titleLabel.frame = CGRectMake(0, CGRectGetMaxY(self.imageView.frame)+2, self.bounds.size.width, 14);
+    if (!WCFloat.hideText) self.titleLabel.frame=CGRectOffset(title,0,offset);
     self.titleLabel.textAlignment = NSTextAlignmentCenter;
     BOOL dot = self.tag == 2;
     self.badge.text = dot ? @"" : @"1";

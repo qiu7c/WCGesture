@@ -3,8 +3,22 @@
 %hook MMTabBar
 - (void)layoutSubviews {
     BOOL apply = WCGestureFloatingTabBarBeginLayout((UITabBar *)self);
-    %orig;
-    if (apply) WCGestureFloatingTabBarEndLayout((UITabBar *)self);
+    if (apply) {
+        [UIView performWithoutAnimation:^{
+            %orig;
+            WCGestureFloatingTabBarEndLayout((UITabBar *)self);
+        }];
+    } else {
+        %orig;
+    }
+}
+- (void)setHidden:(BOOL)hidden {
+    if (!hidden && [(UITabBar *)self isHidden]) WCGestureFloatingTabBarPrepareForDisplay((UITabBar *)self);
+    %orig(hidden);
+}
+- (void)willMoveToWindow:(UIWindow *)window {
+    %orig(window);
+    if (window) WCGestureFloatingTabBarPrepareForDisplay((UITabBar *)self);
 }
 - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
     UIView *original = %orig(point, event);

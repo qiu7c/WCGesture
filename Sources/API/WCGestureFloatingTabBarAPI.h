@@ -1,6 +1,7 @@
 #import <UIKit/UIKit.h>
 
 void WCGestureFloatingTabBarInstall(void);
+void WCGestureFloatingTabBarPrepareForDisplay(UITabBar *bar);
 BOOL WCGestureFloatingTabBarBeginLayout(UITabBar *bar);
 void WCGestureFloatingTabBarEndLayout(UITabBar *bar);
 id WCGestureFloatingTabBarAppearance(UITabBar *bar, SEL setter, id value);
