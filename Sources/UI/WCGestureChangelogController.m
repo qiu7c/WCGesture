@@ -11,6 +11,7 @@
     self.tableView.rowHeight=UITableViewAutomaticDimension;self.tableView.estimatedRowHeight=64;
     self.tableView.allowsSelection=NO;
     self.updates=@[
+        @"加厚首页搜索框并对齐卡片边缘，统一顶栏和列表背景色。",
         @"分组与系统横幅合并圆角，新增“合并置顶”开关。",
         @"首页搜索框同步圆角与边距，调整顶部导航背景衔接。",
         @"修正首页圆角的布局重入和重复外观刷新问题。",

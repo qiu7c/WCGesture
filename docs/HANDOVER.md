@@ -1,5 +1,9 @@
 # One Wx 开发交接
 
+## 2026-10-29 搜索框加厚、边缘对齐与首页背景统一
+
+用户截图反馈搜索框偏薄、比下方卡片更宽，顶栏仍有灰色色差。搜索容器改为40×布局比例目标高度，在原搜索栏可用高度内上下居中；先在表格坐标中生成完整内缩矩形，再整体转换到输入容器父视图，避免坐标换算后再加边距；恢复状态增加搜索容器纵向frame恢复。首页navigationItem改为同页面留白色的不透明背景，fakeNavBarView同步；首页特有navigationBarBackgroundColor/realNavigationBarBackgroundColor返回同色、navigationBarBlurEffect关闭模糊，签名与MMTabBarBaseViewController→MMUIViewController继承链核对。不改共享导航栏，不加key，不做reload轮询；颜色变化时同步四种appearance。218文件括号/import、307唯一Hook及diff静态检查通过，未编译/真机验证；按用户小修正自动提交推送规则处理。
+
 ## 2026-10-29 分组/系统横幅合并圆角与可选合并置顶（未提交）
 
 提交说明：用户已明确授权提交推送本节全部改动及更新日志；下方未提交描述为实施时记录。版本仍1.0.0，静态检查通过，未编译、未真机验证，不主动查询CI。
